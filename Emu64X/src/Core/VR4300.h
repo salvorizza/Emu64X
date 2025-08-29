@@ -1,0 +1,482 @@
+#pragma once
+
+#include <cstdint>
+#include <array>
+#include <string>
+#include <functional>
+#include <format>
+#include <queue>
+
+#include "Base/Base.h"
+#include "Base/Bus.h"
+
+namespace esx {
+
+	/*#define CO(x) (((x) >> 25) & 0x1)
+	#define CO_N(x) (((x) >> 26) & 0x3)
+	#define COP_FUNC(x) ((x) & 0x1F)*/
+
+	constexpr U32 EXCEPTION_HANDLER_ADDRESS = 0x80000080;
+	constexpr U32 BREAKPOINT_EXCEPTION_HANDLER_ADDRESS = 0x80000040;
+	#define ADDRESS_UNALIGNED(x,type) (((x) & (sizeof(type) - 1)) != 0x0)
+	#define OVERFLOW_ADD32(a,b,s) (~(((a) & 0x80000000) ^ ((b) & 0x80000000)) & (((a) & 0x80000000) ^ ((s) & 0x80000000)))
+	#define OVERFLOW_SUB32(a,b,s) (((a) & 0x80000000) ^ ((b) & 0x80000000)) & (((a) & 0x80000000) ^ ((s) & 0x80000000))
+
+	#define ESX_CORE_BIOS_LOG_TRACE(x,...) //ESX_CORE_LOG_TRACE(x,__VA_ARGS__)
+
+	#define PRINT_LOAD(x)
+	#define PRINT_STORE(x,v)
+
+	#ifdef IO_TRACE
+		#define PRINT_IO_LOAD(x, o) \
+		if (x >= 0x1F801000 && x < 0x1F802000) { \
+			const StringView& ioName = IOMap.contains(x & ~0x1) ? IOMap.at(x & ~0x1) : IOMap.at(x & ~0x3); \
+			ESX_CORE_LOG_INFO("{:08x}h - I/O Read from {}[{:08x}h] value {:08x}h", mCurrentInstruction.Address, ioName, x, o); \
+		}
+
+		#define PRINT_IO_STORE(x, v) \
+		if (x >= 0x1F801000 && x < 0x1F802000) { \
+			const StringView& ioName = IOMap.contains(x & ~0x1) ? IOMap.at(x & ~0x1) : IOMap.at(x & ~0x3); \
+			ESX_CORE_LOG_INFO("{:08x}h - I/O Write {:08x}h to {}[{:08x}h]", mCurrentInstruction.Address, v, ioName, x); \
+		}
+	#else
+		#define PRINT_IO_LOAD(x, o)
+		#define PRINT_IO_STORE(x, v)
+	#endif
+
+	enum class GPRRegister : U8 {
+		zero,
+		at,
+		v0, 
+		v1,
+		a0,a1,a2,a3,
+		t0,t1,t2,t3,t4,t5,t6,t7,
+		s0,s1,s2,s3,s4,s5,s6,s7,
+		t8,t9,
+		k0,k1,
+		gp,
+		sp,
+		fp,
+		ra
+	};
+
+	/*
+	  cop0r0-r2   - N/A
+	  cop0r3      - BPC - Breakpoint on execute (R/W)
+	  cop0r4      - N/A
+	  cop0r5      - BDA - Breakpoint on data access (R/W)
+	  cop0r6      - JUMPDEST - Randomly memorized jump address (R)
+	  cop0r7      - DCIC - Breakpoint control (R/W)
+	  cop0r8      - BadVaddr - Bad Virtual Address (R)
+	  cop0r9      - BDAM - Data Access breakpoint mask (R/W)
+	  cop0r10     - N/A
+	  cop0r11     - BPCM - Execute breakpoint mask (R/W)
+	  cop0r12     - SR - System status register (R/W)
+	  cop0r13     - CAUSE - Describes the most recently recognised exception (R)
+	  cop0r14     - EPC - Return Address from Trap (R)
+	  cop0r15     - PRID - Processor ID (R)
+	  cop0r16-r31 - Garbage
+	  cop0r32-r63 - N/A - None such (Control regs)
+	*/
+	enum class COP0Register : U8 {
+		BPC = 3, //Breakpoint on Execute Address (R/W)
+		BDA = 5, //Breakpoint on Data Access Address (R/W)
+		JumpDest = 6, //Randomly memorized jump address
+		DCIC = 7, //Breakpoint control (R/W)
+		BadVAddr = 8, //Stores virtual address for the most recent address related exception
+		BDAM = 9, //Breakpoint on Data Access Mask (R/W)
+		BPCM = 11, //Breakpoint on Execute Mask (R/W)
+		SR = 12, //Process status register/Used for exception handling
+		Cause = 13, //Exception cause register/Stores the type of exception that last occurred
+		EPC = 14, //(ExceptionPC) Contains address of instruction that caused the exception
+		PRId = 15 //Processor identification and revision.
+	};
+
+	enum class ExceptionType : U8 {
+		Interrupt = 0x00,
+		AddressErrorLoad = 0x04,
+		AddressErrorStore = 0x05,
+		Syscall = 0x08,
+		Breakpoint = 0x09,
+		ReservedInstruction = 0x0A,
+		CoprocessorUnusable = 0x0B,
+		ArithmeticOverflow = 0x0C
+	};
+
+	struct Instruction;
+	class VR4300;
+	class Coprocessor;
+	typedef void(VR4300::*ExecuteFunction)();
+	typedef void(Coprocessor::*CoprocessorExecuteFunction)(VR4300*);
+	class InterruptControl;
+
+	struct RegisterIndex {
+		I32 Value;
+
+		RegisterIndex() : Value(-1) {}
+		explicit RegisterIndex(U8 value) : Value(value) {}
+		RegisterIndex(COP0Register r) : Value((U8)r) {}
+		RegisterIndex(GPRRegister r) : Value((U8)r) {}
+
+		operator U8() {
+			return Value;
+		}
+	};
+
+	struct Instruction {
+		U32 Address = 0;
+		U32 binaryInstruction = 0;
+		ExecuteFunction Execute = nullptr;
+
+		inline U8 Opcode() const {
+			return binaryInstruction >> 26;
+		}
+
+		RegisterIndex RegisterSource() const {
+			return RegisterIndex(((binaryInstruction >> 21) & 0x1F));
+		}
+
+		RegisterIndex RegisterTarget() const {
+			return RegisterIndex(((binaryInstruction >> 16) & 0x1F));
+		}
+
+		RegisterIndex RegisterDestination() const  {
+			return RegisterIndex(((binaryInstruction >> 11) & 0x1F));
+		}
+
+		U8 ShiftAmount() const  {
+			return ((binaryInstruction >> 6) & 0x1F);
+		}
+
+		U8 Function() const {
+			return (binaryInstruction & 0x3F);
+		}
+
+		U16 Immediate() const {
+			return (binaryInstruction & 0xFFFF);
+		}
+
+		I32 ImmediateSE() const {
+			return static_cast<I32>(static_cast<I16>(Immediate()));
+		}
+
+		U32 Code() const {
+			return ((binaryInstruction >> 6) & 0xFFFFF);
+		}
+
+		U32 PseudoAddress() const {
+			return (binaryInstruction & 0x3FFFFFF);
+		}
+
+		U32 Immediate25() const {
+			return PseudoAddress();
+		}
+
+		String Mnemonic(const SharedPtr<VR4300>& cpuState) const;
+	};
+
+	class CPUStatusPanel;
+	class DisassemblerPanel;
+
+	struct InstructionCache {
+		U32 Word = 0;
+	};
+
+	template<size_t W>
+	struct CacheLine {
+		U32 Tag = 0;
+		BIT Valid = ESX_FALSE;
+		BIT Dirty = ESX_FALSE;
+		Array<InstructionCache, W> Instructions = {};
+	};
+
+	template<size_t L, size_t W>
+	struct Cache {
+		Array<CacheLine<W>, L> CacheLines = {};
+	};
+
+	using iCache = Cache<512, 8>;
+	using dCache = Cache<512, 4>;
+
+	struct StoreOperation {
+		U32 Address = 0;
+		U32 Data = 0;
+		U32 Size = 0;
+	};
+
+	class Coprocessor {
+	public:
+		Coprocessor() = default;
+		virtual ~Coprocessor() = default;
+
+		void NA(VR4300* cpu) { cpu->raiseException(ExceptionType::CoprocessorUnusable); }
+		virtual void MF(VR4300* cpu) = 0;
+		virtual void DMF(VR4300* cpu) = 0;
+		virtual void CF(VR4300* cpu) = 0;
+		virtual void MT(VR4300* cpu) = 0;
+		virtual void DMT(VR4300* cpu) = 0;
+		virtual void CT(VR4300* cpu) = 0;
+		virtual void BCF(VR4300* cpu) = 0;
+		virtual void BCT(VR4300* cpu) = 0;
+		virtual void BCFL(VR4300* cpu) = 0;
+		virtual void BCTL(VR4300* cpu) = 0;
+		virtual void CO(VR4300* cpu) = 0;
+	};
+
+	class SystemControlCoprocessor : public Coprocessor {
+	public:
+		SystemControlCoprocessor() = default;
+		~SystemControlCoprocessor() = default;
+
+		virtual void MF(VR4300* cpu) override;
+		virtual void DMF(VR4300* cpu) override;
+		virtual void CF(VR4300* cpu) override;
+		virtual void MT(VR4300* cpu) override;
+		virtual void DMT(VR4300* cpu) override;
+		virtual void CT(VR4300* cpu) override;
+		virtual void BCF(VR4300* cpu) override;
+		virtual void BCT(VR4300* cpu) override;
+		virtual void BCFL(VR4300* cpu) override;
+		virtual void BCTL(VR4300* cpu) override;
+		virtual void CO(VR4300* cpu) override;
+
+	private:
+		Array<U32, 64> mRegisters;
+	};
+	
+	class VR4300 : public BusDevice {
+	public:
+		friend class CPUStatusPanel;
+		friend class DisassemblerPanel;
+		friend class TTYPanel;
+		friend class Coprocessor;
+
+		VR4300();
+		~VR4300();
+
+		virtual void init() override;
+		void clock();
+		U32 fetch(U32 address);
+		void decode(Instruction& result, U32 instruction, U32 address, BIT suppressException = ESX_FALSE);
+		virtual void reset();
+
+		template<typename T>
+		U32 load(U32 address, BIT& exception) {
+			if (ADDRESS_UNALIGNED(address,T)) {
+				raiseException(ExceptionType::AddressErrorLoad);
+				exception = ESX_TRUE;
+				return 0;
+			}
+
+			if (isWriteQueueActive(address)) {
+				if (flushWriteQueue(address) == ESX_FALSE) {
+					flushWriteQueueFirst();
+				}
+			} else {
+				flushWriteQueueAll(); //TODO: Write queue stall
+			}
+
+			PRINT_LOAD(address);
+
+			T output = mRootBus->load<T>(address);
+
+			PRINT_IO_LOAD(address, output);
+			
+			return output;
+		}
+
+		template<typename T>
+		void store(U32 address, U32 value) {
+			if (ADDRESS_UNALIGNED(address, T)) {
+				raiseException(ExceptionType::AddressErrorStore);
+				return;
+			}
+
+			PRINT_STORE(address, value);
+			PRINT_IO_STORE(address,value);
+
+			if (isWriteQueueActive(address)) {
+				if (isWriteQueueFull()) {
+					flushWriteQueueAll();
+				}
+
+				addWriteQueueOperation({ .Address = address, .Data = value, .Size = sizeof(T) });
+			} else {
+				flushWriteQueueAll(); //TODO: Stall cause by write queue
+				mRootBus->store<T>(address, value);
+			}
+		}
+
+		static inline BIT isCacheActive(U32 address) {
+			return (address & (1 << 29)) == 0;
+		}
+
+		inline BIT isWriteQueueActive(U32 address) {
+			/*U32 sr = getCP0Register(COP0Register::SR);
+
+			return (sr & 0x10000) == 0 && (address & (1 << 29)) == 0;*/
+			return ESX_FALSE;
+		}
+
+		void handleInterrupts();
+		void raiseException(ExceptionType type);
+
+		inline U64 getClocks() const { return mCycles; }
+
+		//Arithmetic
+		void ADD();
+		void ADDU();
+		void SUB();
+		void SUBU();
+		void ADDI();
+		void ADDIU();
+		void MULT();
+		void MULTU();
+		void DIV();
+		void DIVU();
+		void MFLO();
+		void MTLO();
+		void MFHI();
+		void MTHI();
+
+		//Memory
+		void LW();
+		void LH();
+		void LHU();
+		void LB();
+		void LBU();
+		void LWL();
+		void LWR();
+		void SW();
+		void SWL();
+		void SWR();
+		void SH();
+		void SB();
+		void LUI();
+
+		//Comparison
+		void SLT();
+		void SLTU();
+		void SLTI();
+		void SLTIU();
+
+		//Binary
+		void AND();
+		void ANDI();
+		void OR();
+		void ORI();
+		void XOR();
+		void XORI();
+		void NOR();
+		void SLL();
+		void SRL();
+		void SRA();
+		void SLLV();
+		void SRLV();
+		void SRAV();
+
+		//Control
+		void BEQ();
+		void BNE();
+		void BLTZ();
+		void BLTZAL();
+		void BLEZ();
+		void BGTZ();
+		void BGEZ();
+		void BGEZAL();
+		void J();
+		void JR();
+		void JAL();
+		void JALR();
+		void BREAK();
+		void SYSCALL();
+
+		//COPx
+		void COP0();
+		void COP1();
+		void COP2();
+		void COP3();
+		void MTC0();
+		void MFC0();
+		void CFC2();
+		void MTC2();
+		void MFC2();
+		void CTC2();
+		void BC0F();
+		void BC2F();
+		void BC0T();
+		void BC2T();
+		void RFE();
+		void LWC0();
+		void LWC1();
+		void LWC2();
+		void LWC3();
+		void SWC0();
+		void SWC1();
+		void SWC2();
+		void SWC3();
+
+		void NA();
+
+		Instruction mCurrentInstruction;
+
+		U64 getRegister(RegisterIndex index);
+
+	private:
+		inline void addPendingLoad(RegisterIndex index, U64 value);
+		inline void resetPendingLoad();
+
+		void setRegister(RegisterIndex index, U64 value);
+
+		void setCP0Register(RegisterIndex index, U32 value);
+		U32 getCP0Register(RegisterIndex index);
+
+		U32 cacheMiss(U32 address, U32 cacheLineNumber, U32 tag, U32 startIndex);
+
+		void iCacheStore(U32 address, U32 value);
+
+		inline BIT isWriteQueueFull() { return (mWriteQueue.size() == 4) ? ESX_TRUE : ESX_FALSE; }
+		void addWriteQueueOperation(const StoreOperation& writeOp);
+		void doWriteQueueOperation(const StoreOperation& writeOp);
+		BIT flushWriteQueue(U32 address);
+		void flushWriteQueueFirst();
+		void flushWriteQueueAll();
+
+	private:
+		SharedPtr<Bus> mRootBus;
+
+		Array<U64, 32> mRegisters;
+
+		SystemControlCoprocessor mCP0;
+
+		Pair<RegisterIndex, U64> mPendingLoad;
+		Pair<RegisterIndex, U64> mMemoryLoad;
+		Pair<RegisterIndex, U64> mWriteBack;
+
+		U64 mPC = 0;
+		U64 mNextPC = 0;
+		U64 mCurrentPC = 0;
+		U64 mCallPC = 0;
+		U64 mHI = 0;
+		U64 mLO = 0;
+
+		iCache mICache = {};
+		dCache mDCache = {};
+
+		Vector<StoreOperation> mWriteQueue = {};
+		BIT mStall = ESX_FALSE;
+
+		BIT mBranch = ESX_FALSE;
+		BIT mBranchSlot = ESX_FALSE;
+		BIT mTookBranch = ESX_FALSE;
+		BIT mTookBranchSlot = ESX_FALSE;
+
+		float mGPUClock = 0;
+
+		U64 mCycles = 0;
+		U64 mCyclesToWait = 0;
+
+		SharedPtr<InterruptControl> mInterruptControl;
+	};
+
+}
