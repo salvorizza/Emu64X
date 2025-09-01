@@ -954,16 +954,28 @@ namespace esx {
 		raiseException(ExceptionType::Syscall);
 	}
 
-	static const Array<CoprocessorExecuteFunction, 32> cop0decode = {
+	static const Array<CoprocessorExecuteFunction, 32> cop0decodeRS = {
 		&SystemControlCoprocessor::MF,	&SystemControlCoprocessor::DMF,	&SystemControlCoprocessor::CF,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::MT,	&SystemControlCoprocessor::DMT,	&SystemControlCoprocessor::CT,	&SystemControlCoprocessor::NA,
 		&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,
 		&SystemControlCoprocessor::CO,	&SystemControlCoprocessor::CO,	&SystemControlCoprocessor::CO,	&SystemControlCoprocessor::CO,	&SystemControlCoprocessor::CO,	&SystemControlCoprocessor::CO,	&SystemControlCoprocessor::CO,	&SystemControlCoprocessor::CO,
 		&SystemControlCoprocessor::CO,	&SystemControlCoprocessor::CO,	&SystemControlCoprocessor::CO,	&SystemControlCoprocessor::CO,	&SystemControlCoprocessor::CO,	&SystemControlCoprocessor::CO,	&SystemControlCoprocessor::CO,	&SystemControlCoprocessor::CO
 	};
 
+	static const Array<CoprocessorExecuteFunction, 32> cop0decodeBC = {
+		&SystemControlCoprocessor::BCF,	&SystemControlCoprocessor::BCT,	&SystemControlCoprocessor::BCFL,	&SystemControlCoprocessor::BCTL,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,
+		&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,		&SystemControlCoprocessor::NA,		&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,
+		&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,		&SystemControlCoprocessor::NA,		&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,
+		&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,		&SystemControlCoprocessor::NA,		&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA
+	};
+
 	void VR4300::COP0()
 	{
-		CoprocessorExecuteFunction coprocessorFunction = cop0decode[mCurrentInstruction.RegisterSource().Value];
+		CoprocessorExecuteFunction coprocessorFunction = nullptr;
+		if (mCurrentInstruction.RegisterSource().Value != 8) {
+			coprocessorFunction = cop0decodeRS[mCurrentInstruction.RegisterSource().Value];
+		} else {
+			coprocessorFunction = cop0decodeRS[mCurrentInstruction.RegisterTarget().Value];
+		}
 		((&mCP0)->*coprocessorFunction)(this);
 	}
 
@@ -1019,59 +1031,6 @@ namespace esx {
 		raiseException(ExceptionType::CoprocessorUnusable);
 	}
 
-	void VR4300::MTC0()
-	{
-		U32 sr = getCP0Register(COP0Register::SR);
-		U32 r = getRegister(mCurrentInstruction.RegisterTarget());
-
-		if (mCurrentInstruction.RegisterDestination() <= 2 ||
-			mCurrentInstruction.RegisterDestination() == 4 ||
-			mCurrentInstruction.RegisterDestination() == 10 ||
-			(mCurrentInstruction.RegisterDestination() >= 32 && mCurrentInstruction.RegisterDestination() <= 63)) {
-			raiseException(ExceptionType::ReservedInstruction);
-			return;
-		}
-
-		if (mCurrentInstruction.RegisterDestination() < 16 && (sr & 0x10000002) == 0x1) {
-			raiseException(ExceptionType::CoprocessorUnusable);
-			return;
-		}
-
-		switch ((COP0Register)(U8)mCurrentInstruction.RegisterDestination()) {
-			case COP0Register::Cause: {
-				U32 t = getCP0Register(mCurrentInstruction.RegisterDestination());
-
-				t &= ~0x300;
-				r &= 0x300;
-
-				r |= t;
-				break;
-			}
-
-			case COP0Register::EPC:
-			case COP0Register::BadVAddr:
-			case COP0Register::PRId:
-			case COP0Register::JumpDest:
-				return;
-
-		}
-
-		setCP0Register(mCurrentInstruction.RegisterDestination(), r);
-	}
-
-	void VR4300::MFC0()
-	{
-		U32 sr = getCP0Register(COP0Register::SR);
-		U32 r = getCP0Register(mCurrentInstruction.RegisterDestination());
-
-		if (mCurrentInstruction.RegisterDestination() < 16 && (sr & 0x10000002) == 0x1) {
-			raiseException(ExceptionType::CoprocessorUnusable);
-			return;
-		}
-
-		addPendingLoad(mCurrentInstruction.RegisterTarget(), r);
-	}
-
 	void VR4300::CFC2()
 	{
 		//addPendingLoad(mCurrentInstruction.RegisterTarget(), mGTE.getRegister(32 + mCurrentInstruction.RegisterDestination().Value));
@@ -1115,19 +1074,6 @@ namespace esx {
 			mNextPC -= 4;
 			mTookBranch = ESX_TRUE;
 		}*/
-	}
-
-	void VR4300::BC0T()
-	{
-		mBranch = ESX_TRUE;
-		U8 a = getCP0Register(COP0Register::SR) & (1 << 6);
-		I32 o = mCurrentInstruction.ImmediateSE() << 2;
-
-		if (a == 1) {
-			mNextPC += o;
-			mNextPC -= 4;
-			mTookBranch = ESX_TRUE;
-		}
 	}
 
 	void VR4300::BC2T()

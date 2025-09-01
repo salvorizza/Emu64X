@@ -216,6 +216,74 @@ namespace esx {
 	};
 
 
+	template<typename Storage>
+	class RegisterField {
+	public:
+		RegisterField(Storage value)
+			: mValue(value)
+		{
+		}
+
+		template<typename T>
+		T as() {
+			return static_cast<T>(mValue);
+		}
+	private:
+		Storage mValue;
+	};
+
+	template <typename Layout, typename Storage = U32>
+	class Register {
+	public:
+		Register(Storage& value)
+			: mValue(value)
+		{
+		}
+
+		~Register() = default;
+
+		Storage read() const {
+			return mValue;
+		}
+
+		void write(Storage v) {
+			mValue = v & Layout::Mask;
+		}
+
+		RegisterField<Storage> get(typename Layout::Field fieldName) const {
+			auto [pos, len] = Layout::info(fieldName);
+			Storage mask = ((Storage(1) << len) - 1) << pos;
+			return (mValue & mask) >> pos;
+		}
+
+		void set(typename Layout::Field fieldName, Storage fieldValue) {
+			auto [pos, len] = Layout::info(fieldName);
+			Storage mask = ((Storage(1) << len) - 1) << pos;
+			mValue = (mValue & ~mask) | ((fieldValue << pos) & mask);
+		}
+
+	private:
+		Storage mValue = 0;
+	};
+
+
+	enum class GPRRegister : U8;
+	enum class SystemControlRegisterType : U8;
+
+	struct RegisterIndex {
+		I32 Value;
+
+		RegisterIndex() : Value(-1) {}
+		explicit RegisterIndex(U8 value) : Value(value) {}
+		RegisterIndex(GPRRegister r) : Value((U8)r) {}
+		RegisterIndex(SystemControlRegisterType r) : Value((U8)r) {}
+
+		operator U8() {
+			return Value;
+		}
+	};
+
+
 #ifdef ESX_DEBUG
 #if defined(ESX_PLATFORM_WINDOWS)
 #define ESX_DEBUGBREAK() __debugbreak()
