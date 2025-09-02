@@ -11,11 +11,13 @@ namespace esx {
 		//KUSEG:2048MB
 		0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF,
 		//KSEG0:512MB
-		0x7FFFFFFF,
+		0x1FFFFFFF,
 		//KSEG1:512MB
 		0x1FFFFFFF,
 		//KSEG2:1024MB
-		0xFFFFFFFF,0xFFFFFFFF
+		0xFFFFFFFF,
+		//KSEG3:1024MB
+		0xFFFFFFFF
 	};
 
 	struct BusRange {
@@ -99,8 +101,11 @@ namespace esx {
 		IntervalTreeNode(const Interval& i) : interval(i), maxEnd(i.first.End), left(nullptr), right(nullptr) {}
 	};
 
-	constexpr size_t PageSize = KIBI(64);
+	constexpr size_t PageSize = KIBI(4);
 	constexpr size_t PageTableSize = 0x10000;
+
+	constexpr size_t NumPages = MIBI(4) / PageSize;
+	constexpr size_t NumPagesPIF = (0x7C0 / PageSize) + 1;
 
 	using Page = Span<U8>;
 	using PageTable = Array<Page, PageTableSize>;
@@ -115,9 +120,9 @@ namespace esx {
 		void sortRanges();
 
 		template<typename T>
-		void store(U32 address, T value) {
-			U32 page = address >> 16;
-			U32 offset = address & 0xFFFF;
+		void store(U32 physicalAddress, T value) {
+			U32 page = physicalAddress >> 16;
+			U32 offset = physicalAddress & 0xFFFF;
 			const auto& span = mPageTableW[page];
 
 			if (span.size() != 0) {
@@ -125,19 +130,19 @@ namespace esx {
 			}
 			else {
 				if (page == 0x1F80 || page == 0x9F80 || page == 0xBF80 || page == 0xFFFE) { // check if this is the IO/scratchpad page
-					storeIO<T>(toPhysicalAddress(address), value);
+					storeIO<T>(physicalAddress, value);
 				}
 				else {
-					ESX_CORE_LOG_ERROR("Writing Address 0x{:08x}: not found at {} bytes", address, sizeof(T));
+					ESX_CORE_LOG_ERROR("Writing Address 0x{:08x}: not found at {} bytes", physicalAddress, sizeof(T));
 				}
 			}
 
 		}
 
 		template<typename T>
-		T load(U32 address) {
-			U32 page = address >> 16;
-			U32 offset = address & 0xFFFF;
+		T load(U32 physicalAddress) {
+			U32 page = physicalAddress >> 16;
+			U32 offset = physicalAddress & 0xFFFF;
 			const auto& span = mPageTableR[page];
 
 			if (span.size() != 0) {
@@ -145,7 +150,7 @@ namespace esx {
 			}
 			else {
 				if (page == 0x1F80 || page == 0x9F80 || page == 0xBF80 || page == 0xFFFE) { // check if this is the IO/scratchpad page
-					return loadIO<T>(toPhysicalAddress(address));
+					return loadIO<T>(physicalAddress);
 				} else {
 					ESX_CORE_LOG_ERROR("Reading Address 0x{:08x}: not found at {} bytes", address, sizeof(T));
 				}
@@ -154,38 +159,38 @@ namespace esx {
 		}
 
 		template<typename T>
-		void storeIO(U32 address, T value) {
-			IntervalTreeNode* node = findRangeInIntervalTree(mIntervalTree, address);
+		void storeIO(U32 physicalAddress, T value) {
+			IntervalTreeNode* node = findRangeInIntervalTree(mIntervalTree, physicalAddress);
 
 			auto& [busRange, device] = node->interval;
 			if (node) {
 				if (device) {
-					device->store(mName, address & busRange.Mask, value);
+					device->store(mName, physicalAddress & busRange.Mask, value);
 				}
 				else {
-					ESX_CORE_LOG_ERROR("Writing Address 0x{:08x}: not found at {} bytes", address, sizeof(T));
+					ESX_CORE_LOG_ERROR("Writing Address 0x{:08x}: not found at {} bytes", physicalAddress, sizeof(T));
 				}
 			} else {
-				ESX_CORE_LOG_ERROR("Writing Address 0x{:08x}: not found at {} bytes", address, sizeof(T));
+				ESX_CORE_LOG_ERROR("Writing Address 0x{:08x}: not found at {} bytes", physicalAddress, sizeof(T));
 
 			}
 		}
 
 		template<typename T>
-		T loadIO(U32 address) {
+		T loadIO(U32 physicalAddress) {
 			T result = 0;
 
-			IntervalTreeNode* node = findRangeInIntervalTree(mIntervalTree, address);
+			IntervalTreeNode* node = findRangeInIntervalTree(mIntervalTree, physicalAddress);
 			if (node) {
 				auto& [busRange, device] = node->interval;
 				if (device) {
-					device->load(mName, address & busRange.Mask, result);
+					device->load(mName, physicalAddress & busRange.Mask, result);
 				}
 				else {
-					ESX_CORE_LOG_ERROR("Reading Address 0x{:08x}: not found at {} bytes", address, sizeof(T));
+					ESX_CORE_LOG_ERROR("Reading Address 0x{:08x}: not found at {} bytes", physicalAddress, sizeof(T));
 				}
 			} else {
-				ESX_CORE_LOG_ERROR("Reading Address 0x{:08x}: not found at {} bytes", address, sizeof(T));
+				ESX_CORE_LOG_ERROR("Reading Address 0x{:08x}: not found at {} bytes", physicalAddress, sizeof(T));
 			}
 
 			return result;
@@ -209,11 +214,6 @@ namespace esx {
 
 		IntervalTreeNode* buildIntervalTree(const Vector<Interval>& intervals);
 		IntervalTreeNode* findRangeInIntervalTree(IntervalTreeNode* root, uint32_t address);
-
-		static U32 toPhysicalAddress(U32 address) {
-			return address & SEGS_MASKS[address >> 29];
-		}
-
 	private:
 		StringView mName;
 		UnorderedMap<StringView, SharedPtr<BusDevice>> mDevices;

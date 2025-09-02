@@ -3,10 +3,15 @@
 #include <iostream>
 #include <iomanip>
 #include <fstream>
+#include <intrin.h>
+
 
 #include "Core/InterruptControl.h"
 
 #include "optick.h"
+
+#pragma intrinsic(_mul128)
+#pragma intrinsic(_umul128)
 
 namespace esx {
 
@@ -51,10 +56,14 @@ namespace esx {
 				mBranch = ESX_FALSE;
 				mTookBranch = ESX_FALSE;
 
-				if (opcode != 0 && mCurrentInstruction.Execute) {
-					(this->*mCurrentInstruction.Execute)();
+				if ((mBranchSlot == ESX_TRUE && mNullifyBranchSlot == ESX_FALSE) || mBranchSlot == ESX_FALSE) {
+					if (opcode != 0 && mCurrentInstruction.Execute) {
+						(this->*mCurrentInstruction.Execute)();
+					}
+				} else {
+					mNullifyBranchSlot = ESX_FALSE;
 				}
-
+				
 				mRegisters[mMemoryLoad.first] = mMemoryLoad.second;
 				mRegisters[0] = 0;
 				mMemoryLoad = mPendingLoad;
@@ -175,6 +184,7 @@ namespace esx {
 		mCallPC = 0;
 		mHI = 0;
 		mLO = 0;
+		mLLBit = ESX_FALSE;
 		
 		std::memset(&mICache, 0, sizeof(iCache));
 
@@ -191,7 +201,7 @@ namespace esx {
 
 		mPC = 0xBFC00000;
 		mNextPC = mPC + 4;
-		setCP0Register(COP0Register::PRId, 0x00000002);
+		mCP0.setRegister(SystemControlRegisterType::PRId, 0x000000B0);
 		resetPendingLoad();
 
 		mMemoryLoad = std::make_pair<RegisterIndex, U64>(RegisterIndex(0), 0);
@@ -219,7 +229,48 @@ namespace esx {
 		U32 a = getRegister(mCurrentInstruction.RegisterSource());
 		U32 b = getRegister(mCurrentInstruction.RegisterTarget());
 
-		U32 r = a + b;
+		U64 r = a + b;
+
+		if (mCP0.is64BitMode()) {
+			r = static_cast<I32>(static_cast<U32>(r));
+		} else {
+			r &= 0xFFFFFFFF;
+		}
+
+		setRegister(mCurrentInstruction.RegisterDestination(), r);
+	}
+
+	void VR4300::DADD()
+	{
+		if (mCP0.isReserved64BitInstruction()) {
+			raiseException(ExceptionType::ReservedInstruction);
+			return;
+		}
+
+		I64 a = getRegister(mCurrentInstruction.RegisterSource());
+		I64 b = getRegister(mCurrentInstruction.RegisterTarget());
+
+		I64 r = a + b;
+
+		if (OVERFLOW_ADD64(a, b, r)) {
+			raiseException(ExceptionType::ArithmeticOverflow);
+			return;
+		}
+
+		setRegister(mCurrentInstruction.RegisterDestination(), r);
+	}
+
+	void VR4300::DADDU()
+	{
+		if (mCP0.isReserved64BitInstruction()) {
+			raiseException(ExceptionType::ReservedInstruction);
+			return;
+		}
+
+		U64 a = getRegister(mCurrentInstruction.RegisterSource());
+		U64 b = getRegister(mCurrentInstruction.RegisterTarget());
+
+		U64 r = a + b;
 
 		setRegister(mCurrentInstruction.RegisterDestination(), r);
 	}
@@ -244,7 +295,48 @@ namespace esx {
 		U32 a = getRegister(mCurrentInstruction.RegisterSource());
 		U32 b = getRegister(mCurrentInstruction.RegisterTarget());
 
-		U32 r = a - b;
+		U64 r = a - b;
+
+		if (mCP0.is64BitMode()) {
+			r = static_cast<I32>(static_cast<U32>(r));
+		} else {
+			r &= 0xFFFFFFFF;
+		}
+
+		setRegister(mCurrentInstruction.RegisterDestination(), r);
+	}
+
+	void VR4300::DSUB()
+	{
+		if (mCP0.isReserved64BitInstruction()) {
+			raiseException(ExceptionType::ReservedInstruction);
+			return;
+		}
+
+		I64 a = getRegister(mCurrentInstruction.RegisterSource());
+		I64 b = getRegister(mCurrentInstruction.RegisterTarget());
+
+		I64 r = a - b;
+
+		if (OVERFLOW_SUB64(a, b, r)) {
+			raiseException(ExceptionType::ArithmeticOverflow);
+			return;
+		}
+
+		setRegister(mCurrentInstruction.RegisterDestination(), r);
+	}
+
+	void VR4300::DSUBU()
+	{
+		if (mCP0.isReserved64BitInstruction()) {
+			raiseException(ExceptionType::ReservedInstruction);
+			return;
+		}
+
+		U64 a = getRegister(mCurrentInstruction.RegisterSource());
+		U64 b = getRegister(mCurrentInstruction.RegisterTarget());
+
+		U64 r = a - b;
 
 		setRegister(mCurrentInstruction.RegisterDestination(), r);
 	}
@@ -269,7 +361,48 @@ namespace esx {
 		U32 a = getRegister(mCurrentInstruction.RegisterSource());
 		U32 b = mCurrentInstruction.ImmediateSE();
 
-		U32 r = a + b;
+		U64 r = a + b;
+
+		if (mCP0.is64BitMode()) {
+			r = static_cast<I32>(static_cast<U32>(r));
+		} else {
+			r &= 0xFFFFFFFF;
+		}
+
+		setRegister(mCurrentInstruction.RegisterTarget(), r);
+	}
+
+	void VR4300::DADDI()
+	{
+		if (mCP0.isReserved64BitInstruction()) {
+			raiseException(ExceptionType::ReservedInstruction);
+			return;
+		}
+
+		I64 a = getRegister(mCurrentInstruction.RegisterSource());
+		I64 b = mCurrentInstruction.ImmediateSE();
+
+		I64 r = a + b;
+
+		if (OVERFLOW_ADD64(a, b, r)) {
+			raiseException(ExceptionType::ArithmeticOverflow);
+			return;
+		}
+
+		setRegister(mCurrentInstruction.RegisterTarget(), r);
+	}
+
+	void VR4300::DADDIU()
+	{
+		if (mCP0.isReserved64BitInstruction()) {
+			raiseException(ExceptionType::ReservedInstruction);
+			return;
+		}
+
+		U64 a = getRegister(mCurrentInstruction.RegisterSource());
+		U64 b = mCurrentInstruction.ImmediateSE();
+
+		U64 r = a + b;
 
 		setRegister(mCurrentInstruction.RegisterTarget(), r);
 	}
@@ -283,17 +416,57 @@ namespace esx {
 
 		mHI = (r >> 32) & 0xFFFFFFFF;
 		mLO = r & 0xFFFFFFFF;
+
+		if (mCP0.is64BitMode()) {
+			mHI = static_cast<I32>(mHI);
+			mLO = static_cast<I32>(mLO);
+		}
 	}
 
 	void VR4300::MULTU()
 	{
-		U64 a = getRegister(mCurrentInstruction.RegisterSource());
-		U64 b = getRegister(mCurrentInstruction.RegisterTarget());
+		U64 a = getRegister(mCurrentInstruction.RegisterSource()) & 0xFFFFFFFF;
+		U64 b = getRegister(mCurrentInstruction.RegisterTarget()) & 0xFFFFFFFF;
 
 		U64 r = a * b;
 
 		mHI = (r >> 32) & 0xFFFFFFFF;
 		mLO = r & 0xFFFFFFFF;
+
+		if (mCP0.is64BitMode()) {
+			mHI = static_cast<I32>(mHI);
+			mLO = static_cast<I32>(mLO);
+		}
+	}
+
+	void VR4300::DMULT()
+	{
+		if (mCP0.isReserved64BitInstruction()) {
+			raiseException(ExceptionType::ReservedInstruction);
+			return;
+		}
+
+		I64 a = static_cast<I64>(getRegister(mCurrentInstruction.RegisterSource()));
+		I64 b = static_cast<I64>(getRegister(mCurrentInstruction.RegisterTarget()));
+
+		I64 lo, hi;
+		lo = _mul128(a, b, &hi);
+
+		mHI = hi;
+		mLO = lo;
+	}
+
+	void VR4300::DMULTU()
+	{
+		if (mCP0.isReserved64BitInstruction()) {
+			raiseException(ExceptionType::ReservedInstruction);
+			return;
+		}
+
+		U64 a = getRegister(mCurrentInstruction.RegisterSource());
+		U64 b = getRegister(mCurrentInstruction.RegisterTarget());
+
+		mLO = _umul128(a, b, &mHI);
 	}
 
 	void VR4300::DIV()
@@ -313,10 +486,15 @@ namespace esx {
 			mHI = a;
 
 			if (a >= 0) {
-				mLO = 0xFFFFFFFF;
+				mLO = 0x7FFFFFFF;
 			} else {
-				mLO = 1;
+				mLO = 0x80000001;
 			}
+		}
+
+		if (mCP0.is64BitMode()) {
+			mHI = static_cast<I32>(mHI);
+			mLO = static_cast<I32>(mLO);
 		}
 	}
 
@@ -330,7 +508,63 @@ namespace esx {
 			mLO = a / b;
 		} else {
 			mHI = a;
-			mLO = 0xFFFFFFFF;
+			mLO = 0x7FFFFFFF;
+		}
+
+		if (mCP0.is64BitMode()) {
+			mHI = static_cast<I32>(mHI);
+			mLO = static_cast<I32>(mLO);
+		}
+	}
+
+	void VR4300::DDIV()
+	{
+		if (mCP0.isReserved64BitInstruction()) {
+			raiseException(ExceptionType::ReservedInstruction);
+			return;
+		}
+
+		I64 a = getRegister(mCurrentInstruction.RegisterSource());
+		I64 b = getRegister(mCurrentInstruction.RegisterTarget());
+
+		if (b != 0) {
+			if (a == 0x8000000000000000 && b == -1) {
+				mHI = 0;
+				mLO = 0x8000000000000000;
+			}
+			else {
+				mHI = a % b;
+				mLO = a / b;
+			}
+		}
+		else {
+			mHI = a;
+
+			if (a >= 0) {
+				mLO = 0x7FFFFFFF;
+			} else {
+				mLO = 0x80000001;
+			}
+			mLO = static_cast<I32>(mLO);
+		}
+	}
+
+	void VR4300::DDIVU()
+	{
+		if (mCP0.isReserved64BitInstruction()) {
+			raiseException(ExceptionType::ReservedInstruction);
+			return;
+		}
+
+		U64 a = getRegister(mCurrentInstruction.RegisterSource());
+		U64 b = getRegister(mCurrentInstruction.RegisterTarget());
+
+		if (b != 0) {
+			mHI = a % b;
+			mLO = a / b;
+		} else {
+			mHI = a;
+			mLO = 0x7FFFFFFF;
 		}
 	}
 
@@ -354,20 +588,26 @@ namespace esx {
 		mHI = getRegister(mCurrentInstruction.RegisterSource());
 	}
 
+	void VR4300::LD()
+	{
+	}
+
+	void VR4300::LDL()
+	{
+	}
+
+	void VR4300::LDR()
+	{
+	}
+
 	void VR4300::LW()
 	{
 		BIT exception = ESX_FALSE;
 
-		U32 sr = getCP0Register(COP0Register::SR);
 		U32 a = getRegister(mCurrentInstruction.RegisterSource());
 		U32 b = mCurrentInstruction.ImmediateSE();
 
 		U32 m = a + b;
-
-		if ((sr & 0x10000) != 0) {
-			ESX_CORE_LOG_WARNING("Cache isolated LW from {:08x} not handled", m);
-			return;
-		}
 
 		U32 r = load<U32>(m, exception);
 		if (exception) {
@@ -377,20 +617,18 @@ namespace esx {
 		addPendingLoad(mCurrentInstruction.RegisterTarget(), r);
 	}
 
+	void VR4300::LWU()
+	{
+	}
+
 	void VR4300::LH()
 	{
 		BIT exception = ESX_FALSE;
 
-		U32 sr = getCP0Register(COP0Register::SR);
 		U32 a = getRegister(mCurrentInstruction.RegisterSource());
 		U32 b = mCurrentInstruction.ImmediateSE();
 
 		U32 m = a + b;
-
-		if ((sr & 0x10000) != 0) {
-			ESX_CORE_LOG_WARNING("Cache isolated LH from {:08x} not handled", m);
-			return;
-		}
 
 		U32 r = load<U16>(m, exception);
 		if (exception) {
@@ -406,16 +644,10 @@ namespace esx {
 	{
 		BIT exception = ESX_FALSE;
 
-		U32 sr = getCP0Register(COP0Register::SR);
 		U32 a = getRegister(mCurrentInstruction.RegisterSource());
 		U32 b = mCurrentInstruction.ImmediateSE();
 
 		U32 m = a + b;
-
-		if ((sr & 0x10000) != 0) {
-			ESX_CORE_LOG_WARNING("Cache isolated LHU from {:08x} not handled", m);
-			return;
-		}
 
 		U32 r = load<U16>(m, exception);
 		if (exception) {
@@ -429,16 +661,10 @@ namespace esx {
 	{
 		BIT exception = ESX_FALSE;
 
-		U32 sr = getCP0Register(COP0Register::SR);
 		U32 a = getRegister(mCurrentInstruction.RegisterSource());
 		U32 b = mCurrentInstruction.ImmediateSE();
 
 		U32 m = a + b;
-
-		if ((sr & 0x10000) != 0) {
-			ESX_CORE_LOG_WARNING("Cache isolated LB from {:08x} not handled", m);
-			return;
-		}
 
 		U32 r = load<U8>(m, exception);
 		r = static_cast<U32>(static_cast<I32>(static_cast<I8>(static_cast<U8>(r))));
@@ -450,16 +676,10 @@ namespace esx {
 	{
 		BIT exception = ESX_FALSE;
 
-		U32 sr = getCP0Register(COP0Register::SR);
 		U32 a = getRegister(mCurrentInstruction.RegisterSource());
 		U32 b = mCurrentInstruction.ImmediateSE();
 
 		U32 m = a + b;
-
-		if ((sr & 0x10000) != 0) {
-			ESX_CORE_LOG_WARNING("Cache isolated LBU from {:08x} not handled", m);
-			return;
-		}
 
 		U32 r = load<U8>(m, exception);
 
@@ -470,7 +690,6 @@ namespace esx {
 	{
 		BIT exception = ESX_FALSE;
 
-		U32 sr = getCP0Register(COP0Register::SR);
 		U32 a = getRegister(mCurrentInstruction.RegisterSource());
 		U32 b = mCurrentInstruction.ImmediateSE();
 		U32 c = getRegister(mCurrentInstruction.RegisterTarget());
@@ -479,11 +698,6 @@ namespace esx {
 		}
 
 		U32 m = a + b;
-
-		if ((sr & 0x10000) != 0) {
-			ESX_CORE_LOG_WARNING("Cache isolated LWL from {:08x} not handled", m);
-			return;
-		}
 
 		U32 am = m & ~(0x3);
 		U32 aw = load<U32>(am, exception);
@@ -498,17 +712,11 @@ namespace esx {
 	{
 		BIT exception = ESX_FALSE;
 
-		U32 sr = getCP0Register(COP0Register::SR);
 		U32 a = getRegister(mCurrentInstruction.RegisterSource());
 		U32 b = mCurrentInstruction.ImmediateSE();
 		U32 c = getRegister(mCurrentInstruction.RegisterTarget());
 
 		U32 m = a + b;
-
-		if ((sr & 0x10000) != 0) {
-			ESX_CORE_LOG_WARNING("Cache isolated SWL from {:08x} not handled", m);
-			return;
-		}
 
 		U32 am = m & ~(0x3);
 		U32 aw = load<U32>(am, exception);
@@ -524,7 +732,6 @@ namespace esx {
 	{
 		BIT exception = ESX_FALSE;
 
-		U32 sr = getCP0Register(COP0Register::SR);
 		U32 a = getRegister(mCurrentInstruction.RegisterSource());
 		U32 b = mCurrentInstruction.ImmediateSE();
 		U32 c = getRegister(mCurrentInstruction.RegisterTarget());
@@ -533,11 +740,6 @@ namespace esx {
 		}
 
 		U32 m = a + b;
-
-		if ((sr & 0x10000) != 0) {
-			ESX_CORE_LOG_WARNING("Cache isolated LWR from {:08x} not handled", m);
-			return;
-		}
 
 		U32 am = m & ~(0x3);
 		U32 aw = load<U32>(am, exception);
@@ -552,17 +754,11 @@ namespace esx {
 	{
 		BIT exception = ESX_FALSE;
 
-		U32 sr = getCP0Register(COP0Register::SR);
 		U32 a = getRegister(mCurrentInstruction.RegisterSource());
 		U32 b = mCurrentInstruction.ImmediateSE();
 		U32 c = getRegister(mCurrentInstruction.RegisterTarget());
 
 		U32 m = a + b;
-
-		if ((sr & 0x10000) != 0) {
-			ESX_CORE_LOG_WARNING("Cache isolated SWR to {:08x} not handled", m);
-			return;
-		}
 
 		U32 am = m & ~(0x3);
 		U32 aw = load<U32>(am, exception);
@@ -575,53 +771,54 @@ namespace esx {
 
 	void VR4300::SB()
 	{
-		U32 sr = getCP0Register(COP0Register::SR);
 		U32 a = getRegister(mCurrentInstruction.RegisterSource());
 		U32 b = mCurrentInstruction.ImmediateSE();
 		U32 v = getRegister(mCurrentInstruction.RegisterTarget());
 
 		U32 m = a + b;
 
-		if ((sr & 0x10000) != 0) {
-			ESX_CORE_LOG_WARNING("Cache SB store to {:08x} not handled", m);
-			return;
-		}
-		
 		store<U8>(m, v);
+	}
+
+	void VR4300::SCD()
+	{
 	}
 
 	void VR4300::SH()
 	{
-		U32 sr = getCP0Register(COP0Register::SR);
 		U32 a = getRegister(mCurrentInstruction.RegisterSource());
 		U32 b = mCurrentInstruction.ImmediateSE();
 		U32 v = getRegister(mCurrentInstruction.RegisterTarget());
 
 		U32 m = a + b;
-
-		if ((sr & 0x10000) != 0) {
-			ESX_CORE_LOG_WARNING("Cache SH store to {:08x} not handled", m);
-			return;
-		}
 
 		store<U16>(m, v);
 	}
 
+	void VR4300::SC()
+	{
+	}
+
+	void VR4300::SD()
+	{
+	}
+
+	void VR4300::SDL()
+	{
+	}
+
+	void VR4300::SDR()
+	{
+	}
+
 	void VR4300::SW()
 	{
-		U32 sr = getCP0Register(COP0Register::SR);
 		U32 a = getRegister(mCurrentInstruction.RegisterSource());
 		U32 b = mCurrentInstruction.ImmediateSE();
 
 		U32 m = a + b;
 
 		U32 v = getRegister(mCurrentInstruction.RegisterTarget());
-
-		if ((sr & 0x10000) != 0) {
-			iCacheStore(m, v);
-			return;
-		}
-
 
 		store<U32>(m, v);
 	}
@@ -630,6 +827,14 @@ namespace esx {
 	{
 		U32 r = mCurrentInstruction.Immediate() << 16;
 		setRegister(mCurrentInstruction.RegisterTarget(), r);
+	}
+
+	void VR4300::LL()
+	{
+	}
+
+	void VR4300::LLD()
+	{
 	}
 
 	void VR4300::SLT()
@@ -747,7 +952,43 @@ namespace esx {
 		U32 a = getRegister(mCurrentInstruction.RegisterTarget());
 		U32 s = mCurrentInstruction.ShiftAmount();
 
-		U32 r = a << s;
+		U64 r = a << s;
+
+		if (mCP0.is64BitMode()) {
+			r = static_cast<I32>(static_cast<U32>(r));
+		} else {
+			r &= 0xFFFFFFFF;
+		}
+
+		setRegister(mCurrentInstruction.RegisterDestination(), r);
+	}
+
+	void VR4300::DSLL()
+	{
+		if (mCP0.isReserved64BitInstruction()) {
+			raiseException(ExceptionType::ReservedInstruction);
+			return;
+		}
+
+		U64 a = getRegister(mCurrentInstruction.RegisterTarget());
+		U32 s = mCurrentInstruction.ShiftAmount();
+
+		U64 r = a << s;
+
+		setRegister(mCurrentInstruction.RegisterDestination(), r);
+	}
+
+	void VR4300::DSLL32()
+	{
+		if (mCP0.isReserved64BitInstruction()) {
+			raiseException(ExceptionType::ReservedInstruction);
+			return;
+		}
+
+		U64 a = getRegister(mCurrentInstruction.RegisterTarget());
+		U32 s = 32 + mCurrentInstruction.ShiftAmount();
+
+		U64 r = a << s;
 
 		setRegister(mCurrentInstruction.RegisterDestination(), r);
 	}
@@ -757,7 +998,43 @@ namespace esx {
 		U32 a = getRegister(mCurrentInstruction.RegisterTarget());
 		U32 s = mCurrentInstruction.ShiftAmount();
 
-		U32 r = a >> s;
+		U64 r = a >> s;
+
+		if (mCP0.is64BitMode()) {
+			r = static_cast<I32>(static_cast<U32>(r));
+		} else {
+			r &= 0xFFFFFFFF;
+		}
+
+		setRegister(mCurrentInstruction.RegisterDestination(), r);
+	}
+
+	void VR4300::DSRL()
+	{
+		if (mCP0.isReserved64BitInstruction()) {
+			raiseException(ExceptionType::ReservedInstruction);
+			return;
+		}
+
+		U64 a = getRegister(mCurrentInstruction.RegisterTarget());
+		U32 s = mCurrentInstruction.ShiftAmount();
+
+		U64 r = a >> s;
+
+		setRegister(mCurrentInstruction.RegisterDestination(), r);
+	}
+
+	void VR4300::DSRL32()
+	{
+		if (mCP0.isReserved64BitInstruction()) {
+			raiseException(ExceptionType::ReservedInstruction);
+			return;
+		}
+
+		U64 a = getRegister(mCurrentInstruction.RegisterTarget());
+		U32 s = 32 + mCurrentInstruction.ShiftAmount();
+
+		U64 r = a >> s;
 
 		setRegister(mCurrentInstruction.RegisterDestination(), r);
 	}
@@ -767,7 +1044,43 @@ namespace esx {
 		I32 a = getRegister(mCurrentInstruction.RegisterTarget());
 		U32 s = mCurrentInstruction.ShiftAmount();
 
-		U32 r = a >> s;
+		U64 r = a >> s;
+
+		if (mCP0.is64BitMode()) {
+			r = static_cast<I32>(static_cast<U32>(r));
+		} else {
+			r &= 0xFFFFFFFF;
+		}
+
+		setRegister(mCurrentInstruction.RegisterDestination(), r);
+	}
+
+	void VR4300::DSRA()
+	{
+		if (mCP0.isReserved64BitInstruction()) {
+			raiseException(ExceptionType::ReservedInstruction);
+			return;
+		}
+
+		I64 a = getRegister(mCurrentInstruction.RegisterTarget());
+		U32 s = mCurrentInstruction.ShiftAmount();
+
+		U64 r = a >> s;
+
+		setRegister(mCurrentInstruction.RegisterDestination(), r);
+	}
+
+	void VR4300::DSRA32()
+	{
+		if (mCP0.isReserved64BitInstruction()) {
+			raiseException(ExceptionType::ReservedInstruction);
+			return;
+		}
+
+		I64 a = getRegister(mCurrentInstruction.RegisterTarget());
+		U32 s = 32 + mCurrentInstruction.ShiftAmount();
+
+		U64 r = a >> s;
 
 		setRegister(mCurrentInstruction.RegisterDestination(), r);
 	}
@@ -777,7 +1090,28 @@ namespace esx {
 		U32 a = getRegister(mCurrentInstruction.RegisterTarget());
 		U32 s = getRegister(mCurrentInstruction.RegisterSource());
 
-		U32 r = a << (s & 0x1F);
+		U64 r = a << (s & 0x1F);
+
+		if (mCP0.is64BitMode()) {
+			r = static_cast<I32>(static_cast<U32>(r));
+		} else {
+			r &= 0xFFFFFFFF;
+		}
+
+		setRegister(mCurrentInstruction.RegisterDestination(), r);
+	}
+
+	void VR4300::DSLLV()
+	{
+		if (mCP0.isReserved64BitInstruction()) {
+			raiseException(ExceptionType::ReservedInstruction);
+			return;
+		}
+
+		U64 a = getRegister(mCurrentInstruction.RegisterTarget());
+		U64 s = getRegister(mCurrentInstruction.RegisterSource());
+
+		U64 r = a << (s & 0x3F);
 
 		setRegister(mCurrentInstruction.RegisterDestination(), r);
 	}
@@ -787,7 +1121,28 @@ namespace esx {
 		U32 a = getRegister(mCurrentInstruction.RegisterTarget());
 		U32 s = getRegister(mCurrentInstruction.RegisterSource());
 
-		U32 r = a >> (s & 0x1F);
+		U64 r = a >> (s & 0x1F);
+
+		if (mCP0.is64BitMode()) {
+			r = static_cast<I32>(static_cast<U32>(r));
+		} else {
+			r &= 0xFFFFFFFF;
+		}
+
+		setRegister(mCurrentInstruction.RegisterDestination(), r);
+	}
+
+	void VR4300::DSRLV()
+	{
+		if (mCP0.isReserved64BitInstruction()) {
+			raiseException(ExceptionType::ReservedInstruction);
+			return;
+		}
+
+		U64 a = getRegister(mCurrentInstruction.RegisterTarget());
+		U64 s = getRegister(mCurrentInstruction.RegisterSource());
+
+		U64 r = a >> (s & 0x3F);
 
 		setRegister(mCurrentInstruction.RegisterDestination(), r);
 	}
@@ -797,18 +1152,37 @@ namespace esx {
 		I32 a = getRegister(mCurrentInstruction.RegisterTarget());
 		U32 s = getRegister(mCurrentInstruction.RegisterSource());
 
-		U32 r = a >> (s & 0x1F);
+		U64 r = a >> (s & 0x1F);
+
+		if (mCP0.is64BitMode()) {
+			r = static_cast<I32>(static_cast<U32>(r));
+		} else {
+			r &= 0xFFFFFFFF;
+		}
+
+		setRegister(mCurrentInstruction.RegisterDestination(), r);
+	}
+
+	void VR4300::DSRAV()
+	{
+		if (mCP0.isReserved64BitInstruction()) {
+			raiseException(ExceptionType::ReservedInstruction);
+			return;
+		}
+
+		I64 a = getRegister(mCurrentInstruction.RegisterTarget());
+		U32 s = getRegister(mCurrentInstruction.RegisterSource());
+
+		U64 r = a >> (s & 0x3F);
 
 		setRegister(mCurrentInstruction.RegisterDestination(), r);
 	}
 
 	void VR4300::BEQ()
 	{
-		//ESX_CORE_LOG_TRACE("BEQ {:08x}h", mCurrentInstruction.Address);
-
 		mBranch = ESX_TRUE;
-		U32 a = getRegister(mCurrentInstruction.RegisterSource());
-		U32 b = getRegister(mCurrentInstruction.RegisterTarget());
+		U64 a = getRegister(mCurrentInstruction.RegisterSource());
+		U64 b = getRegister(mCurrentInstruction.RegisterTarget());
 		I32 o = mCurrentInstruction.ImmediateSE() << 2;
 
 		if (a == b) {
@@ -818,11 +1192,19 @@ namespace esx {
 		}
 	}
 
+	void VR4300::BEQL()
+	{
+		BEQ();
+		if (mTookBranch == ESX_FALSE) {
+			mNullifyBranchSlot = ESX_TRUE;
+		}
+	}
+
 	void VR4300::BNE()
 	{
 		mBranch = ESX_TRUE;
-		U32 a = getRegister(mCurrentInstruction.RegisterSource());
-		U32 b = getRegister(mCurrentInstruction.RegisterTarget());
+		U64 a = getRegister(mCurrentInstruction.RegisterSource());
+		U64 b = getRegister(mCurrentInstruction.RegisterTarget());
 		I32 o = mCurrentInstruction.ImmediateSE() << 2;
 
 		if (a != b) {
@@ -832,10 +1214,18 @@ namespace esx {
 		}
 	}
 
+	void VR4300::BNEL()
+	{
+		BNE();
+		if (mTookBranch == ESX_FALSE) {
+			mNullifyBranchSlot = ESX_TRUE;
+		}
+	}
+
 	void VR4300::BLTZ()
 	{
 		mBranch = ESX_TRUE;
-		I32 a = getRegister(mCurrentInstruction.RegisterSource());
+		I64 a = getRegister(mCurrentInstruction.RegisterSource());
 		I32 o = mCurrentInstruction.ImmediateSE() << 2;
 
 		if (a < 0) {
@@ -845,10 +1235,18 @@ namespace esx {
 		}
 	}
 
+	void VR4300::BLTZL()
+	{
+		BLTZ();
+		if (mTookBranch == ESX_FALSE) {
+			mNullifyBranchSlot = ESX_TRUE;
+		}
+	}
+
 	void VR4300::BLTZAL()
 	{
 		mBranch = ESX_TRUE;
-		I32 a = getRegister(mCurrentInstruction.RegisterSource());
+		I64 a = getRegister(mCurrentInstruction.RegisterSource());
 		I32 o = mCurrentInstruction.ImmediateSE() << 2;
 
 		setRegister(GPRRegister::ra, mNextPC);
@@ -860,10 +1258,18 @@ namespace esx {
 		}
 	}
 
+	void VR4300::BLTZALL()
+	{
+		BLTZAL();
+		if (mTookBranch == ESX_FALSE) {
+			mNullifyBranchSlot = ESX_TRUE;
+		}
+	}
+
 	void VR4300::BLEZ()
 	{
 		mBranch = ESX_TRUE;
-		I32 a = getRegister(mCurrentInstruction.RegisterSource());
+		I64 a = getRegister(mCurrentInstruction.RegisterSource());
 		I32 o = mCurrentInstruction.ImmediateSE() << 2;
 
 		if (a <= 0) {
@@ -873,10 +1279,18 @@ namespace esx {
 		}
 	}
 
+	void VR4300::BLEZL()
+	{
+		BLEZ();
+		if (mTookBranch == ESX_FALSE) {
+			mNullifyBranchSlot = ESX_TRUE;
+		}
+	}
+
 	void VR4300::BGTZ()
 	{
 		mBranch = ESX_TRUE;
-		I32 a = getRegister(mCurrentInstruction.RegisterSource());
+		I64 a = getRegister(mCurrentInstruction.RegisterSource());
 		I32 o = mCurrentInstruction.ImmediateSE() << 2;
 
 		if (a > 0) {
@@ -886,10 +1300,18 @@ namespace esx {
 		}
 	}
 
+	void VR4300::BGTZL()
+	{
+		BGTZ();
+		if (mTookBranch == ESX_FALSE) {
+			mNullifyBranchSlot = ESX_TRUE;
+		}
+	}
+
 	void VR4300::BGEZ()
 	{
 		mBranch = ESX_TRUE;
-		I32 a = getRegister(mCurrentInstruction.RegisterSource());
+		I64 a = getRegister(mCurrentInstruction.RegisterSource());
 		I32 o = mCurrentInstruction.ImmediateSE() << 2;
 
 		if (a >= 0) {
@@ -899,10 +1321,18 @@ namespace esx {
 		}
 	}
 
+	void VR4300::BGEZL()
+	{
+		BGEZ();
+		if (mTookBranch == ESX_FALSE) {
+			mNullifyBranchSlot = ESX_TRUE;
+		}
+	}
+
 	void VR4300::BGEZAL()
 	{
 		mBranch = ESX_TRUE;
-		I32 a = getRegister(mCurrentInstruction.RegisterSource());
+		I64 a = getRegister(mCurrentInstruction.RegisterSource());
 		I32 o = mCurrentInstruction.ImmediateSE() << 2;
 
 		setRegister(GPRRegister::ra, mNextPC);
@@ -914,9 +1344,17 @@ namespace esx {
 		}
 	}
 
+	void VR4300::BGEZALL()
+	{
+		BGEZAL();
+		if (mTookBranch == ESX_FALSE) {
+			mNullifyBranchSlot = ESX_TRUE;
+		}
+	}
+
 	void VR4300::J()
 	{
-		U32 a = (mNextPC & 0xF0000000) | (mCurrentInstruction.PseudoAddress() << 2);
+		U64 a = (mNextPC & 0xFFFFFFFFF0000000) | (mCurrentInstruction.PseudoAddress() << 2);
 		mNextPC = a;
 		mBranch = ESX_TRUE;
 		mTookBranch = ESX_TRUE;
@@ -925,7 +1363,7 @@ namespace esx {
 
 	void VR4300::JR()
 	{
-		U32 a = getRegister(mCurrentInstruction.RegisterSource());
+		U64 a = getRegister(mCurrentInstruction.RegisterSource());
 		mNextPC = a;
 		mBranch = ESX_TRUE;
 		mTookBranch = ESX_TRUE;
@@ -952,6 +1390,136 @@ namespace esx {
 	void VR4300::SYSCALL()
 	{
 		raiseException(ExceptionType::Syscall);
+	}
+
+	void VR4300::CACHE()
+	{
+		//TODO: All caching system
+	}
+
+	void VR4300::SYNC()
+	{
+		//NOP on VR4300
+	}
+
+	void VR4300::TGE()
+	{
+		I64 a = getRegister(mCurrentInstruction.RegisterSource());
+		I64 b = getRegister(mCurrentInstruction.RegisterTarget());
+
+		if (a >= b) {
+			raiseException(ExceptionType::Trap);
+		}
+	}
+
+	void VR4300::TGEI()
+	{
+		I64 a = getRegister(mCurrentInstruction.RegisterSource());
+		I64 b = mCurrentInstruction.ImmediateSE();
+
+		if (a >= b) {
+			raiseException(ExceptionType::Trap);
+		}
+	}
+
+	void VR4300::TGEU()
+	{
+		U64 a = getRegister(mCurrentInstruction.RegisterSource());
+		U64 b = getRegister(mCurrentInstruction.RegisterTarget());
+
+		if (a >= b) {
+			raiseException(ExceptionType::Trap);
+		}
+	}
+
+	void VR4300::TGEIU()
+	{
+		U64 a = getRegister(mCurrentInstruction.RegisterSource());
+		U64 b = mCurrentInstruction.Immediate();
+
+		if (a >= b) {
+			raiseException(ExceptionType::Trap);
+		}
+	}
+
+	void VR4300::TLT()
+	{
+		I64 a = getRegister(mCurrentInstruction.RegisterSource());
+		I64 b = getRegister(mCurrentInstruction.RegisterTarget());
+
+		if (a < b) {
+			raiseException(ExceptionType::Trap);
+		}
+	}
+
+	void VR4300::TLTI()
+	{
+		I64 a = getRegister(mCurrentInstruction.RegisterSource());
+		I64 b = mCurrentInstruction.ImmediateSE();
+
+		if (a < b) {
+			raiseException(ExceptionType::Trap);
+		}
+	}
+
+	void VR4300::TLTU()
+	{
+		U64 a = getRegister(mCurrentInstruction.RegisterSource());
+		U64 b = getRegister(mCurrentInstruction.RegisterTarget());
+
+		if (a < b) {
+			raiseException(ExceptionType::Trap);
+		}
+	}
+
+	void VR4300::TLTIU()
+	{
+		U64 a = getRegister(mCurrentInstruction.RegisterSource());
+		U64 b = mCurrentInstruction.Immediate();
+
+		if (a < b) {
+			raiseException(ExceptionType::Trap);
+		}
+	}
+
+	void VR4300::TEQ()
+	{
+		I64 a = getRegister(mCurrentInstruction.RegisterSource());
+		I64 b = getRegister(mCurrentInstruction.RegisterTarget());
+
+		if (a == b) {
+			raiseException(ExceptionType::Trap);
+		}
+	}
+
+	void VR4300::TEQI()
+	{
+		I64 a = getRegister(mCurrentInstruction.RegisterSource());
+		I64 b = mCurrentInstruction.ImmediateSE();
+
+		if (a == b) {
+			raiseException(ExceptionType::Trap);
+		}
+	}
+
+	void VR4300::TNE()
+	{
+		I64 a = getRegister(mCurrentInstruction.RegisterSource());
+		I64 b = getRegister(mCurrentInstruction.RegisterTarget());
+
+		if (a != b) {
+			raiseException(ExceptionType::Trap);
+		}
+	}
+
+	void VR4300::TNEI()
+	{
+		I64 a = getRegister(mCurrentInstruction.RegisterSource());
+		I64 b = mCurrentInstruction.ImmediateSE();
+
+		if (a != b) {
+			raiseException(ExceptionType::Trap);
+		}
 	}
 
 	static const Array<CoprocessorExecuteFunction, 32> cop0decodeRS = {
@@ -986,43 +1554,6 @@ namespace esx {
 
 	void VR4300::COP2()
 	{
-		/*//ESX_CORE_LOG_TRACE("COP2");
-		if (CO(mCurrentInstruction.binaryInstruction) == 0) {
-			switch (mCurrentInstruction.RegisterSource().Value) {
-				case 0x00: {
-					MFC2();
-					break;
-				}
-				case 0x02: {
-					CFC2();
-					break;
-				}
-				case 0x04: {
-					MTC2();
-					break;
-				}
-				case 0x06: {
-					CTC2();
-					break;
-				}
-				case 0x08: {
-					if (mCurrentInstruction.RegisterTarget().Value == 1) {
-						BC2T();
-					}
-					else if (mCurrentInstruction.RegisterTarget().Value == 0) {
-						BC2F();
-					}
-					break;
-				}
-				default: {
-					raiseException(ExceptionType::CoprocessorUnusable);
-					break;
-				}
-			}
-		}
-		else {
-			//mGTE.command(mCurrentInstruction.Immediate25());
-		}*/
 		raiseException(ExceptionType::CoprocessorUnusable);
 	}
 
@@ -1031,77 +1562,12 @@ namespace esx {
 		raiseException(ExceptionType::CoprocessorUnusable);
 	}
 
-	void VR4300::CFC2()
+	void VR4300::LDC1()
 	{
-		//addPendingLoad(mCurrentInstruction.RegisterTarget(), mGTE.getRegister(32 + mCurrentInstruction.RegisterDestination().Value));
 	}
 
-	void VR4300::MTC2()
+	void VR4300::LDC2()
 	{
-		//mGTE.setRegister(mCurrentInstruction.RegisterDestination().Value, getRegister(mCurrentInstruction.RegisterTarget()));
-	}
-
-	void VR4300::MFC2()
-	{
-		//addPendingLoad(mCurrentInstruction.RegisterTarget(), mGTE.getRegister(mCurrentInstruction.RegisterDestination().Value));
-	}
-
-	void VR4300::CTC2()
-	{
-		//mGTE.setRegister(32 + mCurrentInstruction.RegisterDestination().Value, getRegister(mCurrentInstruction.RegisterTarget()));
-	}
-
-	void VR4300::BC0F()
-	{
-		mBranch = ESX_TRUE;
-		U8 a = getCP0Register(COP0Register::SR) & (1 << 6);
-		I32 o = mCurrentInstruction.ImmediateSE() << 2;
-
-		if (a == 0) {
-			mNextPC += o;
-			mNextPC -= 4;
-			mTookBranch = ESX_TRUE;
-		}
-	}
-
-	void VR4300::BC2F()
-	{
-		/*mBranch = ESX_TRUE;
-		I32 o = mCurrentInstruction.ImmediateSE() << 2;
-
-		if (mGTE.getFlag() == false) {
-			mNextPC += o;
-			mNextPC -= 4;
-			mTookBranch = ESX_TRUE;
-		}*/
-	}
-
-	void VR4300::BC2T()
-	{
-		mBranch = ESX_TRUE;
-		I32 o = mCurrentInstruction.ImmediateSE() << 2;
-
-		/*if (mGTE.getFlag() == true) {
-			mNextPC += o;
-			mNextPC -= 4;
-			mTookBranch = ESX_TRUE;
-		}*/
-	}
-
-	void VR4300::RFE()
-	{
-		U32 sr = getCP0Register(COP0Register::SR);
-
-		if ((sr & 0x10000002) == 0x1) {
-			raiseException(ExceptionType::CoprocessorUnusable);
-			return;
-		}
-
-		U32 mode = sr & 0x3F;
-		sr &= ~0xF;
-		sr |= (mode >> 2) & 0x3F;
-
-		setCP0Register(COP0Register::SR, sr);
 	}
 
 	void VR4300::LWC0()
@@ -1116,25 +1582,20 @@ namespace esx {
 
 	void VR4300::LWC2()
 	{
-		BIT exception = ESX_FALSE;
-
-		U32 sr = getCP0Register(COP0Register::SR);
-		U32 a = getRegister(mCurrentInstruction.RegisterSource());
-		U32 b = mCurrentInstruction.ImmediateSE();
-
-		U32 m = a + b;
-
-		if ((sr & 0x10000) != 0) {
-			ESX_CORE_LOG_WARNING("Cache isolated load from {:08x} not handled", m);
-			return;
-		}
-
-		U32 r = load<U32>(m, exception);
-
-		//mGTE.setRegister(mCurrentInstruction.RegisterTarget().Value, r);
+		raiseException(ExceptionType::CoprocessorUnusable);
 	}
 
 	void VR4300::LWC3()
+	{
+		raiseException(ExceptionType::CoprocessorUnusable);
+	}
+
+	void VR4300::SDC1()
+	{
+		raiseException(ExceptionType::CoprocessorUnusable);
+	}
+
+	void VR4300::SDC2()
 	{
 		raiseException(ExceptionType::CoprocessorUnusable);
 	}
@@ -1151,20 +1612,7 @@ namespace esx {
 
 	void VR4300::SWC2()
 	{
-		U32 sr = getCP0Register(COP0Register::SR);
-		U32 a = getRegister(mCurrentInstruction.RegisterSource());
-		U32 b = mCurrentInstruction.ImmediateSE();
-
-		U32 m = a + b;
-
-		if ((sr & 0x10000) != 0) {
-			ESX_CORE_LOG_WARNING("Cache isolated store to {:08x} not handled", m);
-			return;
-		}
-
-		//U32 v = mGTE.getRegister(mCurrentInstruction.RegisterTarget().Value);
-
-		//store<U32>(m, v);
+		raiseException(ExceptionType::CoprocessorUnusable);
 	}
 
 	void VR4300::SWC3()
@@ -1202,16 +1650,6 @@ namespace esx {
 	U64 VR4300::getRegister(RegisterIndex index)
 	{
 		return mRegisters[index.Value];
-	}
-
-	void VR4300::setCP0Register(RegisterIndex index, U32 value)
-	{
-		mCP0Registers[index.Value] = value;
-	}
-
-	U32 VR4300::getCP0Register(RegisterIndex index)
-	{
-		return mCP0Registers[index.Value];
 	}
 
 	U32 VR4300::cacheMiss(U32 address, U32 cacheLineNumber, U32 tag, U32 startIndex)
@@ -1287,7 +1725,7 @@ namespace esx {
 
 	void VR4300::handleInterrupts()
 	{
-		U32 cause = getCP0Register(COP0Register::Cause);
+		/*U32 cause = getCP0Register(COP0Register::Cause);
 		U32 sr = getCP0Register(COP0Register::SR);
 
 		U32 opcodeNextInstruction = fetch(mPC);
@@ -1308,50 +1746,11 @@ namespace esx {
 			if (IEC && ((IM & IP) > 0)) {
 				raiseException(ExceptionType::Interrupt);
 			}
-		}
+		}*/
 	}
 
-	void VR4300::raiseException(ExceptionType type)
-	{
-		U32 sr = getCP0Register(COP0Register::SR);
-		U32 epc = getCP0Register(COP0Register::EPC);
-		U32 cause = getCP0Register(COP0Register::Cause);
-
-		U32 handler = 0x80000080;
-		if ((sr & (1 << 22)) != 0) {
-			handler = 0xBFC00180;
-		}
-
-		U32 mode = sr & 0x3F;
-		sr &= ~0x3F;
-		sr |= (mode << 2) & 0x3F;
-
-		cause = ((U32)type) << 2;
-
-		if (type == ExceptionType::Interrupt) {
-			epc = mPC;
-			mBranchSlot = mBranch;
-			mTookBranchSlot = mTookBranch;
-		} else {
-			epc = mCurrentPC;
-		}
-
-		if (mBranchSlot) {
-			epc -= 4;
-			cause |= 1 << 31;
-			setCP0Register(COP0Register::JumpDest, mPC);
-
-			if (mTookBranchSlot) {
-				cause |= 1 << 30;
-			}
-		}
-
-		setCP0Register(COP0Register::Cause, cause);
-		setCP0Register(COP0Register::EPC, epc);
-		setCP0Register(COP0Register::SR, sr);
-
-		mPC = handler;
-		mNextPC = mPC + 4;
+	void VR4300::raiseException(ExceptionType type) {
+		mCP0.raiseException(type);
 	}
 
 	String Instruction::Mnemonic(const SharedPtr<VR4300>& cpuState) const
@@ -1542,8 +1941,8 @@ namespace esx {
 					case 0x11:
 					case 0x12:
 					case 0x13: {
-						U8 cpn = CO_N(binaryInstruction);
-						if (CO(binaryInstruction) == 0) {
+						U8 cpn = COP_N(binaryInstruction);
+						if (COP(binaryInstruction) == 0) {
 							switch (RegisterSource().Value) {
 								case 0x00: {
 									return FormatString(ESX_TEXT("mfc{} {},${}"), cpn, registersMnemonics[(U8)RegisterTarget()], (U8)RegisterDestination());
@@ -1624,7 +2023,7 @@ namespace esx {
 					case 0x31:
 					case 0x32:
 					case 0x33: {
-						U8 cpn = CO_N(binaryInstruction);
+						U8 cpn = COP_N(binaryInstruction);
 						return FormatString(ESX_TEXT("lwc{} ${},0x{:08x}"), cpn, registersMnemonics[(U8)RegisterTarget()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
 						break;
 					}
@@ -1634,7 +2033,7 @@ namespace esx {
 					case 0x39:
 					case 0x3A:
 					case 0x3B: {
-						U8 cpn = CO_N(binaryInstruction);
+						U8 cpn = COP_N(binaryInstruction);
 						return FormatString(ESX_TEXT("swc{} ${},0x{:08x}"), cpn, registersMnemonics[(U8)RegisterTarget()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
 						break;
 					}

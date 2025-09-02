@@ -3,8 +3,8 @@
 #include "VR4300.h"
 
 namespace esx {
-	Coprocessor::Coprocessor(U8 number)
-		: mNumber(number)
+	Coprocessor::Coprocessor(VR4300* cpu, U8 number)
+		: mCPU(cpu), mNumber(number)
 	{
 	}
 
@@ -14,19 +14,19 @@ namespace esx {
 		resetPendingLoad();
 	}
 
-	void Coprocessor::NA(VR4300* cpu) {
-		cpu->raiseException(ExceptionType::ReservedInstruction);
+	void Coprocessor::NA() {
+		mCPU->raiseException(ExceptionType::ReservedInstruction);
 	}
 
-	void Coprocessor::MF(VR4300* cpu) {
-		if (!cpu->mCP0.isCoprocessorUsable(mNumber)) {
-			cpu->raiseException(ExceptionType::CoprocessorUnusable);
+	void Coprocessor::MF() {
+		if (!mCPU->mCP0.isCoprocessorUsable(mNumber)) {
+			mCPU->raiseException(ExceptionType::CoprocessorUnusable);
 			return;
 		}
 
 		U64 r = 0;
-		if (mNumber != 0 && cpu->mCP0.is64BitMode()) {
-			U8 rd = cpu->mCurrentInstruction.RegisterDestination().Value;
+		if (mNumber != 0 && mCPU->mCP0.is64BitMode()) {
+			U8 rd = mCPU->mCurrentInstruction.RegisterDestination().Value;
 			r = getRegister(RegisterIndex((rd >> 1) << 1));
 
 			if ((rd & 0x1) == 0) {
@@ -35,45 +35,45 @@ namespace esx {
 				r = (r >> 32) & 0xFFFFFFFF;
 			}
 		} else {
-			r = getRegister(cpu->mCurrentInstruction.RegisterDestination());
+			r = getRegister(mCPU->mCurrentInstruction.RegisterDestination());
 		}
 		
-		if (cpu->mCP0.is64BitMode()) {
+		if (mCPU->mCP0.is64BitMode()) {
 			r = static_cast<I64>(static_cast<I32>(static_cast<U32>(r)));
 		}
 
-		cpu->addPendingLoad(cpu->mCurrentInstruction.RegisterTarget(), r);
+		mCPU->addPendingLoad(mCPU->mCurrentInstruction.RegisterTarget(), r);
 	}
 
-	void Coprocessor::DMF(VR4300* cpu) {
-		if (!cpu->mCP0.isCoprocessorUsable(mNumber)) {
-			cpu->raiseException(ExceptionType::CoprocessorUnusable);
+	void Coprocessor::DMF() {
+		if (!mCPU->mCP0.isCoprocessorUsable(mNumber)) {
+			mCPU->raiseException(ExceptionType::CoprocessorUnusable);
 			return;
 		}
 
-		if (cpu->mCP0.isReserved64BitInstruction()) {
-			cpu->raiseException(ExceptionType::ReservedInstruction);
+		if (mCPU->mCP0.isReserved64BitInstruction()) {
+			mCPU->raiseException(ExceptionType::ReservedInstruction);
 			return;
 		}
 
-		U64 r = getRegister(cpu->mCurrentInstruction.RegisterDestination());
-		cpu->addPendingLoad(cpu->mCurrentInstruction.RegisterTarget(), r);
+		U64 r = getRegister(mCPU->mCurrentInstruction.RegisterDestination());
+		mCPU->addPendingLoad(mCPU->mCurrentInstruction.RegisterTarget(), r);
 	}
 
-	void Coprocessor::CF(VR4300* cpu) {
-		cpu->raiseException(ExceptionType::CoprocessorUnusable);
+	void Coprocessor::CF() {
+		mCPU->raiseException(ExceptionType::CoprocessorUnusable);
 	}
 
-	void Coprocessor::MT(VR4300* cpu) {
-		if (!cpu->mCP0.isCoprocessorUsable(mNumber)) {
-			cpu->raiseException(ExceptionType::CoprocessorUnusable);
+	void Coprocessor::MT() {
+		if (!mCPU->mCP0.isCoprocessorUsable(mNumber)) {
+			mCPU->raiseException(ExceptionType::CoprocessorUnusable);
 			return;
 		}
 
-		U64 data = cpu->getRegister(cpu->mCurrentInstruction.RegisterTarget());
+		U64 data = mCPU->getRegister(mCPU->mCurrentInstruction.RegisterTarget());
 
-		if (mNumber != 0 && cpu->mCP0.is64BitMode()) {
-			U8 rd = cpu->mCurrentInstruction.RegisterDestination().Value;
+		if (mNumber != 0 && mCPU->mCP0.is64BitMode()) {
+			U8 rd = mCPU->mCurrentInstruction.RegisterDestination().Value;
 			U64 r = getRegister(RegisterIndex((rd >> 1) << 1));
 			data &= 0xFFFFFFFF;
 
@@ -88,46 +88,46 @@ namespace esx {
 		}
 		else {
 			U64 r = data;
-			addPendingLoad(cpu->mCurrentInstruction.RegisterDestination(), r);
+			addPendingLoad(mCPU->mCurrentInstruction.RegisterDestination(), r);
 		}
 	}
 
-	void Coprocessor::DMT(VR4300* cpu) {
-		if (!cpu->mCP0.isCoprocessorUsable(mNumber)) {
-			cpu->raiseException(ExceptionType::CoprocessorUnusable);
+	void Coprocessor::DMT() {
+		if (!mCPU->mCP0.isCoprocessorUsable(mNumber)) {
+			mCPU->raiseException(ExceptionType::CoprocessorUnusable);
 			return;
 		}
 
-		if (cpu->mCP0.isReserved64BitInstruction()) {
-			cpu->raiseException(ExceptionType::ReservedInstruction);
+		if (mCPU->mCP0.isReserved64BitInstruction()) {
+			mCPU->raiseException(ExceptionType::ReservedInstruction);
 			return;
 		}
 
-		U64 r = cpu->getRegister(cpu->mCurrentInstruction.RegisterTarget());
-		addPendingLoad(cpu->mCurrentInstruction.RegisterDestination(), r);
+		U64 r = mCPU->getRegister(mCPU->mCurrentInstruction.RegisterTarget());
+		addPendingLoad(mCPU->mCurrentInstruction.RegisterDestination(), r);
 	}
 
-	void Coprocessor::CT(VR4300* cpu) {
-		cpu->raiseException(ExceptionType::CoprocessorUnusable);
+	void Coprocessor::CT() {
+		mCPU->raiseException(ExceptionType::CoprocessorUnusable);
 	}
 
-	void Coprocessor::BCF(VR4300* cpu) {
-		cpu->raiseException(ExceptionType::CoprocessorUnusable);
+	void Coprocessor::BCF() {
+		mCPU->raiseException(ExceptionType::CoprocessorUnusable);
 	}
 
-	void Coprocessor::BCT(VR4300* cpu) {
-		cpu->raiseException(ExceptionType::CoprocessorUnusable);
+	void Coprocessor::BCT() {
+		mCPU->raiseException(ExceptionType::CoprocessorUnusable);
 	}
 
-	void Coprocessor::BCFL(VR4300* cpu) {
-		cpu->raiseException(ExceptionType::CoprocessorUnusable);
+	void Coprocessor::BCFL() {
+		mCPU->raiseException(ExceptionType::CoprocessorUnusable);
 	}
 
-	void Coprocessor::BCTL(VR4300* cpu) {
-		cpu->raiseException(ExceptionType::CoprocessorUnusable);
+	void Coprocessor::BCTL() {
+		mCPU->raiseException(ExceptionType::CoprocessorUnusable);
 	}
 
-	void Coprocessor::CO(VR4300* cpu) {
+	void Coprocessor::CO() {
 
 	}
 

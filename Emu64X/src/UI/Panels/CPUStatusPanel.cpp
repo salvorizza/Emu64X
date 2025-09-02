@@ -133,26 +133,26 @@ namespace esx {
 						ImGui::TableNextColumn();
 						ImGui::TextUnformatted(registersMnemonics[i]);
 						ImGui::TableNextColumn();
-						ImGui::Text("0x%08X", mInstance->mRegisters[i]);
+						ImGui::Text("0x%16X", mInstance->mRegisters[i]);
 					}
 
 					ImGui::TableNextRow();
 					ImGui::TableNextColumn();
 					ImGui::TextUnformatted("HI");
 					ImGui::TableNextColumn();
-					ImGui::Text("0x%08X", mInstance->mHI);
+					ImGui::Text("0x%16X", mInstance->mHI);
 
 					ImGui::TableNextRow();
 					ImGui::TableNextColumn();
 					ImGui::TextUnformatted("LO");
 					ImGui::TableNextColumn();
-					ImGui::Text("0x%08X", mInstance->mLO);
+					ImGui::Text("0x%16X", mInstance->mLO);
 
 					ImGui::TableNextRow();
 					ImGui::TableNextColumn();
 					ImGui::TextUnformatted("PC");
 					ImGui::TableNextColumn();
-					ImGui::Text("0x%08X", mInstance->mPC);
+					ImGui::Text("0x%16X", mInstance->mPC);
 
 				}
 				ImGui::EndTable();
@@ -170,7 +170,7 @@ namespace esx {
 						ImGui::TableNextColumn();
 						ImGui::TextUnformatted(cop0RegistersMnemonics[i]);
 						ImGui::TableNextColumn();
-						ImGui::Text("0x%08X", mInstance->mCP0Registers[i]);
+						ImGui::Text("0x%16X", mInstance->mCP0.getRegister(RegisterIndex(i)));
 					}
 					
 				}

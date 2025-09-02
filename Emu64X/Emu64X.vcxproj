@@ -162,7 +162,9 @@
     <ClInclude Include="src\Core\InterruptControl.h" />
     <ClInclude Include="src\Core\RAM.h" />
     <ClInclude Include="src\Core\Scheduler.h" />
-    <ClInclude Include="src\Core\VR4300.h" />
+    <ClInclude Include="src\Core\VR4300\Coprocessor.h" />
+    <ClInclude Include="src\Core\VR4300\SystemControlCoprocessor.h" />
+    <ClInclude Include="src\Core\VR4300\VR4300.h" />
     <ClInclude Include="src\UI\Application\Application.h" />
     <ClInclude Include="src\UI\Application\ApplicationManager.h" />
     <ClInclude Include="src\UI\Application\LoopTimer.h" />
@@ -198,7 +200,9 @@
     <ClCompile Include="src\Core\InterruptControl.cpp" />
     <ClCompile Include="src\Core\RAM.cpp" />
     <ClCompile Include="src\Core\Scheduler.cpp" />
-    <ClCompile Include="src\Core\VR4300.cpp" />
+    <ClCompile Include="src\Core\VR4300\Coprocessor.cpp" />
+    <ClCompile Include="src\Core\VR4300\SystemControlCoprocessor.cpp" />
+    <ClCompile Include="src\Core\VR4300\VR4300.cpp" />
     <ClCompile Include="src\UI\Application\ApplicationManager.cpp" />
     <ClCompile Include="src\UI\Graphics\BatchRenderer.cpp" />
     <ClCompile Include="src\UI\Graphics\FrameBuffer.cpp" />

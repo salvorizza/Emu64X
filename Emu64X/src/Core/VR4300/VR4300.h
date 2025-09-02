@@ -14,15 +14,17 @@
 
 namespace esx {
 
-	/*#define CO(x) (((x) >> 25) & 0x1)
-	#define CO_N(x) (((x) >> 26) & 0x3)
-	#define COP_FUNC(x) ((x) & 0x1F)*/
+	#define COP(x) (((x) >> 25) & 0x1)
+	#define COP_N(x) (((x) >> 26) & 0x3)
+	#define COP_FUNC(x) ((x) & 0x1F)
 
 	constexpr U32 EXCEPTION_HANDLER_ADDRESS = 0x80000080;
 	constexpr U32 BREAKPOINT_EXCEPTION_HANDLER_ADDRESS = 0x80000040;
 	#define ADDRESS_UNALIGNED(x,type) (((x) & (sizeof(type) - 1)) != 0x0)
 	#define OVERFLOW_ADD32(a,b,s) (~(((a) & 0x80000000) ^ ((b) & 0x80000000)) & (((a) & 0x80000000) ^ ((s) & 0x80000000)))
 	#define OVERFLOW_SUB32(a,b,s) (((a) & 0x80000000) ^ ((b) & 0x80000000)) & (((a) & 0x80000000) ^ ((s) & 0x80000000))
+	#define OVERFLOW_ADD64(a,b,s) (~(((a) & 0x8000000000000000) ^ ((b) & 0x8000000000000000)) & (((a) & 0x8000000000000000) ^ ((s) & 0x8000000000000000)))
+	#define OVERFLOW_SUB64(a,b,s) (((a) & 0x8000000000000000) ^ ((b) & 0x8000000000000000)) & (((a) & 0x8000000000000000) ^ ((s) & 0x8000000000000000))
 
 	#define ESX_CORE_BIOS_LOG_TRACE(x,...) //ESX_CORE_LOG_TRACE(x,__VA_ARGS__)
 
@@ -60,17 +62,6 @@ namespace esx {
 		sp,
 		fp,
 		ra
-	};
-
-	enum class ExceptionType : U8 {
-		Interrupt = 0x00,
-		AddressErrorLoad = 0x04,
-		AddressErrorStore = 0x05,
-		Syscall = 0x08,
-		Breakpoint = 0x09,
-		ReservedInstruction = 0x0A,
-		CoprocessorUnusable = 0x0B,
-		ArithmeticOverflow = 0x0C
 	};
 
 	struct Instruction;
@@ -171,6 +162,7 @@ namespace esx {
 		friend class DisassemblerPanel;
 		friend class TTYPanel;
 		friend class Coprocessor;
+		friend class SystemControlCoprocessor;
 
 		VR4300();
 		~VR4300();
@@ -182,49 +174,53 @@ namespace esx {
 		virtual void reset();
 
 		template<typename T>
-		U32 load(U32 address, BIT& exception) {
-			if (ADDRESS_UNALIGNED(address,T)) {
+		U32 load(U32 virtualAddress, BIT& exception) {
+			if (ADDRESS_UNALIGNED(virtualAddress,T)) {
 				raiseException(ExceptionType::AddressErrorLoad);
 				exception = ESX_TRUE;
 				return 0;
 			}
 
-			if (isWriteQueueActive(address)) {
-				if (flushWriteQueue(address) == ESX_FALSE) {
+			U32 physicalAddress = mCP0.AddressTranslation(virtualAddress);
+
+			if (isWriteQueueActive(physicalAddress)) {
+				if (flushWriteQueue(physicalAddress) == ESX_FALSE) {
 					flushWriteQueueFirst();
 				}
 			} else {
 				flushWriteQueueAll(); //TODO: Write queue stall
 			}
 
-			PRINT_LOAD(address);
+			PRINT_LOAD(physicalAddress);
 
-			T output = mRootBus->load<T>(address);
+			T output = mRootBus->load<T>(physicalAddress);
 
-			PRINT_IO_LOAD(address, output);
+			PRINT_IO_LOAD(physicalAddress, output);
 			
 			return output;
 		}
 
 		template<typename T>
-		void store(U32 address, U32 value) {
+		void store(U32 virtualAddress, U32 value) {
 			if (ADDRESS_UNALIGNED(address, T)) {
 				raiseException(ExceptionType::AddressErrorStore);
 				return;
 			}
 
-			PRINT_STORE(address, value);
-			PRINT_IO_STORE(address,value);
+			U32 physicalAddress = mCP0.AddressTranslation(virtualAddress);
 
-			if (isWriteQueueActive(address)) {
+			PRINT_STORE(physicalAddress, value);
+			PRINT_IO_STORE(physicalAddress,value);
+
+			if (isWriteQueueActive(physicalAddress)) {
 				if (isWriteQueueFull()) {
 					flushWriteQueueAll();
 				}
 
-				addWriteQueueOperation({ .Address = address, .Data = value, .Size = sizeof(T) });
+				addWriteQueueOperation({ .Address = physicalAddress, .Data = value, .Size = sizeof(T) });
 			} else {
 				flushWriteQueueAll(); //TODO: Stall cause by write queue
-				mRootBus->store<T>(address, value);
+				mRootBus->store<T>(physicalAddress, value);
 			}
 		}
 
@@ -247,33 +243,56 @@ namespace esx {
 		//Arithmetic
 		void ADD();
 		void ADDU();
+		void DADD();
+		void DADDU();
 		void SUB();
 		void SUBU();
+		void DSUB();
+		void DSUBU();
 		void ADDI();
 		void ADDIU();
+		void DADDI();
+		void DADDIU();
 		void MULT();
 		void MULTU();
+		void DMULT();
+		void DMULTU();
 		void DIV();
 		void DIVU();
+		void DDIV();
+		void DDIVU();
 		void MFLO();
 		void MTLO();
 		void MFHI();
 		void MTHI();
 
 		//Memory
+		void LD();
+		void LDL();
+		void LDR();
 		void LW();
+		void LWU();
+		void LWL();
+		void LWR();
 		void LH();
 		void LHU();
 		void LB();
 		void LBU();
-		void LWL();
-		void LWR();
+		void LUI();
+		void LL();
+		void LLD();
+		
+		void SC();
+		void SD();
+		void SDL();
+		void SDR();
 		void SW();
 		void SWL();
 		void SWR();
 		void SH();
 		void SB();
-		void LUI();
+		void SCD();
+		
 
 		//Comparison
 		void SLT();
@@ -290,59 +309,83 @@ namespace esx {
 		void XORI();
 		void NOR();
 		void SLL();
+		void DSLL();
+		void DSLL32();
 		void SRL();
+		void DSRL();
+		void DSRL32();
 		void SRA();
+		void DSRA();
+		void DSRA32();
 		void SLLV();
+		void DSLLV();
 		void SRLV();
+		void DSRLV();
 		void SRAV();
+		void DSRAV();
 
 		//Control
 		void BEQ();
+		void BEQL();
 		void BNE();
+		void BNEL();
 		void BLTZ();
+		void BLTZL();
 		void BLTZAL();
+		void BLTZALL();
 		void BLEZ();
+		void BLEZL();
 		void BGTZ();
+		void BGTZL();
 		void BGEZ();
+		void BGEZL();
 		void BGEZAL();
+		void BGEZALL();
 		void J();
 		void JR();
 		void JAL();
 		void JALR();
 		void BREAK();
 		void SYSCALL();
+		void CACHE();
+		void SYNC();
+		void TGE();
+		void TGEI();
+		void TGEU();
+		void TGEIU();
+		void TLT();
+		void TLTI();
+		void TLTU();
+		void TLTIU();
+		void TEQ();
+		void TEQI();
+		void TNE();
+		void TNEI();
 
 		//COPx
 		void COP0();
 		void COP1();
 		void COP2();
 		void COP3();
-		void MTC0();
-		void MFC0();
-		void CFC2();
-		void MTC2();
-		void MFC2();
-		void CTC2();
-		void BC0F();
-		void BC2F();
-		void BC0T();
-		void BC2T();
-		void RFE();
+		void LDC1();
+		void LDC2();
 		void LWC0();
 		void LWC1();
 		void LWC2();
 		void LWC3();
+		void SDC1();
+		void SDC2();
 		void SWC0();
 		void SWC1();
 		void SWC2();
 		void SWC3();
+		
 
 		void NA();
 
 		Instruction mCurrentInstruction;
 
 		U64 getRegister(RegisterIndex index);
-
 	private:
 		inline void addPendingLoad(RegisterIndex index, U64 value);
 		inline void resetPendingLoad();
@@ -380,6 +423,7 @@ namespace esx {
 		U64 mCallPC = 0;
 		U64 mHI = 0;
 		U64 mLO = 0;
+		BIT mLLBit = ESX_FALSE;
 
 		iCache mICache = {};
 		dCache mDCache = {};
@@ -389,6 +433,7 @@ namespace esx {
 
 		BIT mBranch = ESX_FALSE;
 		BIT mBranchSlot = ESX_FALSE;
+		BIT mNullifyBranchSlot = ESX_FALSE;
 		BIT mTookBranch = ESX_FALSE;
 		BIT mTookBranchSlot = ESX_FALSE;
 

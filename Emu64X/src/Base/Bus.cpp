@@ -29,20 +29,18 @@ namespace esx {
 		auto bios = getDevice("Bios");
 		auto ram = getDevice("RAM");
 
-		for (I32 pageIndex = 0; pageIndex < 128; pageIndex++) {
-			U8* pointer = ram->getFastPointer((pageIndex * PageSize) & 0x1FFFFF);
+		for (I32 pageIndex = 0; pageIndex < NumPages; pageIndex++) {
+			U8* pointer = ram->getFastPointer(pageIndex * PageSize);
 			Span<U8> span = Span<U8>(pointer, pointer + PageSize);
 
-			mPageTableR[pageIndex + 0x0000] = span;
 			mPageTableR[pageIndex + 0x8000] = span;
 			mPageTableR[pageIndex + 0xA000] = span;
 
-			mPageTableW[pageIndex + 0x0000] = span;
 			mPageTableW[pageIndex + 0x8000] = span;
 			mPageTableW[pageIndex + 0xA000] = span;
 		}
 
-		for (I32 pageIndex = 0; pageIndex < 8; pageIndex++) {
+		for (I32 pageIndex = 0; pageIndex < NumPagesPIF; pageIndex++) {
 			U8* pointer = bios->getFastPointer(pageIndex * PageSize);
 			Span<U8> span = Span<U8>(pointer, pointer + PageSize);
 

@@ -402,25 +402,73 @@ namespace esx {
 	};
 	using ErrorEPCRegister = Register<ErrorEPCRegisterLayout, U64>;
 
+	enum class ExceptionType : U8 {
+		Interrupt = 0,
+		TLBMod = 1,
+		TLBMissLoadFetch = 2,
+		TLBMissStore = 3,
+		AddressErrorLoad = 4,
+		AddressErrorStore = 5,
+		InstructionBusError = 6,
+		DataBusError = 7,
+		Syscall = 8,
+		Breakpoint = 9,
+		ReservedInstruction = 10,
+		CoprocessorUnusable = 11,
+		ArithmeticOverflow = 12,
+		Trap = 13,
+		FloatingPoint = 15,
+		Watch = 23
+	};
+
+	enum class OperatingMode : U8 {
+		Kernel = 0b00,
+		Supervisor = 0b01,
+		User = 0b10
+	};
+
+	enum class Interrupt : U8 {
+		IP0 = 1 << 0,
+		IP1 = 1 << 1,
+		IP2 = 1 << 2,
+		IP3 = 1 << 3,
+		IP4 = 1 << 4,
+		IP5 = 1 << 5,
+		IP6 = 1 << 6,
+		IP7 = 1 << 7
+	};
+
 	class SystemControlCoprocessor : public Coprocessor {
 	public:
-		SystemControlCoprocessor() = default;
+		SystemControlCoprocessor();
 		~SystemControlCoprocessor() = default;
 
-		virtual void CO(VR4300* cpu) override;
+		virtual void clock(U64 clocks) override;
 
-		void TLBR(VR4300* cpu);
-		void TLBWI(VR4300* cpu);
-		void TLBWR(VR4300* cpu);
-		void TLBP(VR4300* cpu);
-		void ERET(VR4300* cpu);
+		virtual void CO() override;
+
+		void TLBR();
+		void TLBWI();
+		void TLBWR();
+		void TLBP();
+		void ERET();
+
+		void handleInterrupts();
+		void raiseException(ExceptionType type);
+
+		U32 AddressTranslation(U32 virtualAddress);
 
 		virtual U64 getRegister(RegisterIndex reg) const override;
 		virtual void setRegister(RegisterIndex reg, U64 value) override;
 
+		void clearInterrupt(Interrupt interrupt);
+		void generateInterrupt(Interrupt interrupt);
+		OperatingMode getCurrentOperatingMode() const;
 		BIT is64BitMode() const;
 		BIT isCoprocessorUsable(U8 copNumber) const;
 		BIT isReserved64BitInstruction() const;
+		BIT areInterruptsPending() const;
+		BIT areInterruptsEnabled() const;
 	private:
 		IndexRegister      mIndexRegister;
 		RandomRegister     mRandomRegister;
