@@ -3,9 +3,10 @@
 #include "VR4300.h"
 
 namespace esx {
-    SystemControlCoprocessor::SystemControlCoprocessor()
-        : Coprocessor(0)
+    SystemControlCoprocessor::SystemControlCoprocessor(VR4300* cpu)
+        : Coprocessor(cpu, 0)
     {
+        mRandomRegister.set(RandomRegisterLayout::Field::Random, 31);
     }
 
     void SystemControlCoprocessor::clock(U64 clocks)
@@ -15,6 +16,11 @@ namespace esx {
         }
         mCountRegister.write(mCountRegister.read() + 2);
 
+        U8 random = mRandomRegister.get(RandomRegisterLayout::Field::Random).as<U8>();
+        U8 wired = mWiredRegister.get(WiredRegisterLayout::Field::Wired).as<U8>();
+        random--;
+        if (random < wired) random = wired;
+        mRandomRegister.set(RandomRegisterLayout::Field::Random, random);
 
         Coprocessor::clock(clocks);
 
@@ -58,18 +64,87 @@ namespace esx {
 
     void SystemControlCoprocessor::TLBR()
     {
+        if (!isCoprocessorUsable(0)) {
+            mCPU->raiseException(ExceptionType::CoprocessorUnusable);
+            return;
+        }
+
+        U8 index = mIndexRegister.get(IndexRegisterLayout::Field::Index).as<U8>();
+
+        TLBEntry& entry = mTLB[index];
+
+        mPageMaskRegister.write(entry.PageMask.read());
+
+        mEntryHiRegister.write(entry.EntryHi.read() & ~(entry.PageMask.read()));
+
+        mEntryLo1Register.write(entry.EntryLo1.read());
+        mEntryLo1Register.set(EntryLoRegisterLayout::Field::G, entry.EntryHi.get(EntryHiRegisterLayout::Field::G).as<BIT>());
+
+        mEntryLo0Register.write(entry.EntryLo0.read());
+        mEntryLo0Register.set(EntryLoRegisterLayout::Field::G, entry.EntryHi.get(EntryHiRegisterLayout::Field::G).as<BIT>());
     }
 
     void SystemControlCoprocessor::TLBWI()
     {
+        if (!isCoprocessorUsable(0)) {
+            mCPU->raiseException(ExceptionType::CoprocessorUnusable);
+            return;
+        }
+
+        U8 index = mIndexRegister.get(IndexRegisterLayout::Field::Index).as<U8>();
+
+        TLBEntry& entry = mTLB[index];
+
+        entry.PageMask.write(mPageMaskRegister.read());
+
+        entry.EntryHi.write(mEntryHiRegister.read() & ~(mPageMaskRegister.read()));
+        entry.EntryHi.set(EntryHiRegisterLayout::Field::G, mEntryLo0Register.get(EntryLoRegisterLayout::Field::G).as<BIT>() & mEntryLo1Register.get(EntryLoRegisterLayout::Field::G).as<BIT>());
+
+        entry.EntryLo1.write(mEntryLo1Register.read());
+        
+        entry.EntryLo0.write(mEntryLo0Register.read());
     }
 
     void SystemControlCoprocessor::TLBWR()
     {
+        if (!isCoprocessorUsable(0)) {
+            mCPU->raiseException(ExceptionType::CoprocessorUnusable);
+            return;
+        }
+
+        U8 index = mRandomRegister.get(RandomRegisterLayout::Field::Random).as<U8>();
+
+        TLBEntry& entry = mTLB[index];
+
+        entry.PageMask.write(mPageMaskRegister.read());
+
+        entry.EntryHi.write(mEntryHiRegister.read() & ~(mPageMaskRegister.read()));
+        entry.EntryHi.set(EntryHiRegisterLayout::Field::G, mEntryLo0Register.get(EntryLoRegisterLayout::Field::G).as<BIT>() & mEntryLo1Register.get(EntryLoRegisterLayout::Field::G).as<BIT>());
+
+        entry.EntryLo1.write(mEntryLo1Register.read());
+
+        entry.EntryLo0.write(mEntryLo0Register.read());
     }
 
     void SystemControlCoprocessor::TLBP()
     {
+        if (!isCoprocessorUsable(0)) {
+            mCPU->raiseException(ExceptionType::CoprocessorUnusable);
+            return;
+        }
+
+        mIndexRegister.set(IndexRegisterLayout::Field::Probe, ESX_TRUE);
+        for (U8 i = 0; i < mTLB.size(); i++) {
+            TLBEntry& entry = mTLB[i];
+
+            if (
+                (entry.EntryHi.get(EntryHiRegisterLayout::Field::VPN2).as<U32>() == mEntryHiRegister.get(EntryHiRegisterLayout::Field::VPN2).as<U32>()) &&
+                (entry.EntryHi.get(EntryHiRegisterLayout::Field::G).as<BIT>() == ESX_TRUE || (entry.EntryHi.get(EntryHiRegisterLayout::Field::ASID).as<U32>() == mEntryHiRegister.get(EntryHiRegisterLayout::Field::ASID).as<U32>()))
+                ) {
+                mIndexRegister.set(IndexRegisterLayout::Field::Index, i);
+                mIndexRegister.set(IndexRegisterLayout::Field::Probe, ESX_FALSE);
+            }
+        }
     }
 
     void SystemControlCoprocessor::ERET()
@@ -191,7 +266,13 @@ namespace esx {
             case SystemControlRegisterType::EntryLo1: mEntryLo1Register.write(value); break;
             case SystemControlRegisterType::Context:  mContextRegister.write(value); break;
             case SystemControlRegisterType::PageMask: mPageMaskRegister.write(value); break;
-            case SystemControlRegisterType::Wired:    mWiredRegister.write(value); break;
+
+            case SystemControlRegisterType::Wired: {
+                mWiredRegister.write(value); 
+                mRandomRegister.set(RandomRegisterLayout::Field::Random, 31);
+                break;
+            }
+
             case SystemControlRegisterType::Count:    mCountRegister.write(value); break;
             case SystemControlRegisterType::EntryHi:  mEntryHiRegister.write(value); break;
 

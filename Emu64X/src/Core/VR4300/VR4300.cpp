@@ -16,7 +16,8 @@
 namespace esx {
 
 	VR4300::VR4300()
-		:	BusDevice(ESX_TEXT("VR4300"))
+		:	BusDevice(ESX_TEXT("VR4300")),
+			mCP0(this)
 	{
 		reset();
 
@@ -78,34 +79,56 @@ namespace esx {
 		mCyclesToWait--;
 
 		mInterruptControl->clock(mCycles);
-		handleInterrupts();
+		mCP0.clock(mCycles);
+
+		mCP0.handleInterrupts();
 
 		mCycles++;
 	}
 
 
-	U32 VR4300::fetch(U32 address)
+	U32 VR4300::fetch(U32 virtualAddress)
 	{
-		if (ADDRESS_UNALIGNED(address, U32)) {
+		if (ADDRESS_UNALIGNED(virtualAddress, U32)) {
 			raiseException(ExceptionType::AddressErrorLoad);
 			return 0;
 		}
 
-		if (isCacheActive(address)) {
-			U32 index = (address >> 2) & 0x7;
-			U32 cacheLineNumber = (address >> 5) & 0x1FF;
-			U32 tag = address >> 12;
+		U32 physicalAddress = mCP0.AddressTranslation(virtualAddress);
+
+		if (isCacheActive(physicalAddress)) {
+			U32 index = (virtualAddress >> 2) & 0x7;
+			U32 cacheLineNumber = (virtualAddress >> 5) & 0x1FF;
+			U32 tag = physicalAddress >> 12;
 
 			auto& cacheLine = mICache.CacheLines[cacheLineNumber];
 			if (cacheLine.Tag == tag && cacheLine.Valid) {
 				auto& instruction = cacheLine.Instructions[index];
 				return instruction.Word;
 			} else {
-				return cacheMiss(address, cacheLineNumber, tag, index);
+				return cacheMiss(virtualAddress, physicalAddress, cacheLineNumber, tag, index);
 			}
 		} else {
-			return mRootBus->load<U32>(address);
+			return mRootBus->load<U32>(physicalAddress);
 		}
+	}
+
+
+	U32 VR4300::cacheMiss(U32 virtualAddress, U32 physicalAddress, U32 cacheLineNumber, U32 tag, U32 startIndex)
+	{
+		auto& cacheLine = mICache.CacheLines[cacheLineNumber];
+
+		U32 baseAddr = physicalAddress & ~0x1F;
+
+		for (U32 index = 0; index < cacheLine.Instructions.size(); index++) {
+			auto& instruction = cacheLine.Instructions[index];
+			instruction.Word = mRootBus->load<U32>(baseAddr + index * sizeof(U32));
+		}
+
+		cacheLine.Tag = tag;
+		cacheLine.Valid = ESX_TRUE;
+
+		return cacheLine.Instructions[startIndex].Word;
 	}
 
 	static const Array<ExecuteFunction, 64> primaryOpCodeDecode = {
@@ -1652,22 +1675,6 @@ namespace esx {
 		return mRegisters[index.Value];
 	}
 
-	U32 VR4300::cacheMiss(U32 address, U32 cacheLineNumber, U32 tag, U32 startIndex)
-	{
-		auto& cacheLine = mICache.CacheLines[cacheLineNumber];
-
-		U32 baseAddr = address & ~0x1F;
-
-		for (U32 index = 0; index < cacheLine.Instructions.size(); index++) {
-			auto& instruction = cacheLine.Instructions[index];
-			instruction.Word = mRootBus->load<U32>(baseAddr + index * sizeof(U32));
-		}
-
-		cacheLine.Tag = tag;
-		cacheLine.Valid = ESX_TRUE;
-
-		return cacheLine.Instructions[startIndex].Word;
-	}
 
 	void VR4300::iCacheStore(U32 address, U32 value)
 	{
@@ -1721,32 +1728,6 @@ namespace esx {
 			doWriteQueueOperation(*it);
 		}
 		mWriteQueue.clear();
-	}
-
-	void VR4300::handleInterrupts()
-	{
-		/*U32 cause = getCP0Register(COP0Register::Cause);
-		U32 sr = getCP0Register(COP0Register::SR);
-
-		U32 opcodeNextInstruction = fetch(mPC);
-		if ((opcodeNextInstruction >> 26) != 0x12) {
-			if (mInterruptControl->interruptPending()) {
-				cause |= (1 << 10);
-			}
-			else {
-				cause &= ~(1 << 10);
-			}
-
-			setCP0Register(COP0Register::Cause, cause);
-
-			BIT IEC = sr & 0x1;
-			U8 IM = (sr >> 8) & 0xFF;
-			U8 IP = (cause >> 8) & 0xFF;
-
-			if (IEC && ((IM & IP) > 0)) {
-				raiseException(ExceptionType::Interrupt);
-			}
-		}*/
 	}
 
 	void VR4300::raiseException(ExceptionType type) {

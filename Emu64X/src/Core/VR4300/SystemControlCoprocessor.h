@@ -71,53 +71,46 @@ namespace esx {
 	};
 	using RandomRegister = Register<RandomRegisterLayout, U32>;
 
-	struct EntryLo0RegisterLayout {
-		enum class Field { Value };
+	struct EntryLoRegisterLayout {
+		enum class Field { G, V, D, C, PFN };
 
 		static constexpr U32 Mask = 0xFFFFFFFF;
 
 		static constexpr Pair<I32, I32> info(Field f) {
 			switch (f) {
-			case Field::Value: return { 0, 31 };
+				case Field::G: return { 0, 1 };
+				case Field::V: return { 1, 2 };
+				case Field::D: return { 2, 3 };
+				case Field::C: return { 3, 5 };
+				case Field::PFN: return { 6, 25 };
 			}
 		}
 	};
-	using EntryLo0Register = Register<EntryLo0RegisterLayout, U32>;
-
-	struct EntryLo1RegisterLayout {
-		enum class Field { Value };
-
-		static constexpr U32 Mask = 0xFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-			case Field::Value: return { 0, 31 };
-			}
-		}
-	};
-	using EntryLo1Register = Register<EntryLo1RegisterLayout, U32>;
+	using EntryLoRegister = Register<EntryLoRegisterLayout, U32>;
 
 	struct EntryHiRegisterLayout {
-		enum class Field { Value };
+		enum class Field { VPN2, G, ASID };
 
 		static constexpr U32 Mask = 0xFFFFFFFF;
 
 		static constexpr Pair<I32, I32> info(Field f) {
 			switch (f) {
-			case Field::Value: return { 0, 31 };
+				case Field::ASID: return { 0, 7 };
+				case Field::G: return { 12, 13 };
+				case Field::VPN2: return { 13, 31 };
 			}
 		}
 	};
 	using EntryHiRegister = Register<EntryHiRegisterLayout, U32>;
 
 	struct PageMaskRegisterLayout {
-		enum class Field { Value };
+		enum class Field { MASK };
 
 		static constexpr U32 Mask = 0xFFFFFFFF;
 
 		static constexpr Pair<I32, I32> info(Field f) {
 			switch (f) {
-			case Field::Value: return { 0, 31 };
+			case Field::MASK: return { 13, 24 };
 			}
 		}
 	};
@@ -267,25 +260,25 @@ namespace esx {
 
 		static constexpr Pair<I32, I32> info(Field f) {
 			switch (f) {
-			case Field::IE: return { 0, 1 };
-			case Field::EXL: return { 1, 2 };
-			case Field::ERL: return { 2, 3 };
-			case Field::KSU: return { 3, 4 };
-			case Field::UX: return { 4, 5 };
-			case Field::SX: return { 5, 6 };
-			case Field::KX: return { 6, 7 };
-			case Field::IM: return { 8, 15 };
-			case Field::DE: return { 15, 16 };
-			case Field::CR: return { 16, 17 };
-			case Field::CH: return { 17, 18 };
-			case Field::SR: return { 19, 20 };
-			case Field::TS: return { 20, 21 };
-			case Field::BEV: return { 21, 22 };
-			case Field::ITS: return { 23, 24 };
-			case Field::RE: return { 25, 26 };
-			case Field::FR: return { 26, 27 };
-			case Field::RP: return { 27, 28 };
-			case Field::CU: return { 28, 31 };
+				case Field::IE: return { 0, 1 };
+				case Field::EXL: return { 1, 2 };
+				case Field::ERL: return { 2, 3 };
+				case Field::KSU: return { 3, 4 };
+				case Field::UX: return { 4, 5 };
+				case Field::SX: return { 5, 6 };
+				case Field::KX: return { 6, 7 };
+				case Field::IM: return { 8, 15 };
+				case Field::DE: return { 15, 16 };
+				case Field::CR: return { 16, 17 };
+				case Field::CH: return { 17, 18 };
+				case Field::SR: return { 19, 20 };
+				case Field::TS: return { 20, 21 };
+				case Field::BEV: return { 21, 22 };
+				case Field::ITS: return { 23, 24 };
+				case Field::RE: return { 25, 26 };
+				case Field::FR: return { 26, 27 };
+				case Field::RP: return { 27, 28 };
+				case Field::CU: return { 28, 31 };
 			}
 		}
 	};
@@ -438,9 +431,18 @@ namespace esx {
 		IP7 = 1 << 7
 	};
 
+
+	struct TLBEntry {
+		EntryLoRegister	   EntryLo0;
+		EntryLoRegister    EntryLo1;
+		EntryHiRegister    EntryHi;
+		PageMaskRegister   PageMask;
+	};
+	using TLB = Array<TLBEntry, 32>;
+
 	class SystemControlCoprocessor : public Coprocessor {
 	public:
-		SystemControlCoprocessor();
+		SystemControlCoprocessor(VR4300* cpu);
 		~SystemControlCoprocessor() = default;
 
 		virtual void clock(U64 clocks) override;
@@ -472,8 +474,8 @@ namespace esx {
 	private:
 		IndexRegister      mIndexRegister;
 		RandomRegister     mRandomRegister;
-		EntryLo0Register   mEntryLo0Register;
-		EntryLo1Register   mEntryLo1Register;
+		EntryLoRegister	   mEntryLo0Register;
+		EntryLoRegister    mEntryLo1Register;
 		EntryHiRegister    mEntryHiRegister;
 		PageMaskRegister   mPageMaskRegister;
 		WiredRegister      mWiredRegister;
@@ -495,5 +497,7 @@ namespace esx {
 		PErrRegister       mPErrRegister;
 		CacheErrRegister   mCacheErrRegister;
 		ErrorEPCRegister   mErrorEPCRegister;
+
+		TLB mTLB;
 	};
 }

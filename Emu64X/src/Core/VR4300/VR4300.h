@@ -169,7 +169,7 @@ namespace esx {
 
 		virtual void init() override;
 		void clock();
-		U32 fetch(U32 address);
+		U32 fetch(U32 virtualAddress);
 		void decode(Instruction& result, U32 instruction, U32 address, BIT suppressException = ESX_FALSE);
 		virtual void reset();
 
@@ -235,7 +235,6 @@ namespace esx {
 			return ESX_FALSE;
 		}
 
-		void handleInterrupts();
 		void raiseException(ExceptionType type);
 
 		inline U64 getClocks() const { return mCycles; }
@@ -395,7 +394,7 @@ namespace esx {
 		void setCP0Register(RegisterIndex index, U32 value);
 		U32 getCP0Register(RegisterIndex index);
 
-		U32 cacheMiss(U32 address, U32 cacheLineNumber, U32 tag, U32 startIndex);
+		U32 cacheMiss(U32 virtualAddress, U32 physicalAddress, U32 cacheLineNumber, U32 tag, U32 startIndex);
 
 		void iCacheStore(U32 address, U32 value);
 

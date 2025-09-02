@@ -256,15 +256,20 @@ namespace esx {
 		}
 
 		RegisterField<Storage> get(typename Layout::Field fieldName) const {
-			auto [pos, len] = Layout::info(fieldName);
-			Storage mask = ((Storage(1) << len) - 1) << pos;
-			return (mValue & mask) >> pos;
+			auto [start, end] = Layout::info(fieldName);
+			I32 len = (end - start) + 1;
+			
+			Storage mask = ((Storage(1) << len) - 1) << start;
+			return (mValue & mask) >> start;
 		}
 
 		void set(typename Layout::Field fieldName, Storage fieldValue) {
-			auto [pos, len] = Layout::info(fieldName);
-			Storage mask = ((Storage(1) << len) - 1) << pos;
-			mValue = (mValue & ~mask) | ((fieldValue << pos) & mask);
+			auto [start, end] = Layout::info(fieldName);
+			I32 len = (end - start) + 1;
+
+			Storage mask = ((Storage(1) << len) - 1) << start;
+
+			mValue = (mValue & ~mask) | ((fieldValue << start) & mask);
 		}
 
 	private:
@@ -287,6 +292,7 @@ namespace esx {
 			return Value;
 		}
 	};
+
 
 
 #ifdef ESX_DEBUG
