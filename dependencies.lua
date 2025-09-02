@@ -1,0 +1,9 @@
+IncludeDir = {}
+IncludeDir["GLFW"] = "%{wks.location}/Emu64X/vendor/glfw/include"
+IncludeDir["ImGui"] = "%{wks.location}/Emu64X/vendor/imgui"
+IncludeDir["Glad"] = "%{wks.location}/Emu64X/vendor/Glad/include"
+IncludeDir["glm"] = "%{wks.location}/Emu64X/vendor/glm"
+IncludeDir["stb"] = "%{wks.location}/Emu64X/vendor/stb"
+IncludeDir["ImGuiConsole"] = "%{wks.location}/Emu64X/vendor/imgui-console/include"
+IncludeDir["Optick"] = "%{wks.location}/Emu64X/vendor/optick/src"
+IncludeDir["miniaudio"] = "%{wks.location}/Emu64X/vendor/miniaudio"

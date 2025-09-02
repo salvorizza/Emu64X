@@ -1,0 +1,301 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Resources">
+      <UniqueIdentifier>{000BCD17-6C75-818E-B5B3-3234215D5FE3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources\commons">
+      <UniqueIdentifier>{CB57621D-376E-60B3-80E5-EBD4EC3A313B}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources\commons\icons">
+      <UniqueIdentifier>{D6763CA9-42AE-8440-4BB8-E863B76EAB39}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources\vendor">
+      <UniqueIdentifier>{5D41E6BF-493A-0512-726C-EA965EC4E41D}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources\vendor\glfw">
+      <UniqueIdentifier>{3C77731B-A8E3-2E16-71D7-C673DD02517E}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources\vendor\glfw\examples">
+      <UniqueIdentifier>{6AA81921-56CE-E387-3F14-69532BD90854}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources\vendor\optick">
+      <UniqueIdentifier>{365C27D9-A293-6F70-AB9D-D39317549669}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources\vendor\optick\gui">
+      <UniqueIdentifier>{AA126299-1620-907F-9F06-8C6A0B135C36}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources\vendor\optick\gui\Optick">
+      <UniqueIdentifier>{C300365E-AF3C-39C8-184F-51BF04AAE1E2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources\vendor\optick\gui\Optick\Resources">
+      <UniqueIdentifier>{ED35F592-D948-F5EB-8232-D2D86E249239}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources\vendor\optick\gui\Optick\TimeLine">
+      <UniqueIdentifier>{C981A94F-35E7-3CD6-BEBF-DEAE2A243245}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources\vendor\optick\gui\Optick\TimeLine\Icons">
+      <UniqueIdentifier>{349783A6-A05D-E0C2-E9B8-6E2555BE4E27}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src">
+      <UniqueIdentifier>{2DAB880B-99B4-887C-2230-9F7C8E38947C}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\Base">
+      <UniqueIdentifier>{D70B1CCF-C3D8-76DA-ECF1-6482D81DAC68}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\Core">
+      <UniqueIdentifier>{A5D31CCF-91A0-77DA-BAB9-6582A6E5AC68}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\UI">
+      <UniqueIdentifier>{3A4B661C-26ED-90F2-0FA8-A446FBE81743}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\UI\Application">
+      <UniqueIdentifier>{FD2D7479-E911-35CF-5272-2F223E751F51}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\UI\Graphics">
+      <UniqueIdentifier>{BA54038D-26E0-7051-2FF1-F3459BFBCC51}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\UI\Panels">
+      <UniqueIdentifier>{4C569521-B816-1158-8151-5AD5EDD05534}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\UI\Window">
+      <UniqueIdentifier>{E1327A32-4DF3-F568-162E-3FE682AD3A45}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\Utils">
+      <UniqueIdentifier>{4D9AFFB3-B904-B42A-0243-65D06EEC917F}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\Base\Assert.h">
+      <Filter>src\Base</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Base\Base.h">
+      <Filter>src\Base</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Base\Bus.h">
+      <Filter>src\Base</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Base\PlatformDetection.h">
+      <Filter>src\Base</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\Bios.h">
+      <Filter>src\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\IRenderer.h">
+      <Filter>src\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\InterruptControl.h">
+      <Filter>src\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\RAM.h">
+      <Filter>src\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\Scheduler.h">
+      <Filter>src\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\VR4300.h">
+      <Filter>src\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\Application\Application.h">
+      <Filter>src\UI\Application</Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\Application\ApplicationManager.h">
+      <Filter>src\UI\Application</Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\Application\LoopTimer.h">
+      <Filter>src\UI\Application</Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\Graphics\BatchRenderer.h">
+      <Filter>src\UI\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\Graphics\FrameBuffer.h">
+      <Filter>src\UI\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\Graphics\IndexBuffer.h">
+      <Filter>src\UI\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\Graphics\PixelBuffer.h">
+      <Filter>src\UI\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\Graphics\Shader.h">
+      <Filter>src\UI\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\Graphics\SoftwareRenderer.h">
+      <Filter>src\UI\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\Graphics\Texture2D.h">
+      <Filter>src\UI\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\Graphics\VertexArray.h">
+      <Filter>src\UI\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\Graphics\VertexBuffer.h">
+      <Filter>src\UI\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\Panels\CPUStatusPanel.h">
+      <Filter>src\UI\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\Panels\ConsolePanel.h">
+      <Filter>src\UI\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\Panels\DisassemblerPanel.h">
+      <Filter>src\UI\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\Panels\FileDialogPanel.h">
+      <Filter>src\UI\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\Panels\MemoryEditor.h">
+      <Filter>src\UI\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\Panels\MemoryEditorPanel.h">
+      <Filter>src\UI\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\Panels\Panel.h">
+      <Filter>src\UI\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\Panels\ViewportPanel.h">
+      <Filter>src\UI\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\Utils.h">
+      <Filter>src\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\Window\ControllerManager.h">
+      <Filter>src\UI\Window</Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\Window\FontAwesome5.h">
+      <Filter>src\UI\Window</Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\Window\ImGuiManager.h">
+      <Filter>src\UI\Window</Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\Window\InputManager.h">
+      <Filter>src\UI\Window</Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\Window\Window.h">
+      <Filter>src\UI\Window</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Utils\Geometry.h">
+      <Filter>src\Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Utils\LoggingSystem.h">
+      <Filter>src\Utils</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\Base\Bus.cpp">
+      <Filter>src\Base</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Core\Bios.cpp">
+      <Filter>src\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Core\InterruptControl.cpp">
+      <Filter>src\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Core\RAM.cpp">
+      <Filter>src\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Core\Scheduler.cpp">
+      <Filter>src\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Core\VR4300.cpp">
+      <Filter>src\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\Application\ApplicationManager.cpp">
+      <Filter>src\UI\Application</Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\Graphics\BatchRenderer.cpp">
+      <Filter>src\UI\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\Graphics\FrameBuffer.cpp">
+      <Filter>src\UI\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\Graphics\IndexBuffer.cpp">
+      <Filter>src\UI\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\Graphics\PixelBuffer.cpp">
+      <Filter>src\UI\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\Graphics\Shader.cpp">
+      <Filter>src\UI\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\Graphics\SoftwareRenderer.cpp">
+      <Filter>src\UI\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\Graphics\Texture2D.cpp">
+      <Filter>src\UI\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\Graphics\VertexArray.cpp">
+      <Filter>src\UI\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\Graphics\VertexBuffer.cpp">
+      <Filter>src\UI\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\Panels\CPUStatusPanel.cpp">
+      <Filter>src\UI\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\Panels\ConsolePanel.cpp">
+      <Filter>src\UI\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\Panels\DisassemblerPanel.cpp">
+      <Filter>src\UI\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\Panels\FileDialogPanel.cpp">
+      <Filter>src\UI\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\Panels\MemoryEditorPanel.cpp">
+      <Filter>src\UI\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\Panels\Panel.cpp">
+      <Filter>src\UI\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\Panels\ViewportPanel.cpp">
+      <Filter>src\UI\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\Utils.cpp">
+      <Filter>src\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\Window\ControllerManager.cpp">
+      <Filter>src\UI\Window</Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\Window\ImGuiManager.cpp">
+      <Filter>src\UI\Window</Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\Window\InputManager.cpp">
+      <Filter>src\UI\Window</Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\Window\Window.cpp">
+      <Filter>src\UI\Window</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Utils\Geometry.cpp">
+      <Filter>src\Utils</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Utils\LoggingSystem.cpp">
+      <Filter>src\Utils</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="commons\icons\Logo.ico">
+      <Filter>Resources\commons\icons</Filter>
+    </None>
+    <None Include="vendor\glfw\examples\glfw.ico">
+      <Filter>Resources\vendor\glfw\examples</Filter>
+    </None>
+    <None Include="vendor\optick\gui\Optick\Resources\Bug.ico">
+      <Filter>Resources\vendor\optick\gui\Optick\Resources</Filter>
+    </None>
+    <None Include="vendor\optick\gui\Optick\Resources\icon.ico">
+      <Filter>Resources\vendor\optick\gui\Optick\Resources</Filter>
+    </None>
+    <None Include="vendor\optick\gui\Optick\TimeLine\Icons\Stop-icon.ico">
+      <Filter>Resources\vendor\optick\gui\Optick\TimeLine\Icons</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="resources.rc">
+      <Filter>Resources</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+</Project>
