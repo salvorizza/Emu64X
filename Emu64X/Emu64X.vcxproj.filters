@@ -46,6 +46,9 @@
     <Filter Include="src\Core">
       <UniqueIdentifier>{A5D31CCF-91A0-77DA-BAB9-6582A6E5AC68}</UniqueIdentifier>
     </Filter>
+    <Filter Include="src\Core\VR4300">
+      <UniqueIdentifier>{E3B1F5B0-4F3D-6375-584E-E669C458BF75}</UniqueIdentifier>
+    </Filter>
     <Filter Include="src\UI">
       <UniqueIdentifier>{3A4B661C-26ED-90F2-0FA8-A446FBE81743}</UniqueIdentifier>
     </Filter>
@@ -93,8 +96,14 @@
     <ClInclude Include="src\Core\Scheduler.h">
       <Filter>src\Core</Filter>
     </ClInclude>
-    <ClInclude Include="src\Core\VR4300.h">
-      <Filter>src\Core</Filter>
+    <ClInclude Include="src\Core\VR4300\Coprocessor.h">
+      <Filter>src\Core\VR4300</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\VR4300\SystemControlCoprocessor.h">
+      <Filter>src\Core\VR4300</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\VR4300\VR4300.h">
+      <Filter>src\Core\VR4300</Filter>
     </ClInclude>
     <ClInclude Include="src\UI\Application\Application.h">
       <Filter>src\UI\Application</Filter>
@@ -197,8 +206,14 @@
     <ClCompile Include="src\Core\Scheduler.cpp">
       <Filter>src\Core</Filter>
     </ClCompile>
-    <ClCompile Include="src\Core\VR4300.cpp">
-      <Filter>src\Core</Filter>
+    <ClCompile Include="src\Core\VR4300\Coprocessor.cpp">
+      <Filter>src\Core\VR4300</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Core\VR4300\SystemControlCoprocessor.cpp">
+      <Filter>src\Core\VR4300</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Core\VR4300\VR4300.cpp">
+      <Filter>src\Core\VR4300</Filter>
     </ClCompile>
     <ClCompile Include="src\UI\Application\ApplicationManager.cpp">
       <Filter>src\UI\Application</Filter>

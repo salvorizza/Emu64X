@@ -235,6 +235,11 @@ namespace esx {
 	template <typename Layout, typename Storage = U32>
 	class Register {
 	public:
+		Register()
+			: mValue(0)
+		{
+		}
+
 		Register(Storage& value)
 			: mValue(value)
 		{

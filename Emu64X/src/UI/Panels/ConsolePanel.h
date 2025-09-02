@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Core/VR4300.h>
+#include <Core/VR4300/VR4300.h>
 #include <imgui_console/imgui_console.h>
 
 #include "Panel.h"

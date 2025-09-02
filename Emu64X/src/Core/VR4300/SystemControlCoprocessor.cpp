@@ -3,74 +3,181 @@
 #include "VR4300.h"
 
 namespace esx {
-	
-    void SystemControlCoprocessor::CO(VR4300* cpu)
+    SystemControlCoprocessor::SystemControlCoprocessor()
+        : Coprocessor(0)
     {
-        switch (cpu->mCurrentInstruction.CoprocessorFunction()) {
+    }
+
+    void SystemControlCoprocessor::clock(U64 clocks)
+    {
+        if (mCountRegister.read() == mCompareRegister.read()) {
+            generateInterrupt(Interrupt::IP7);
+        }
+        mCountRegister.write(mCountRegister.read() + 2);
+
+
+        Coprocessor::clock(clocks);
+
+        handleInterrupts();
+    }
+
+    void SystemControlCoprocessor::CO()
+    {
+        switch (mCPU->mCurrentInstruction.CoprocessorFunction()) {
             case 1: {
-                TLBR(cpu);
+                TLBR();
                 break;
             }
 
             case 2: {
-                TLBWI(cpu);
+                TLBWI();
                 break;
             }
 
             case 6: {
-                TLBWR(cpu);
+                TLBWR();
                 break;
             }
 
             case 8: {
-                TLBP(cpu);
+                TLBP();
                 break;
             }
 
             case 16: {
-                cpu->raiseException(ExceptionType::ReservedInstruction);
+                raiseException(ExceptionType::ReservedInstruction);
                 break;
             }
 
             case 24: {
-                ERET(cpu);
+                ERET();
                 break;
             }
         }
     }
 
-    void SystemControlCoprocessor::ERET(VR4300* cpu)
+    void SystemControlCoprocessor::TLBR()
     {
+    }
+
+    void SystemControlCoprocessor::TLBWI()
+    {
+    }
+
+    void SystemControlCoprocessor::TLBWR()
+    {
+    }
+
+    void SystemControlCoprocessor::TLBP()
+    {
+    }
+
+    void SystemControlCoprocessor::ERET()
+    {
+        U64 PC = 0;
+        if (mStatusRegister.get(StatusRegisterLayout::Field::ERL).as<BIT>() == ESX_TRUE) {
+            PC = mErrorEPCRegister.get(ErrorEPCRegisterLayout::Field::Value).as<U64>();
+            mStatusRegister.set(StatusRegisterLayout::Field::ERL, ESX_FALSE);
+        } else {
+            PC = mEPCRegister.get(EPCRegisterLayout::Field::Value).as<U64>();
+            mStatusRegister.set(StatusRegisterLayout::Field::EXL, ESX_FALSE);
+        }
+
+        mCPU->mPC = PC;
+        mCPU->mNextPC = PC + 4;
+
+        mCPU->mLLBit = ESX_FALSE;
+    }
+
+    void SystemControlCoprocessor::handleInterrupts()
+    {
+        if (areInterruptsPending() && areInterruptsEnabled()) {
+            raiseException(ExceptionType::Interrupt);
+        }
+    }
+
+    void SystemControlCoprocessor::raiseException(ExceptionType type)
+    {
+        /*Set FP Control Status Register
+        EnHi < -VPN2, ASID
+        X / Context < -VPN2
+        Set Cause Register
+        EXcCode, CE
+        BadVAddr Register Setting
+            Comments
+            ; FP Control/Status Register are 
+            only set if the respective exception 
+            occurs.
+            EnHi, X/Context are set only for 
+            TLB-Invalid, Modification & Miss 
+            exceptions. It is not set by bus 
+            error exceptions, however.
+        */
+
+        mCauseRegister.set(CauseRegisterLayout::Field::ExcCode, (U8)type);
+        if(type == ExceptionType::CoprocessorUnusable) mCauseRegister.set(CauseRegisterLayout::Field::CE, 0);
+
+        if (mStatusRegister.get(StatusRegisterLayout::Field::EXL).as<BIT>() == ESX_FALSE) {
+            if (mCPU->mBranchSlot == ESX_FALSE) {
+                mCauseRegister.set(CauseRegisterLayout::Field::BD, ESX_FALSE);
+                mEPCRegister.set(EPCRegisterLayout::Field::Value, mCPU->mCurrentPC);
+            } else {
+                mCauseRegister.set(CauseRegisterLayout::Field::BD, ESX_TRUE);
+                mEPCRegister.set(EPCRegisterLayout::Field::Value, mCPU->mCurrentPC - 4);
+            }
+        }
+
+        mStatusRegister.set(StatusRegisterLayout::Field::EXL, ESX_TRUE);
+
+        if (mStatusRegister.get(StatusRegisterLayout::Field::BEV).as<BIT>() == ESX_TRUE) {
+            mCPU->mPC = 0xBFC00200 + 180;
+        } else {
+            mCPU->mPC = 0x80000000 + 180;
+        }
+
+        mCPU->mNextPC = mCPU->mPC + 4;
+    }
+
+    U32 SystemControlCoprocessor::AddressTranslation(U32 virtualAddress)
+    {
+        U32 physicalAddress = 0;
+
+        if (virtualAddress >= 0x80000000 && virtualAddress <= 0xBFFFFFFF) {
+            //KSEG0,KSEG1 directly mapped
+            physicalAddress = virtualAddress & 0x1FFFFFFF;
+        }
+
+        return physicalAddress;
     }
 
     U64 SystemControlCoprocessor::getRegister(RegisterIndex reg) const
     {
         switch (static_cast<SystemControlRegisterType>(reg.Value)) {
-        case SystemControlRegisterType::Index:    return mIndexRegister.read();
-        case SystemControlRegisterType::Random:   return mRandomRegister.read();
-        case SystemControlRegisterType::EntryLo0: return mEntryLo0Register.read();
-        case SystemControlRegisterType::EntryLo1: return mEntryLo1Register.read();
-        case SystemControlRegisterType::Context:  return mContextRegister.read();
-        case SystemControlRegisterType::PageMask: return mPageMaskRegister.read();
-        case SystemControlRegisterType::Wired:    return mWiredRegister.read();
-        case SystemControlRegisterType::BadVAddr: return mBadVAddrRegister.read();
-        case SystemControlRegisterType::Count:    return mCountRegister.read();
-        case SystemControlRegisterType::EntryHi:  return mEntryHiRegister.read();
-        case SystemControlRegisterType::Compare:  return mCompareRegister.read();
-        case SystemControlRegisterType::Status:   return mStatusRegister.read();
-        case SystemControlRegisterType::Cause:    return mCauseRegister.read();
-        case SystemControlRegisterType::EPC:      return mEPCRegister.read();
-        case SystemControlRegisterType::PRId:     return mPRIdRegister.read();
-        case SystemControlRegisterType::Config:   return mConfigRegister.read();
-        case SystemControlRegisterType::LLAddr:   return mLLAddrRegister.read();
-        case SystemControlRegisterType::WatchLo:  return mWatchLoRegister.read();
-        case SystemControlRegisterType::WatchHi:  return mWatchHiRegister.read();
-        case SystemControlRegisterType::XContext: return mXContextRegister.read();
-        case SystemControlRegisterType::PErr:     return mPErrRegister.read();
-        case SystemControlRegisterType::CacheErr: return mCacheErrRegister.read();
-        case SystemControlRegisterType::TagLo:    return mTagLoRegister.read();
-        case SystemControlRegisterType::TagHi:    return mTagHiRegister.read();
-        case SystemControlRegisterType::ErrorEPC: return mErrorEPCRegister.read();
+            case SystemControlRegisterType::Index:    return mIndexRegister.read();
+            case SystemControlRegisterType::Random:   return mRandomRegister.read();
+            case SystemControlRegisterType::EntryLo0: return mEntryLo0Register.read();
+            case SystemControlRegisterType::EntryLo1: return mEntryLo1Register.read();
+            case SystemControlRegisterType::Context:  return mContextRegister.read();
+            case SystemControlRegisterType::PageMask: return mPageMaskRegister.read();
+            case SystemControlRegisterType::Wired:    return mWiredRegister.read();
+            case SystemControlRegisterType::BadVAddr: return mBadVAddrRegister.read();
+            case SystemControlRegisterType::Count:    return mCountRegister.read();
+            case SystemControlRegisterType::EntryHi:  return mEntryHiRegister.read();
+            case SystemControlRegisterType::Compare:  return mCompareRegister.read();
+            case SystemControlRegisterType::Status:   return mStatusRegister.read();
+            case SystemControlRegisterType::Cause:    return mCauseRegister.read();
+            case SystemControlRegisterType::EPC:      return mEPCRegister.read();
+            case SystemControlRegisterType::PRId:     return mPRIdRegister.read();
+            case SystemControlRegisterType::Config:   return mConfigRegister.read();
+            case SystemControlRegisterType::LLAddr:   return mLLAddrRegister.read();
+            case SystemControlRegisterType::WatchLo:  return mWatchLoRegister.read();
+            case SystemControlRegisterType::WatchHi:  return mWatchHiRegister.read();
+            case SystemControlRegisterType::XContext: return mXContextRegister.read();
+            case SystemControlRegisterType::PErr:     return mPErrRegister.read();
+            case SystemControlRegisterType::CacheErr: return mCacheErrRegister.read();
+            case SystemControlRegisterType::TagLo:    return mTagLoRegister.read();
+            case SystemControlRegisterType::TagHi:    return mTagHiRegister.read();
+            case SystemControlRegisterType::ErrorEPC: return mErrorEPCRegister.read();
         }
         return 0;
     }
@@ -79,42 +186,67 @@ namespace esx {
     {
 
         switch (static_cast<SystemControlRegisterType>(reg.Value)) {
-        case SystemControlRegisterType::Index:    mIndexRegister.write(value); break;
-        case SystemControlRegisterType::EntryLo0: mEntryLo0Register.write(value); break;
-        case SystemControlRegisterType::EntryLo1: mEntryLo1Register.write(value); break;
-        case SystemControlRegisterType::Context:  mContextRegister.write(value); break;
-        case SystemControlRegisterType::PageMask: mPageMaskRegister.write(value); break;
-        case SystemControlRegisterType::Wired:    mWiredRegister.write(value); break;
-        case SystemControlRegisterType::Count:    mCountRegister.write(value); break;
-        case SystemControlRegisterType::EntryHi:  mEntryHiRegister.write(value); break;
-        case SystemControlRegisterType::Compare:  mCompareRegister.write(value); break;
-        case SystemControlRegisterType::Status:   mStatusRegister.write(value); break;
-        case SystemControlRegisterType::Cause:    mCauseRegister.write(value); break;
-        case SystemControlRegisterType::EPC:      mEPCRegister.write(value); break;
-        case SystemControlRegisterType::Config:   mConfigRegister.write(value); break;
-        case SystemControlRegisterType::LLAddr:   mLLAddrRegister.write(value); break;
-        case SystemControlRegisterType::WatchLo:  mWatchLoRegister.write(value); break;
-        case SystemControlRegisterType::WatchHi:  mWatchHiRegister.write(value); break;
-        case SystemControlRegisterType::XContext: mXContextRegister.write(value); break;
-        case SystemControlRegisterType::PErr:     mPErrRegister.write(value); break;
-        case SystemControlRegisterType::TagLo:    mTagLoRegister.write(value); break;
-        case SystemControlRegisterType::TagHi:    mTagHiRegister.write(value); break;
-        case SystemControlRegisterType::ErrorEPC: mErrorEPCRegister.write(value); break;
+            case SystemControlRegisterType::Index:    mIndexRegister.write(value); break;
+            case SystemControlRegisterType::EntryLo0: mEntryLo0Register.write(value); break;
+            case SystemControlRegisterType::EntryLo1: mEntryLo1Register.write(value); break;
+            case SystemControlRegisterType::Context:  mContextRegister.write(value); break;
+            case SystemControlRegisterType::PageMask: mPageMaskRegister.write(value); break;
+            case SystemControlRegisterType::Wired:    mWiredRegister.write(value); break;
+            case SystemControlRegisterType::Count:    mCountRegister.write(value); break;
+            case SystemControlRegisterType::EntryHi:  mEntryHiRegister.write(value); break;
+
+            case SystemControlRegisterType::Compare: {
+                mCompareRegister.write(value); 
+                clearInterrupt(Interrupt::IP7);
+                break;
+            }
+
+            case SystemControlRegisterType::Status:   mStatusRegister.write(value); break;
+            case SystemControlRegisterType::Cause:    mCauseRegister.write(value); break;
+            case SystemControlRegisterType::EPC:      mEPCRegister.write(value); break;
+            case SystemControlRegisterType::Config:   mConfigRegister.write(value); break;
+            case SystemControlRegisterType::LLAddr:   mLLAddrRegister.write(value); break;
+            case SystemControlRegisterType::WatchLo:  mWatchLoRegister.write(value); break;
+            case SystemControlRegisterType::WatchHi:  mWatchHiRegister.write(value); break;
+            case SystemControlRegisterType::XContext: mXContextRegister.write(value); break;
+            case SystemControlRegisterType::PErr:     mPErrRegister.write(value); break;
+            case SystemControlRegisterType::TagLo:    mTagLoRegister.write(value); break;
+            case SystemControlRegisterType::TagHi:    mTagHiRegister.write(value); break;
+            case SystemControlRegisterType::ErrorEPC: mErrorEPCRegister.write(value); break;
         }
+    }
+
+    void SystemControlCoprocessor::clearInterrupt(Interrupt interrupt)
+    {
+        mCauseRegister.set(CauseRegisterLayout::Field::IP, mCauseRegister.get(CauseRegisterLayout::Field::IP).as<U8>() & (~static_cast<U8>(interrupt)));
+    }
+
+    void SystemControlCoprocessor::generateInterrupt(Interrupt interrupt)
+    {
+        mCauseRegister.set(CauseRegisterLayout::Field::IP, mCauseRegister.get(CauseRegisterLayout::Field::IP).as<U8>() | static_cast<U8>(interrupt));
+    }
+
+    OperatingMode SystemControlCoprocessor::getCurrentOperatingMode() const
+    {
+        if (mStatusRegister.get(StatusRegisterLayout::Field::EXL).as<BIT>() == ESX_TRUE || mStatusRegister.get(StatusRegisterLayout::Field::ERL).as<BIT>() == ESX_TRUE) {
+            return OperatingMode::Kernel;
+        }
+
+        return mStatusRegister.get(StatusRegisterLayout::Field::KSU).as<OperatingMode>();
     }
 
     BIT SystemControlCoprocessor::is64BitMode() const
     {
-        switch (mStatusRegister.get(StatusRegisterLayout::Field::KSU).as<U8>()) {
-        case 0: return mStatusRegister.get(StatusRegisterLayout::Field::KX).as<BIT>();
-        case 1: return mStatusRegister.get(StatusRegisterLayout::Field::SX).as<BIT>();
-        case 2: return mStatusRegister.get(StatusRegisterLayout::Field::UX).as<BIT>();
+        switch (getCurrentOperatingMode()) {
+            case OperatingMode::Kernel: return mStatusRegister.get(StatusRegisterLayout::Field::KX).as<BIT>();
+            case OperatingMode::Supervisor: return mStatusRegister.get(StatusRegisterLayout::Field::SX).as<BIT>();
+            case OperatingMode::User: return mStatusRegister.get(StatusRegisterLayout::Field::UX).as<BIT>();
         }
     }
 
     BIT SystemControlCoprocessor::isCoprocessorUsable(U8 copNumber) const
     {
-        if (mStatusRegister.get(StatusRegisterLayout::Field::KSU).as<U8>() == 0)
+        if (copNumber == 0 && getCurrentOperatingMode() == OperatingMode::Kernel)
             return ESX_TRUE;
 
         return mStatusRegister.get(StatusRegisterLayout::Field::CU).as<U8>() & (1 << copNumber);
@@ -122,11 +254,23 @@ namespace esx {
 
     BIT SystemControlCoprocessor::isReserved64BitInstruction() const
     {
-        switch (mStatusRegister.get(StatusRegisterLayout::Field::KSU).as<U8>()) {
-        case 0: return ESX_FALSE;
-        case 1: return mStatusRegister.get(StatusRegisterLayout::Field::SX).as<BIT>() == ESX_FALSE;
-        case 2: return mStatusRegister.get(StatusRegisterLayout::Field::UX).as<BIT>() == ESX_FALSE;
+        switch (getCurrentOperatingMode()) {
+            case OperatingMode::Kernel: return ESX_FALSE;
+            case OperatingMode::Supervisor: return mStatusRegister.get(StatusRegisterLayout::Field::SX).as<BIT>() == ESX_FALSE;
+            case OperatingMode::User: return mStatusRegister.get(StatusRegisterLayout::Field::UX).as<BIT>() == ESX_FALSE;
         }
+    }
+
+    BIT SystemControlCoprocessor::areInterruptsPending() const
+    {
+        return mCauseRegister.get(CauseRegisterLayout::Field::IP).as<U8>() & mStatusRegister.get(StatusRegisterLayout::Field::IM).as<U8>();
+    }
+
+    BIT SystemControlCoprocessor::areInterruptsEnabled() const
+    {
+        return mStatusRegister.get(StatusRegisterLayout::Field::IE).as<BIT>() == ESX_TRUE &&
+                mStatusRegister.get(StatusRegisterLayout::Field::EXL).as<BIT>() == ESX_FALSE && 
+                mStatusRegister.get(StatusRegisterLayout::Field::ERL).as<BIT>() == ESX_FALSE;
     }
 
 }

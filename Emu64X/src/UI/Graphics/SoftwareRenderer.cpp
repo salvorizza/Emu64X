@@ -49,8 +49,7 @@ namespace esx {
 
 	template<I32 N>
 	Pair<glm::i32vec2, glm::i32vec2> calculate_bounding(const PolygonVertex* vtx) {
-		Pair<glm::i32vec2, glm::i32vec2> result = std::
-			(glm::i32vec2(vtx[0].vertex.x % VRAM_WIDTH, vtx[0].vertex.y % VRAM_HEIGHT), glm::i32vec2(vtx[0].vertex.x % VRAM_WIDTH, vtx[0].vertex.y % VRAM_HEIGHT));
+		Pair<glm::i32vec2, glm::i32vec2> result = std::make_pair<glm::i32vec2, glm::i32vec2>(glm::i32vec2(vtx[0].vertex.x % VRAM_WIDTH, vtx[0].vertex.y % VRAM_HEIGHT), glm::i32vec2(vtx[0].vertex.x % VRAM_WIDTH, vtx[0].vertex.y % VRAM_HEIGHT));
 
 		for (I32 i = 1; i < N; i++) {
 			result.first.x = std::min<I32>(result.first.x, vtx[i].vertex.x % VRAM_WIDTH);

@@ -18,7 +18,7 @@
 
 #include "Base/Base.h"
 #include "Base/Bus.h"
-#include "Core/VR4300.h"
+#include "Core/VR4300/VR4300.h"
 #include "Core/InterruptControl.h"
 #include "Core/Bios.h"
 #include "Core/RAM.h"
@@ -77,14 +77,14 @@ struct FPSCounter {
 	}
 };
 
-class EmuStationXLogger : public Logger {
+class Emu64XLogger : public Logger {
 public:
-	EmuStationXLogger(const SharedPtr<ConsolePanel>& consolePanel)
+	Emu64XLogger(const SharedPtr<ConsolePanel>& consolePanel)
 		: Logger(ESX_TEXT("Core")),
 			mConsolePanel(consolePanel)
 	{}
 
-	~EmuStationXLogger() = default;
+	~Emu64XLogger() = default;
 
 	virtual void Log(LogType type, const StringView& message) override {
 		if ((I32)type < mLogLevel) return;
@@ -138,7 +138,7 @@ public:
 
 	virtual void onSetup() override {
 		mConsolePanel = MakeShared<ConsolePanel>();
-		mLogger = MakeShared<EmuStationXLogger>(mConsolePanel);
+		mLogger = MakeShared<Emu64XLogger>(mConsolePanel);
 		LoggingSystem::SetCoreLogger(mLogger);
 
 		//mLogger->SetLogLevel(LogType::Error);
@@ -156,8 +156,7 @@ public:
 
 		root = MakeShared<Bus>(ESX_TEXT("Root"));
 		cpu = MakeShared<VR4300>();
-		mainRAM = MakeShared<RAM>("RAM", 0x00000000, MIBI(8), MIBI(2));
-		scratchPad = MakeShared<RAM>("Scratchpad", 0x1F800000, 0x400, KIBI(1), ESX_FALSE);
+		mainRAM = MakeShared<RAM>("RAM", 0x00000000, MIBI(8), MIBI(4));
 		interruptControl = MakeShared<InterruptControl>();
 		bios = MakeShared<Bios>("commons/bios/scph1001.bin");
 
@@ -169,9 +168,6 @@ public:
 
 		root->connectDevice(mainRAM);
 		mainRAM->connectToBus(root);
-
-		root->connectDevice(scratchPad);
-		scratchPad->connectToBus(root);
 
 		root->connectDevice(interruptControl);
 		interruptControl->connectToBus(root);
@@ -255,7 +251,7 @@ public:
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 		window_flags |= ImGuiWindowFlags_NoTitleBar;
 		window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
-		ImGui::Begin("ReviveNES", &p_open, window_flags);
+		ImGui::Begin("Emu64X", &p_open, window_flags);
 		ImGui::PopStyleVar();
 
 		if (ImGui::BeginMenuBar())
@@ -317,7 +313,6 @@ public:
 		fpsCounter.Init();
 		cpu->reset();
 		mainRAM->reset();
-		scratchPad->reset();
 		bios->reset();
 		mConsolePanel->getInternalConsole().System().Items().clear();
 		if (mDisassemblerPanel->getDebugState() == DebugState::Breakpoint) {
@@ -329,7 +324,6 @@ private:
 	SharedPtr<Bus> root;
 	SharedPtr<VR4300> cpu;
 	SharedPtr<RAM> mainRAM;
-	SharedPtr<RAM> scratchPad;
 	SharedPtr<InterruptControl> interruptControl;
 	SharedPtr<Bios> bios;
 	FPSCounter fpsCounter;
@@ -339,7 +333,7 @@ private:
 	SharedPtr<DisassemblerPanel> mDisassemblerPanel;
 	SharedPtr<MemoryEditorPanel> mMemoryEditorPanel;
 	SharedPtr<ConsolePanel> mConsolePanel;
-	SharedPtr<EmuStationXLogger> mLogger;
+	SharedPtr<Emu64XLogger> mLogger;
 	SharedPtr<SoftwareRenderer> mSoftwareRenderer;
 	SharedPtr<BatchRenderer> mBatchRenderer;
 	SharedPtr<ViewportPanel> mViewportPanel;
