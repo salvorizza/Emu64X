@@ -10,6 +10,8 @@
 #include "Base/Base.h"
 #include "Base/Bus.h"
 
+#include "SystemControlCoprocessor.h"
+
 namespace esx {
 
 	/*#define CO(x) (((x) >> 25) & 0x1)
@@ -60,38 +62,6 @@ namespace esx {
 		ra
 	};
 
-	/*
-	  cop0r0-r2   - N/A
-	  cop0r3      - BPC - Breakpoint on execute (R/W)
-	  cop0r4      - N/A
-	  cop0r5      - BDA - Breakpoint on data access (R/W)
-	  cop0r6      - JUMPDEST - Randomly memorized jump address (R)
-	  cop0r7      - DCIC - Breakpoint control (R/W)
-	  cop0r8      - BadVaddr - Bad Virtual Address (R)
-	  cop0r9      - BDAM - Data Access breakpoint mask (R/W)
-	  cop0r10     - N/A
-	  cop0r11     - BPCM - Execute breakpoint mask (R/W)
-	  cop0r12     - SR - System status register (R/W)
-	  cop0r13     - CAUSE - Describes the most recently recognised exception (R)
-	  cop0r14     - EPC - Return Address from Trap (R)
-	  cop0r15     - PRID - Processor ID (R)
-	  cop0r16-r31 - Garbage
-	  cop0r32-r63 - N/A - None such (Control regs)
-	*/
-	enum class COP0Register : U8 {
-		BPC = 3, //Breakpoint on Execute Address (R/W)
-		BDA = 5, //Breakpoint on Data Access Address (R/W)
-		JumpDest = 6, //Randomly memorized jump address
-		DCIC = 7, //Breakpoint control (R/W)
-		BadVAddr = 8, //Stores virtual address for the most recent address related exception
-		BDAM = 9, //Breakpoint on Data Access Mask (R/W)
-		BPCM = 11, //Breakpoint on Execute Mask (R/W)
-		SR = 12, //Process status register/Used for exception handling
-		Cause = 13, //Exception cause register/Stores the type of exception that last occurred
-		EPC = 14, //(ExceptionPC) Contains address of instruction that caused the exception
-		PRId = 15 //Processor identification and revision.
-	};
-
 	enum class ExceptionType : U8 {
 		Interrupt = 0x00,
 		AddressErrorLoad = 0x04,
@@ -107,21 +77,8 @@ namespace esx {
 	class VR4300;
 	class Coprocessor;
 	typedef void(VR4300::*ExecuteFunction)();
-	typedef void(Coprocessor::*CoprocessorExecuteFunction)(VR4300*);
+	typedef void(SystemControlCoprocessor::*CoprocessorExecuteFunction)(VR4300*);
 	class InterruptControl;
-
-	struct RegisterIndex {
-		I32 Value;
-
-		RegisterIndex() : Value(-1) {}
-		explicit RegisterIndex(U8 value) : Value(value) {}
-		RegisterIndex(COP0Register r) : Value((U8)r) {}
-		RegisterIndex(GPRRegister r) : Value((U8)r) {}
-
-		operator U8() {
-			return Value;
-		}
-	};
 
 	struct Instruction {
 		U32 Address = 0;
@@ -172,6 +129,10 @@ namespace esx {
 			return PseudoAddress();
 		}
 
+		U8 CoprocessorFunction() const {
+			return (binaryInstruction & 0x1F);
+		}
+
 		String Mnemonic(const SharedPtr<VR4300>& cpuState) const;
 	};
 
@@ -204,46 +165,6 @@ namespace esx {
 		U32 Size = 0;
 	};
 
-	class Coprocessor {
-	public:
-		Coprocessor() = default;
-		virtual ~Coprocessor() = default;
-
-		void NA(VR4300* cpu) { cpu->raiseException(ExceptionType::CoprocessorUnusable); }
-		virtual void MF(VR4300* cpu) = 0;
-		virtual void DMF(VR4300* cpu) = 0;
-		virtual void CF(VR4300* cpu) = 0;
-		virtual void MT(VR4300* cpu) = 0;
-		virtual void DMT(VR4300* cpu) = 0;
-		virtual void CT(VR4300* cpu) = 0;
-		virtual void BCF(VR4300* cpu) = 0;
-		virtual void BCT(VR4300* cpu) = 0;
-		virtual void BCFL(VR4300* cpu) = 0;
-		virtual void BCTL(VR4300* cpu) = 0;
-		virtual void CO(VR4300* cpu) = 0;
-	};
-
-	class SystemControlCoprocessor : public Coprocessor {
-	public:
-		SystemControlCoprocessor() = default;
-		~SystemControlCoprocessor() = default;
-
-		virtual void MF(VR4300* cpu) override;
-		virtual void DMF(VR4300* cpu) override;
-		virtual void CF(VR4300* cpu) override;
-		virtual void MT(VR4300* cpu) override;
-		virtual void DMT(VR4300* cpu) override;
-		virtual void CT(VR4300* cpu) override;
-		virtual void BCF(VR4300* cpu) override;
-		virtual void BCT(VR4300* cpu) override;
-		virtual void BCFL(VR4300* cpu) override;
-		virtual void BCTL(VR4300* cpu) override;
-		virtual void CO(VR4300* cpu) override;
-
-	private:
-		Array<U32, 64> mRegisters;
-	};
-	
 	class VR4300 : public BusDevice {
 	public:
 		friend class CPUStatusPanel;
