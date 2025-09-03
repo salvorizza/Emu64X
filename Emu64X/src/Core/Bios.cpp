@@ -1,5 +1,7 @@
 #include "Bios.h"
 
+#include <intrin.h>
+
 namespace esx {
 
 
@@ -8,8 +10,8 @@ namespace esx {
 		:	BusDevice(ESX_TEXT("Bios")),
 			mPath(path)
 	{
-		addRange(ESX_TEXT("Root"), 0x1FC00000, KIBI(512), 0x7FFFF);
-		mMemory.reserve(KIBI(512));
+		addRange(ESX_TEXT("Root"), 0x1FC00000, KIBI(2), 0x7FF);
+		mMemory.reserve(KIBI(2));
 
 		reset();
 
@@ -26,12 +28,12 @@ namespace esx {
 
 	void Bios::load(const StringView& busName, U32 address, U32& output)
 	{
-		output = *reinterpret_cast<U32*>(&mMemory[address]);
+		output = _byteswap_ulong(*reinterpret_cast<U32*>(&mMemory[address]));
 	}
 
 	void Bios::load(const StringView& busName, U32 address, U16& output)
 	{
-		output = *reinterpret_cast<U16*>(&mMemory[address]);
+		output = _byteswap_ushort(*reinterpret_cast<U16*>(&mMemory[address]));
 	}
 
 	void Bios::reset()

@@ -133,13 +133,16 @@ namespace esx {
             return;
         }
 
+        U8 ASID = mEntryHiRegister.get(EntryHiRegisterLayout::Field::ASID).as<U32>();
+        U8 VPN2 = mEntryHiRegister.get(EntryHiRegisterLayout::Field::VPN2).as<U32>();
+
         mIndexRegister.set(IndexRegisterLayout::Field::Probe, ESX_TRUE);
         for (U8 i = 0; i < mTLB.size(); i++) {
             TLBEntry& entry = mTLB[i];
 
             if (
-                (entry.EntryHi.get(EntryHiRegisterLayout::Field::VPN2).as<U32>() == mEntryHiRegister.get(EntryHiRegisterLayout::Field::VPN2).as<U32>()) &&
-                (entry.EntryHi.get(EntryHiRegisterLayout::Field::G).as<BIT>() == ESX_TRUE || (entry.EntryHi.get(EntryHiRegisterLayout::Field::ASID).as<U32>() == mEntryHiRegister.get(EntryHiRegisterLayout::Field::ASID).as<U32>()))
+                (entry.EntryHi.get(EntryHiRegisterLayout::Field::VPN2).as<U32>() == VPN2) &&
+                (entry.EntryHi.get(EntryHiRegisterLayout::Field::G).as<BIT>() == ESX_TRUE || (entry.EntryHi.get(EntryHiRegisterLayout::Field::ASID).as<U8>() == ASID))
                 ) {
                 mIndexRegister.set(IndexRegisterLayout::Field::Index, i);
                 mIndexRegister.set(IndexRegisterLayout::Field::Probe, ESX_FALSE);
@@ -171,24 +174,9 @@ namespace esx {
         }
     }
 
-    void SystemControlCoprocessor::raiseException(ExceptionType type)
+    void SystemControlCoprocessor::raiseException(ExceptionType type, U32 virtualAddress)
     {
-        /*Set FP Control Status Register
-        EnHi < -VPN2, ASID
-        X / Context < -VPN2
-        Set Cause Register
-        EXcCode, CE
-        BadVAddr Register Setting
-            Comments
-            ; FP Control/Status Register are 
-            only set if the respective exception 
-            occurs.
-            EnHi, X/Context are set only for 
-            TLB-Invalid, Modification & Miss 
-            exceptions. It is not set by bus 
-            error exceptions, however.
-        */
-
+        if (type == ExceptionType::AddressErrorLoad || type == ExceptionType::AddressErrorStore) mBadVAddrRegister.set(BadVAddrRegisterLayout::Field::Value, virtualAddress);
         mCauseRegister.set(CauseRegisterLayout::Field::ExcCode, (U8)type);
         if(type == ExceptionType::CoprocessorUnusable) mCauseRegister.set(CauseRegisterLayout::Field::CE, 0);
 
@@ -213,14 +201,112 @@ namespace esx {
         mCPU->mNextPC = mCPU->mPC + 4;
     }
 
-    U32 SystemControlCoprocessor::AddressTranslation(U32 virtualAddress)
+    void SystemControlCoprocessor::raiseTLBException(TLBExceptionType type, U32 virtualAddress)
+    {
+        if (type == TLBExceptionType::TLBMissLoadFetch || type == TLBExceptionType::TLBMissStore) {
+            mContextRegister.set(ContextRegisterLayout::Field::BadVPN2, virtualAddress >> 13);
+            mBadVAddrRegister.set(BadVAddrRegisterLayout::Field::Value, virtualAddress);
+        }
+
+        if (type == TLBExceptionType::TLBMissLoadFetch || type == TLBExceptionType::TLBMissStore) {
+            mXContextRegister.set(XContextRegisterLayout::Field::BadVPN2, virtualAddress >> 13);
+            mXContextRegister.set(XContextRegisterLayout::Field::R, (virtualAddress >> 62) & 0x3);
+        }
+
+        mCauseRegister.set(CauseRegisterLayout::Field::ExcCode, (U8)type);
+
+        U32 vecOffset = 0x000;
+        if (mStatusRegister.get(StatusRegisterLayout::Field::EXL).as<BIT>() == ESX_FALSE) {
+            if (mCPU->mBranchSlot == ESX_FALSE) {
+                mCauseRegister.set(CauseRegisterLayout::Field::BD, ESX_FALSE);
+                mEPCRegister.set(EPCRegisterLayout::Field::Value, mCPU->mCurrentPC);
+            }
+            else {
+                mCauseRegister.set(CauseRegisterLayout::Field::BD, ESX_TRUE);
+                mEPCRegister.set(EPCRegisterLayout::Field::Value, mCPU->mCurrentPC - 4);
+            }
+            vecOffset = 0x000;
+        }
+        else {
+            vecOffset = 0x080;
+        }
+
+        mStatusRegister.set(StatusRegisterLayout::Field::EXL, ESX_TRUE);
+
+        if (mStatusRegister.get(StatusRegisterLayout::Field::BEV).as<BIT>() == ESX_TRUE) {
+            mCPU->mPC = 0xBFC00200 + vecOffset;
+        }
+        else {
+            mCPU->mPC = 0x80000000 + vecOffset;
+        }
+
+        mCPU->mNextPC = mCPU->mPC + 4;
+    }
+
+    void SystemControlCoprocessor::watchAddress(U32 physicalAddress, BIT store)
+    {
+        if (store == ESX_TRUE && mWatchLoRegister.get(WatchLoRegisterLayout::Field::W).as<BIT>() == ESX_TRUE && mWatchLoRegister.get(WatchLoRegisterLayout::Field::PAddr0).as<U32>() == physicalAddress >> 3) 
+            raiseException(ExceptionType::Watch);
+
+        if (store == ESX_FALSE && mWatchLoRegister.get(WatchLoRegisterLayout::Field::R).as<BIT>() == ESX_TRUE && mWatchLoRegister.get(WatchLoRegisterLayout::Field::PAddr0).as<U32>() == physicalAddress >> 3)
+            raiseException(ExceptionType::Watch);
+    }
+
+    U32 SystemControlCoprocessor::AddressTranslation(U32 virtualAddress, BIT store, BIT& cached)
     {
         U32 physicalAddress = 0;
 
-        if (virtualAddress >= 0x80000000 && virtualAddress <= 0xBFFFFFFF) {
-            //KSEG0,KSEG1 directly mapped
-            physicalAddress = virtualAddress & 0x1FFFFFFF;
+        if (isAddressLegal(virtualAddress) == ESX_FALSE) {
+            raiseException(store ? ExceptionType::AddressErrorStore :ExceptionType::AddressErrorLoad, virtualAddress);
         }
+
+        if (isAdressMapped(virtualAddress) == ESX_TRUE) {
+            U8 pageSelect = (virtualAddress >> 12) & 0x1;
+            U16 pageOffset = virtualAddress & 0xFFF;
+
+            U8 ASID = mEntryHiRegister.get(EntryHiRegisterLayout::Field::ASID).as<U32>();
+
+            BIT matchFound = ESX_FALSE;
+            for (U8 i = 0; i < mTLB.size(); i++) {
+                TLBEntry& entry = mTLB[i];
+
+                U32 VPN2 = (virtualAddress & ~entry.PageMask.read()) >> 13;
+
+                if (
+                    (entry.EntryHi.get(EntryHiRegisterLayout::Field::VPN2).as<U32>() == VPN2) &&
+                    (entry.EntryHi.get(EntryHiRegisterLayout::Field::G).as<BIT>() == ESX_TRUE || (entry.EntryHi.get(EntryHiRegisterLayout::Field::ASID).as<U8>() == ASID))
+                    ) {
+
+                    EntryLoRegister& lo = pageSelect == 0 ? entry.EntryLo0 : entry.EntryLo1;
+
+                    if (lo.get(EntryLoRegisterLayout::Field::V).as<BIT>() == ESX_FALSE) {
+                        raiseTLBException(store ? TLBExceptionType::TLBInvalidStore : TLBExceptionType::TLBInvalidLoadFetch, virtualAddress);
+                        break;
+                    }
+
+                    if (store == ESX_TRUE && lo.get(EntryLoRegisterLayout::Field::D).as<BIT>() == ESX_TRUE) {
+                        raiseTLBException(TLBExceptionType::TLBMod, virtualAddress);
+                        break;
+                    }
+
+                    physicalAddress = (lo.get(EntryLoRegisterLayout::Field::PFN).as<U32>() << 12) | pageOffset;
+                    cached = lo.get(EntryLoRegisterLayout::Field::C).as<BIT>();
+
+                    matchFound = ESX_TRUE;
+
+                    break;
+                }
+            }
+
+            if (matchFound == ESX_TRUE) {
+                raiseTLBException(store ? TLBExceptionType::TLBMissStore : TLBExceptionType::TLBMissLoadFetch, virtualAddress);
+            }
+        } else {
+            physicalAddress = virtualAddress & 0x1FFFFFFF;
+            cached = ESX_TRUE;
+        }
+
+        mLastPhysicalAddress = physicalAddress;
 
         return physicalAddress;
     }
@@ -316,6 +402,23 @@ namespace esx {
         return mStatusRegister.get(StatusRegisterLayout::Field::KSU).as<OperatingMode>();
     }
 
+    BIT SystemControlCoprocessor::isAddressLegal(U32 virtualAddress) const
+    {
+        U8 segment = virtualAddress >> 29;
+
+        switch (getCurrentOperatingMode()) {
+            case OperatingMode::Kernel: return ESX_TRUE;
+            case OperatingMode::Supervisor: return (segment >= 0 && segment <= 3) || segment == 6;
+            case OperatingMode::User: return segment >= 0 && segment <= 3;
+        }
+    }
+
+    BIT SystemControlCoprocessor::isAdressMapped(U32 virtualAddress) const
+    {
+        U8 segment = virtualAddress >> 29;
+        return (segment >= 0 && segment <= 3) || segment >= 6;
+    }
+
     BIT SystemControlCoprocessor::is64BitMode() const
     {
         switch (getCurrentOperatingMode()) {
@@ -352,6 +455,11 @@ namespace esx {
         return mStatusRegister.get(StatusRegisterLayout::Field::IE).as<BIT>() == ESX_TRUE &&
                 mStatusRegister.get(StatusRegisterLayout::Field::EXL).as<BIT>() == ESX_FALSE && 
                 mStatusRegister.get(StatusRegisterLayout::Field::ERL).as<BIT>() == ESX_FALSE;
+    }
+
+    void SystemControlCoprocessor::setLLAddrToLastTranslation()
+    {
+        mLLAddrRegister.set(LLAddrRegisterLayout::Field::Value, mLastPhysicalAddress);
     }
 
 }

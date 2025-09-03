@@ -414,6 +414,14 @@ namespace esx {
 		Watch = 23
 	};
 
+	enum class TLBExceptionType : U8 {
+		TLBMod = 1,
+		TLBMissLoadFetch = 2,
+		TLBMissStore = 3,
+		TLBInvalidLoadFetch = 4,
+		TLBInvalidStore = 5
+	};
+
 	enum class OperatingMode : U8 {
 		Kernel = 0b00,
 		Supervisor = 0b01,
@@ -456,9 +464,11 @@ namespace esx {
 		void ERET();
 
 		void handleInterrupts();
-		void raiseException(ExceptionType type);
+		void raiseException(ExceptionType type, U32 virtualAddress = 0);
+		void raiseTLBException(TLBExceptionType type, U32 virtualAddress);
 
-		U32 AddressTranslation(U32 virtualAddress);
+		void watchAddress(U32 physicalAddress, BIT store);
+		U32 AddressTranslation(U32 virtualAddress, BIT store, BIT& cached);
 
 		virtual U64 getRegister(RegisterIndex reg) const override;
 		virtual void setRegister(RegisterIndex reg, U64 value) override;
@@ -466,11 +476,14 @@ namespace esx {
 		void clearInterrupt(Interrupt interrupt);
 		void generateInterrupt(Interrupt interrupt);
 		OperatingMode getCurrentOperatingMode() const;
+		BIT isAddressLegal(U32 virtualAddress) const;
+		BIT isAdressMapped(U32 virtualAddress) const;
 		BIT is64BitMode() const;
 		BIT isCoprocessorUsable(U8 copNumber) const;
 		BIT isReserved64BitInstruction() const;
 		BIT areInterruptsPending() const;
 		BIT areInterruptsEnabled() const;
+		void setLLAddrToLastTranslation();
 	private:
 		IndexRegister      mIndexRegister;
 		RandomRegister     mRandomRegister;
@@ -499,5 +512,7 @@ namespace esx {
 		ErrorEPCRegister   mErrorEPCRegister;
 
 		TLB mTLB;
+
+		U32 mLastPhysicalAddress;
 	};
 }

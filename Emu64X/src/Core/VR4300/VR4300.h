@@ -68,7 +68,7 @@ namespace esx {
 	class VR4300;
 	class Coprocessor;
 	typedef void(VR4300::*ExecuteFunction)();
-	typedef void(SystemControlCoprocessor::*CoprocessorExecuteFunction)(VR4300*);
+	typedef void(SystemControlCoprocessor::*CoprocessorExecuteFunction)();
 	class InterruptControl;
 
 	struct Instruction {
@@ -176,12 +176,15 @@ namespace esx {
 		template<typename T>
 		U32 load(U32 virtualAddress, BIT& exception) {
 			if (ADDRESS_UNALIGNED(virtualAddress,T)) {
-				raiseException(ExceptionType::AddressErrorLoad);
+				raiseException(ExceptionType::AddressErrorLoad, virtualAddress);
 				exception = ESX_TRUE;
 				return 0;
 			}
 
-			U32 physicalAddress = mCP0.AddressTranslation(virtualAddress);
+			BIT cached = ESX_FALSE;
+			U32 physicalAddress = mCP0.AddressTranslation(virtualAddress, ESX_FALSE, cached);
+
+			mCP0.watchAddress(physicalAddress, ESX_FALSE);
 
 			if (isWriteQueueActive(physicalAddress)) {
 				if (flushWriteQueue(physicalAddress) == ESX_FALSE) {
@@ -202,12 +205,15 @@ namespace esx {
 
 		template<typename T>
 		void store(U32 virtualAddress, U32 value) {
-			if (ADDRESS_UNALIGNED(address, T)) {
-				raiseException(ExceptionType::AddressErrorStore);
+			if (ADDRESS_UNALIGNED(virtualAddress, T)) {
+				raiseException(ExceptionType::AddressErrorStore, virtualAddress);
 				return;
 			}
 
-			U32 physicalAddress = mCP0.AddressTranslation(virtualAddress);
+			BIT cached = ESX_FALSE;
+			U32 physicalAddress = mCP0.AddressTranslation(virtualAddress, ESX_TRUE, cached);
+
+			mCP0.watchAddress(physicalAddress, ESX_TRUE);
 
 			PRINT_STORE(physicalAddress, value);
 			PRINT_IO_STORE(physicalAddress,value);
@@ -235,7 +241,7 @@ namespace esx {
 			return ESX_FALSE;
 		}
 
-		void raiseException(ExceptionType type);
+		void raiseException(ExceptionType type, U32 virtualAddress = 0);
 
 		inline U64 getClocks() const { return mCycles; }
 

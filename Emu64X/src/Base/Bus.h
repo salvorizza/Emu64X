@@ -14,7 +14,7 @@ namespace esx {
 		0x1FFFFFFF,
 		//KSEG1:512MB
 		0x1FFFFFFF,
-		//KSEG2:1024MB
+		//KSSEG:1024MB
 		0xFFFFFFFF,
 		//KSEG3:1024MB
 		0xFFFFFFFF
@@ -50,6 +50,9 @@ namespace esx {
 		virtual void clock(U64 clocks) {}
 
 		virtual void writeLine(const StringView& busName, const StringView& lineName, BIT value) {}
+
+		virtual void store(const StringView& busName, U32 address, U64 value) { ESX_CORE_LOG_ERROR("Device {} does not implement store64 at address {:08x}h", mName, address); }
+		virtual void load(const StringView& busName, U32 address, U64& output) { ESX_CORE_LOG_ERROR("Device {} does not implement load64 at address {:08x}h", mName, address); }
 
 		virtual void store(const StringView& busName, U32 address, U32 value) { ESX_CORE_LOG_ERROR("Device {} does not implement store32 at address {:08x}h", mName, address); }
 		virtual void load(const StringView& busName, U32 address, U32& output) { ESX_CORE_LOG_ERROR("Device {} does not implement load32 at address {:08x}h", mName, address); }
@@ -121,41 +124,12 @@ namespace esx {
 
 		template<typename T>
 		void store(U32 physicalAddress, T value) {
-			U32 page = physicalAddress >> 16;
-			U32 offset = physicalAddress & 0xFFFF;
-			const auto& span = mPageTableW[page];
-
-			if (span.size() != 0) {
-				*(reinterpret_cast<T*>(&span[offset])) = value;
-			}
-			else {
-				if (page == 0x1F80 || page == 0x9F80 || page == 0xBF80 || page == 0xFFFE) { // check if this is the IO/scratchpad page
-					storeIO<T>(physicalAddress, value);
-				}
-				else {
-					ESX_CORE_LOG_ERROR("Writing Address 0x{:08x}: not found at {} bytes", physicalAddress, sizeof(T));
-				}
-			}
-
+			storeIO<T>(physicalAddress, value);
 		}
 
 		template<typename T>
 		T load(U32 physicalAddress) {
-			U32 page = physicalAddress >> 16;
-			U32 offset = physicalAddress & 0xFFFF;
-			const auto& span = mPageTableR[page];
-
-			if (span.size() != 0) {
-				return *(reinterpret_cast<T*>(&span[offset]));
-			}
-			else {
-				if (page == 0x1F80 || page == 0x9F80 || page == 0xBF80 || page == 0xFFFE) { // check if this is the IO/scratchpad page
-					return loadIO<T>(physicalAddress);
-				} else {
-					ESX_CORE_LOG_ERROR("Reading Address 0x{:08x}: not found at {} bytes", address, sizeof(T));
-				}
-			}
-
+			return loadIO<T>(physicalAddress);
 		}
 
 		template<typename T>
@@ -211,6 +185,8 @@ namespace esx {
 
 		void addRange(const StringView& deviceName, BusRange range);
 
+		//TODO: Give a shit
+		static U32 toPhysicalAddress(U32 address) { return address; }
 
 		IntervalTreeNode* buildIntervalTree(const Vector<Interval>& intervals);
 		IntervalTreeNode* findRangeInIntervalTree(IntervalTreeNode* root, uint32_t address);

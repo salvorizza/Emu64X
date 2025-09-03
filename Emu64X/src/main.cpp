@@ -154,11 +154,12 @@ public:
 		mFileDialogPanel->setCurrentPath("commons/games");
 		mFileDialogPanel->setOnFileSelectedCallback(std::bind(&Emu64X::onFileSelected, this, std::placeholders::_1));
 
+		constexpr size_t t = MIBI(8);
 		root = MakeShared<Bus>(ESX_TEXT("Root"));
 		cpu = MakeShared<VR4300>();
-		mainRAM = MakeShared<RAM>("RAM", 0x00000000, MIBI(8), MIBI(4));
+		mainRAM = MakeShared<RAM>("RAM", 0x00000000, 0x04000000, MIBI(4));
 		interruptControl = MakeShared<InterruptControl>();
-		bios = MakeShared<Bios>("commons/bios/scph1001.bin");
+		bios = MakeShared<Bios>("commons/bios/boot.rom");
 
 		root->connectDevice(cpu);
 		cpu->connectToBus(root);

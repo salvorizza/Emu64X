@@ -33,70 +33,37 @@ namespace esx {
 		};
 
 		constexpr static const char* cop0RegistersMnemonics[] = {
-			"N/A",
-			"N/A",
-			"N/A",
-			"BPC",
-			"N/A",
-			"BDA",
-			"JumpDest",
-			"DCIC",
-			"BadVaddr",
-			"BDAM",
-			"N/A",
-			"BPCM",
+			"Index",
+			"Random",
+			"EntryLo0",
+			"EntryLo1",
+			"Context",
+			"PageMask",
+			"Wired",
+			"BadVAddr",
+			"EntryHi",
+			"Compare",
+			"Status",
+			"Cause",
 			"SR",
 			"Cause",
 			"EPC",
-			"PrID",
+			"Config",
+			"LLAddr",
+			"WatchLo",
+			"WatchHi",
+			"XContext",
 			"*Garbage*",
 			"*Garbage*",
 			"*Garbage*",
 			"*Garbage*",
 			"*Garbage*",
+			"PErr",
+			"CacheErr",
+			"TagLo",
+			"TagHi",
+			"ErrorEPC",
 			"*Garbage*",
-			"*Garbage*",
-			"*Garbage*",
-			"*Garbage*",
-			"*Garbage*",
-			"*Garbage*",
-			"*Garbage*",
-			"*Garbage*",
-			"*Garbage*",
-			"*Garbage*",
-			"*Garbage*",
-			"N/A",
-			"N/A",
-			"N/A",
-			"N/A",
-			"N/A",
-			"N/A",
-			"N/A",
-			"N/A",
-			"N/A",
-			"N/A",
-			"N/A",
-			"N/A",
-			"N/A",
-			"N/A",
-			"N/A",
-			"N/A",
-			"N/A",
-			"N/A",
-			"N/A",
-			"N/A",
-			"N/A",
-			"N/A",
-			"N/A",
-			"N/A",
-			"N/A",
-			"N/A",
-			"N/A",
-			"N/A",
-			"N/A",
-			"N/A",
-			"N/A",
-			"N/A"
 		};
 
 		enum class TabItem {
@@ -133,26 +100,26 @@ namespace esx {
 						ImGui::TableNextColumn();
 						ImGui::TextUnformatted(registersMnemonics[i]);
 						ImGui::TableNextColumn();
-						ImGui::Text("0x%16X", mInstance->mRegisters[i]);
+						ImGui::Text("0x%016X", mInstance->mRegisters[i]);
 					}
 
 					ImGui::TableNextRow();
 					ImGui::TableNextColumn();
 					ImGui::TextUnformatted("HI");
 					ImGui::TableNextColumn();
-					ImGui::Text("0x%16X", mInstance->mHI);
+					ImGui::Text("0x%016X", mInstance->mHI);
 
 					ImGui::TableNextRow();
 					ImGui::TableNextColumn();
 					ImGui::TextUnformatted("LO");
 					ImGui::TableNextColumn();
-					ImGui::Text("0x%16X", mInstance->mLO);
+					ImGui::Text("0x%016X", mInstance->mLO);
 
 					ImGui::TableNextRow();
 					ImGui::TableNextColumn();
 					ImGui::TextUnformatted("PC");
 					ImGui::TableNextColumn();
-					ImGui::Text("0x%16X", mInstance->mPC);
+					ImGui::Text("0x%016X", mInstance->mPC);
 
 				}
 				ImGui::EndTable();
@@ -165,12 +132,12 @@ namespace esx {
 					ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, availWidth * 0.50f);
 					ImGui::TableHeadersRow();
 
-					for (int i = 0; i < 64; i++) {
+					for (int i = 0; i < 32; i++) {
 						ImGui::TableNextRow();
 						ImGui::TableNextColumn();
 						ImGui::TextUnformatted(cop0RegistersMnemonics[i]);
 						ImGui::TableNextColumn();
-						ImGui::Text("0x%16X", mInstance->mCP0.getRegister(RegisterIndex(i)));
+						ImGui::Text("0x%016X", mInstance->mCP0.getRegister(RegisterIndex(i)));
 					}
 					
 				}

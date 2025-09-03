@@ -160,8 +160,8 @@ namespace esx {
 				ImGui::TableSetupColumn("Mnemonic", ImGuiTableColumnFlags_WidthFixed, contentCellsWidth);
 				ImGui::TableHeadersRow();
 
-				constexpr size_t numInstructionsRAM = 0x00800000 / 4;
-				constexpr size_t numInstructionsBios = 0x00080000 / 4;
+				constexpr size_t numInstructionsRAM = 0x03F80000 / 4;
+				constexpr size_t numInstructionsBios = 0x000007C0 / 4;
 
 				ImGuiListClipper clipper;
 				clipper.Begin(numInstructionsRAM + numInstructionsBios);
