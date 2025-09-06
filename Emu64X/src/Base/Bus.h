@@ -186,7 +186,7 @@ namespace esx {
 		void addRange(const StringView& deviceName, BusRange range);
 
 		//TODO: Give a shit
-		static U32 toPhysicalAddress(U32 address) { return address; }
+		static U32 toPhysicalAddress(U32 address) { return address & 0x1FFFFFFF; }
 
 		IntervalTreeNode* buildIntervalTree(const Vector<Interval>& intervals);
 		IntervalTreeNode* findRangeInIntervalTree(IntervalTreeNode* root, uint32_t address);

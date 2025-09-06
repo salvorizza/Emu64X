@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Core/VR4300/VR4300.h>
+#include <Core/MIPS/VR4300/VR4300.h>
 
 #include "Panel.h"
 

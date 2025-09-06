@@ -1,7 +1,7 @@
 #pragma once
 
 #include <UI/Panels/Panel.h>
-#include <Core/VR4300/VR4300.h>
+#include <Core/MIPS/VR4300/VR4300.h>
 #include <Core/RAM.h>
 
 #include <map>

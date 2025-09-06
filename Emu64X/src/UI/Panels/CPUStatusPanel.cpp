@@ -40,14 +40,15 @@ namespace esx {
 			"Context",
 			"PageMask",
 			"Wired",
+			"*Garbage*",
 			"BadVAddr",
+			"Count",
 			"EntryHi",
 			"Compare",
-			"Status",
-			"Cause",
 			"SR",
 			"Cause",
 			"EPC",
+			"PRId",
 			"Config",
 			"LLAddr",
 			"WatchLo",
@@ -137,7 +138,7 @@ namespace esx {
 						ImGui::TableNextColumn();
 						ImGui::TextUnformatted(cop0RegistersMnemonics[i]);
 						ImGui::TableNextColumn();
-						ImGui::Text("0x%016X", mInstance->mCP0.getRegister(RegisterIndex(i)));
+						ImGui::Text("0x%016X", mInstance->mCP0->getRegister(RegisterIndex(i)));
 					}
 					
 				}

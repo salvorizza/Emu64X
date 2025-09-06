@@ -55,7 +55,7 @@ namespace esx {
 			case DebugState::Step:
 			case DebugState::Running: {
 				//U64 startClocks = mInstance->getClocks();
-				while (mInstance->getClocks() < Scheduler::NextEvent().ClockTarget) {
+				//while (mInstance->getClocks() < Scheduler::NextEvent().ClockTarget) {
 					if (breakFunction(mInstance->mPC)) {
 						mScrollToCurrent = true;
 						mCurrent = mInstance->mPC;
@@ -65,12 +65,12 @@ namespace esx {
 					}
 
 					mInstance->clock();
-				}
+				//}
 
-				if (mInstance->getClocks() >= Scheduler::NextEvent().ClockTarget) {
+				/*if (mInstance->getClocks() >= Scheduler::NextEvent().ClockTarget) {
 					Scheduler::ExecuteEvent();
 					Scheduler::Progress();
-				}
+				}*/
 
 				if (mDebugState == DebugState::Breakpoint) {
 					break;
@@ -180,7 +180,7 @@ namespace esx {
 				while (clipper.Step())
 				{
 					for (int row = clipper.DisplayStart; row < clipper.DisplayEnd; row++) {
-						esx::Instruction cpuInstruction;
+						esx::VR4300Instruction cpuInstruction;
 						
 						U32 physAddress = row * 4;
 						U32 translatedAddress = 0x00000000 + physAddress;
@@ -322,7 +322,7 @@ namespace esx {
 	}
 
 	void DisassemblerPanel::disassemble(uint32_t startAddress, size_t size){
-		esx::Instruction cpuInstruction;
+		esx::VR4300Instruction cpuInstruction;
 
 		mInstructions.clear();
 		for (U32 address = startAddress; address < startAddress + size; address +=4) {

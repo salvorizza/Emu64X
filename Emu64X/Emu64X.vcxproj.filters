@@ -46,8 +46,14 @@
     <Filter Include="src\Core">
       <UniqueIdentifier>{A5D31CCF-91A0-77DA-BAB9-6582A6E5AC68}</UniqueIdentifier>
     </Filter>
-    <Filter Include="src\Core\VR4300">
-      <UniqueIdentifier>{E3B1F5B0-4F3D-6375-584E-E669C458BF75}</UniqueIdentifier>
+    <Filter Include="src\Core\MIPS">
+      <UniqueIdentifier>{CDDC7955-399D-F58B-02D8-3E096E573A68}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\Core\MIPS\R4000">
+      <UniqueIdentifier>{B2275DF0-1E89-3AFE-A7F6-80B0135771BD}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\Core\MIPS\VR4300">
+      <UniqueIdentifier>{0BDE7707-F76C-01D1-A08B-15CC8CF91177}</UniqueIdentifier>
     </Filter>
     <Filter Include="src\UI">
       <UniqueIdentifier>{3A4B661C-26ED-90F2-0FA8-A446FBE81743}</UniqueIdentifier>
@@ -87,23 +93,26 @@
     <ClInclude Include="src\Core\IRenderer.h">
       <Filter>src\Core</Filter>
     </ClInclude>
-    <ClInclude Include="src\Core\InterruptControl.h">
-      <Filter>src\Core</Filter>
+    <ClInclude Include="src\Core\MIPS\Common\Common.h">
+      <Filter>src\Core\MIPS</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\MIPS\R4000\R4000.h">
+      <Filter>src\Core\MIPS\R4000</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\MIPS\Common\Coprocessor.h">
+      <Filter>src\Core\MIPS\VR4300</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\MIPS\VR4300\SystemControlCoprocessor.h">
+      <Filter>src\Core\MIPS\VR4300</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\MIPS\VR4300\VR4300.h">
+      <Filter>src\Core\MIPS\VR4300</Filter>
     </ClInclude>
     <ClInclude Include="src\Core\RAM.h">
       <Filter>src\Core</Filter>
     </ClInclude>
     <ClInclude Include="src\Core\Scheduler.h">
       <Filter>src\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Core\VR4300\Coprocessor.h">
-      <Filter>src\Core\VR4300</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Core\VR4300\SystemControlCoprocessor.h">
-      <Filter>src\Core\VR4300</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Core\VR4300\VR4300.h">
-      <Filter>src\Core\VR4300</Filter>
     </ClInclude>
     <ClInclude Include="src\UI\Application\Application.h">
       <Filter>src\UI\Application</Filter>
@@ -189,6 +198,15 @@
     <ClInclude Include="src\Utils\LoggingSystem.h">
       <Filter>src\Utils</Filter>
     </ClInclude>
+    <ClInclude Include="src\Core\RCP\RSP\RSP.h" />
+    <ClInclude Include="src\Core\RCP\RSP\ScalarUnit.h" />
+    <ClInclude Include="src\Core\RCP\RSP\VectorUnit.h" />
+    <ClInclude Include="src\Core\Interfaces\AudioInterface.h" />
+    <ClInclude Include="src\Core\Interfaces\MIPSInterface.h" />
+    <ClInclude Include="src\Core\Interfaces\PeripheralInterface.h" />
+    <ClInclude Include="src\Core\Interfaces\RDRAMInterface.h" />
+    <ClInclude Include="src\Core\Interfaces\SerialInterface.h" />
+    <ClInclude Include="src\Core\Interfaces\VideoInterface.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Base\Bus.cpp">
@@ -197,23 +215,20 @@
     <ClCompile Include="src\Core\Bios.cpp">
       <Filter>src\Core</Filter>
     </ClCompile>
-    <ClCompile Include="src\Core\InterruptControl.cpp">
-      <Filter>src\Core</Filter>
+    <ClCompile Include="src\Core\MIPS\R4000\R4000.cpp">
+      <Filter>src\Core\MIPS\R4000</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Core\MIPS\VR4300\SystemControlCoprocessor.cpp">
+      <Filter>src\Core\MIPS\VR4300</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Core\MIPS\VR4300\VR4300.cpp">
+      <Filter>src\Core\MIPS\VR4300</Filter>
     </ClCompile>
     <ClCompile Include="src\Core\RAM.cpp">
       <Filter>src\Core</Filter>
     </ClCompile>
     <ClCompile Include="src\Core\Scheduler.cpp">
       <Filter>src\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Core\VR4300\Coprocessor.cpp">
-      <Filter>src\Core\VR4300</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Core\VR4300\SystemControlCoprocessor.cpp">
-      <Filter>src\Core\VR4300</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Core\VR4300\VR4300.cpp">
-      <Filter>src\Core\VR4300</Filter>
     </ClCompile>
     <ClCompile Include="src\UI\Application\ApplicationManager.cpp">
       <Filter>src\UI\Application</Filter>
@@ -290,6 +305,15 @@
     <ClCompile Include="src\main.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\Core\RCP\RSP\RSP.cpp" />
+    <ClCompile Include="src\Core\RCP\RSP\ScalarUnit.cpp" />
+    <ClCompile Include="src\Core\RCP\RSP\VectorUnit.cpp" />
+    <ClCompile Include="src\Core\Interfaces\AudioInterface.cpp" />
+    <ClCompile Include="src\Core\Interfaces\MIPSInterface.cpp" />
+    <ClCompile Include="src\Core\Interfaces\PeripheralInterface.cpp" />
+    <ClCompile Include="src\Core\Interfaces\RDRAMInterface.cpp" />
+    <ClCompile Include="src\Core\Interfaces\SerialInterface.cpp" />
+    <ClCompile Include="src\Core\Interfaces\VideoInterface.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="commons\icons\Logo.ico">

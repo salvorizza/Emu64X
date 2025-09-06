@@ -5,9 +5,6 @@
 #include <fstream>
 #include <intrin.h>
 
-
-#include "Core/InterruptControl.h"
-
 #include "optick.h"
 
 #pragma intrinsic(_mul128)
@@ -16,11 +13,9 @@
 namespace esx {
 
 	VR4300::VR4300()
-		:	BusDevice(ESX_TEXT("VR4300")),
-			mCP0(this)
+		:	MIPSProcessor(ESX_TEXT("VR4300"))
 	{
-		reset();
-
+		mCP0 = registerCoprocessor<SystemControlCoprocessor>(0, this);
 	}
 
 	VR4300::~VR4300()
@@ -31,59 +26,13 @@ namespace esx {
 	{
 
 		mRootBus = getBus(ESX_TEXT("Root"));
-		mInterruptControl = getBus("Root")->getDevice<InterruptControl>("InterruptControl");
 	}
 
 	void VR4300::clock()
 	{
-		if (mCyclesToWait == 0) {
-			if (!mStall) {
-				if (ADDRESS_UNALIGNED(mNextPC, U32)) {
-					raiseException(ExceptionType::AddressErrorLoad, mNextPC);
-				}
-
-				U32 opcode = fetch(mPC);
-
-				if (opcode != 0) {
-					decode(mCurrentInstruction, opcode, mPC);
-				}
-
-				mCurrentPC = mPC;
-				mPC = mNextPC;
-				mNextPC += 4;
-
-				mBranchSlot = mBranch;
-				mTookBranchSlot = mTookBranch;
-				mBranch = ESX_FALSE;
-				mTookBranch = ESX_FALSE;
-
-				if ((mBranchSlot == ESX_TRUE && mNullifyBranchSlot == ESX_FALSE) || mBranchSlot == ESX_FALSE) {
-					if (opcode != 0 && mCurrentInstruction.Execute) {
-						(this->*mCurrentInstruction.Execute)();
-					}
-				} else {
-					mNullifyBranchSlot = ESX_FALSE;
-				}
-				
-				mRegisters[mMemoryLoad.first] = mMemoryLoad.second;
-				mRegisters[0] = 0;
-				mMemoryLoad = mPendingLoad;
-				resetPendingLoad();
-
-				mRegisters[mWriteBack.first] = mWriteBack.second;
-				mWriteBack.first = RegisterIndex(0);
-				mRegisters[0] = 0;
-			}
-			mCyclesToWait = 2;
-		}
-		mCyclesToWait--;
-
-		mInterruptControl->clock(mCycles);
-		mCP0.clock(mCycles);
-
-		mCP0.handleInterrupts();
-
-		mCycles++;
+		MIPSProcessor::clock();
+		mCP0->clock(mCycles);
+		mCP0->handleInterrupts();
 	}
 
 
@@ -95,7 +44,7 @@ namespace esx {
 		}
 
 		BIT cached = ESX_FALSE;
-		U32 physicalAddress = mCP0.AddressTranslation(virtualAddress, ESX_FALSE, cached);
+		U32 physicalAddress = mCP0->AddressTranslation(virtualAddress, ESX_FALSE, cached);
 
 		if (cached) {
 			U32 index = (virtualAddress >> 2) & 0x7;
@@ -132,7 +81,7 @@ namespace esx {
 		return cacheLine.Instructions[startIndex].Word;
 	}
 
-	static const Array<ExecuteFunction, 64> primaryOpCodeDecode = {
+	static const Array<VR4300ExecuteFunction, 64> primaryOpCodeDecode = {
 		&VR4300::NA,	&VR4300::NA,		&VR4300::J,		&VR4300::JAL,	&VR4300::BEQ,	&VR4300::BNE,	&VR4300::BLEZ,	&VR4300::BGTZ,
 		&VR4300::ADDI,	&VR4300::ADDIU,		&VR4300::SLTI,	&VR4300::SLTIU, &VR4300::ANDI,	&VR4300::ORI,	&VR4300::XORI,	&VR4300::LUI,
 		&VR4300::COP0,	&VR4300::COP1,		&VR4300::COP2,	&VR4300::NA,	&VR4300::BEQL,	&VR4300::BNEL,	&VR4300::BLEZL,	&VR4300::BGTZL,
@@ -143,7 +92,7 @@ namespace esx {
 		&VR4300::SC,	&VR4300::SWC1,		&VR4300::SWC2,	&VR4300::NA,	&VR4300::SCD,	&VR4300::SDC1,	&VR4300::SDC2,	&VR4300::SD
 	};
 
-	static const Array<ExecuteFunction, 64> secondaryOpCodeDecode = {
+	static const Array<VR4300ExecuteFunction, 64> secondaryOpCodeDecode = {
 		&VR4300::SLL,	&VR4300::NA,	&VR4300::SRL,	&VR4300::SRA,	&VR4300::SLLV,		&VR4300::NA,		&VR4300::SRLV,		&VR4300::SRAV,
 		&VR4300::JR,	&VR4300::JALR,	&VR4300::NA,	&VR4300::NA,	&VR4300::SYSCALL,	&VR4300::BREAK,		&VR4300::NA,		&VR4300::SYNC,
 		&VR4300::MFHI,	&VR4300::MTHI,	&VR4300::MFLO,	&VR4300::MTLO,	&VR4300::DSLLV,		&VR4300::NA,		&VR4300::DSRLV,		&VR4300::DSRAV,
@@ -154,14 +103,14 @@ namespace esx {
 		&VR4300::DSLL,	&VR4300::NA,	&VR4300::DSRL,	&VR4300::DSRA,	&VR4300::DSLL32,	&VR4300::NA,		&VR4300::DSRL32,	&VR4300::DSRA32
 	};
 
-	static const Array<ExecuteFunction, 32> branchOpCodeDecode = {
+	static const Array<VR4300ExecuteFunction, 32> branchOpCodeDecode = {
 		&VR4300::BLTZ,		&VR4300::BGEZ,		&VR4300::BLTZL,		&VR4300::BGEZL,		&VR4300::NA,	&VR4300::NA,	&VR4300::NA,	&VR4300::NA,
 		&VR4300::TGEI,		&VR4300::TGEIU,		&VR4300::TLTI,		&VR4300::TLTIU,		&VR4300::TEQI,	&VR4300::NA,	&VR4300::TNEI,	&VR4300::NA,
 		&VR4300::BLTZAL,	&VR4300::BGEZAL,	&VR4300::BLTZALL,	&VR4300::BGEZALL,	&VR4300::NA,	&VR4300::NA,	&VR4300::NA,	&VR4300::NA,
 		&VR4300::NA,		&VR4300::NA,		&VR4300::NA,		&VR4300::NA,		&VR4300::NA,	&VR4300::NA,	&VR4300::NA,	&VR4300::NA
 	};
 
-	void VR4300::decode(Instruction& result, U32 instruction, U32 address, BIT suppressException)
+	void VR4300::decode(VR4300Instruction& result, U32 instruction, U32 address, BIT suppressException)
 	{
 		result.Address = address;
 		result.binaryInstruction = instruction;
@@ -193,43 +142,15 @@ namespace esx {
 		}
 	}
 
+	void VR4300::execute(VR4300Instruction& instruction)
+	{
+		(this->*instruction.Execute)();
+	}
+
 	void VR4300::reset()
 	{
-		mRegisters = {};
-
-		mMemoryLoad = std::make_pair<RegisterIndex, U64>(RegisterIndex(0), 0);
-		mPendingLoad = std::make_pair<RegisterIndex, U64>(RegisterIndex(0), 0);
-		mWriteBack = std::make_pair<RegisterIndex, U64>(RegisterIndex(0), 0);
-
-		mPC = 0;
-		mNextPC = 0;
-		mCurrentPC = 0;
-		mCallPC = 0;
-		mHI = 0;
-		mLO = 0;
-		mLLBit = ESX_FALSE;
-		
-		std::memset(&mICache, 0, sizeof(iCache));
-
-		mStall = ESX_FALSE;
-
-		mBranch = ESX_FALSE;
-		mBranchSlot = ESX_FALSE;
-		mTookBranch = ESX_FALSE;
-		mTookBranchSlot = ESX_FALSE;
-
-		mGPUClock = 0;
-
-		mCycles = 0;
-
-		mPC = 0xBFC00000;
-		mNextPC = mPC + 4;
-		mCP0.setRegister(SystemControlRegisterType::PRId, 0x000000B0);
-		resetPendingLoad();
-
-		mMemoryLoad = std::make_pair<RegisterIndex, U64>(RegisterIndex(0), 0);
-		mPendingLoad = std::make_pair<RegisterIndex, U64>(RegisterIndex(0), 0);
-		mWriteBack = std::make_pair<RegisterIndex, U64>(RegisterIndex(0), 0);
+		MIPSProcessor::reset();
+		mCP0->setRegister(SystemControlRegisterType::PRId, 0x000000B0);
 	}
 
 	void VR4300::ADD()
@@ -254,7 +175,7 @@ namespace esx {
 
 		U64 r = a + b;
 
-		if (mCP0.is64BitMode()) {
+		if (mCP0->is64BitMode()) {
 			r = static_cast<I32>(static_cast<U32>(r));
 		} else {
 			r &= 0xFFFFFFFF;
@@ -265,7 +186,7 @@ namespace esx {
 
 	void VR4300::DADD()
 	{
-		if (mCP0.isReserved64BitInstruction()) {
+		if (mCP0->isReserved64BitInstruction()) {
 			raiseException(ExceptionType::ReservedInstruction);
 			return;
 		}
@@ -285,7 +206,7 @@ namespace esx {
 
 	void VR4300::DADDU()
 	{
-		if (mCP0.isReserved64BitInstruction()) {
+		if (mCP0->isReserved64BitInstruction()) {
 			raiseException(ExceptionType::ReservedInstruction);
 			return;
 		}
@@ -320,7 +241,7 @@ namespace esx {
 
 		U64 r = a - b;
 
-		if (mCP0.is64BitMode()) {
+		if (mCP0->is64BitMode()) {
 			r = static_cast<I32>(static_cast<U32>(r));
 		} else {
 			r &= 0xFFFFFFFF;
@@ -331,7 +252,7 @@ namespace esx {
 
 	void VR4300::DSUB()
 	{
-		if (mCP0.isReserved64BitInstruction()) {
+		if (mCP0->isReserved64BitInstruction()) {
 			raiseException(ExceptionType::ReservedInstruction);
 			return;
 		}
@@ -351,7 +272,7 @@ namespace esx {
 
 	void VR4300::DSUBU()
 	{
-		if (mCP0.isReserved64BitInstruction()) {
+		if (mCP0->isReserved64BitInstruction()) {
 			raiseException(ExceptionType::ReservedInstruction);
 			return;
 		}
@@ -386,7 +307,7 @@ namespace esx {
 
 		U64 r = a + b;
 
-		if (mCP0.is64BitMode()) {
+		if (mCP0->is64BitMode()) {
 			r = static_cast<I32>(static_cast<U32>(r));
 		} else {
 			r &= 0xFFFFFFFF;
@@ -397,7 +318,7 @@ namespace esx {
 
 	void VR4300::DADDI()
 	{
-		if (mCP0.isReserved64BitInstruction()) {
+		if (mCP0->isReserved64BitInstruction()) {
 			raiseException(ExceptionType::ReservedInstruction);
 			return;
 		}
@@ -417,7 +338,7 @@ namespace esx {
 
 	void VR4300::DADDIU()
 	{
-		if (mCP0.isReserved64BitInstruction()) {
+		if (mCP0->isReserved64BitInstruction()) {
 			raiseException(ExceptionType::ReservedInstruction);
 			return;
 		}
@@ -440,7 +361,7 @@ namespace esx {
 		mHI = (r >> 32) & 0xFFFFFFFF;
 		mLO = r & 0xFFFFFFFF;
 
-		if (mCP0.is64BitMode()) {
+		if (mCP0->is64BitMode()) {
 			mHI = static_cast<I32>(mHI);
 			mLO = static_cast<I32>(mLO);
 		}
@@ -456,7 +377,7 @@ namespace esx {
 		mHI = (r >> 32) & 0xFFFFFFFF;
 		mLO = r & 0xFFFFFFFF;
 
-		if (mCP0.is64BitMode()) {
+		if (mCP0->is64BitMode()) {
 			mHI = static_cast<I32>(mHI);
 			mLO = static_cast<I32>(mLO);
 		}
@@ -464,7 +385,7 @@ namespace esx {
 
 	void VR4300::DMULT()
 	{
-		if (mCP0.isReserved64BitInstruction()) {
+		if (mCP0->isReserved64BitInstruction()) {
 			raiseException(ExceptionType::ReservedInstruction);
 			return;
 		}
@@ -481,7 +402,7 @@ namespace esx {
 
 	void VR4300::DMULTU()
 	{
-		if (mCP0.isReserved64BitInstruction()) {
+		if (mCP0->isReserved64BitInstruction()) {
 			raiseException(ExceptionType::ReservedInstruction);
 			return;
 		}
@@ -515,7 +436,7 @@ namespace esx {
 			}
 		}
 
-		if (mCP0.is64BitMode()) {
+		if (mCP0->is64BitMode()) {
 			mHI = static_cast<I32>(mHI);
 			mLO = static_cast<I32>(mLO);
 		}
@@ -534,7 +455,7 @@ namespace esx {
 			mLO = 0x7FFFFFFF;
 		}
 
-		if (mCP0.is64BitMode()) {
+		if (mCP0->is64BitMode()) {
 			mHI = static_cast<I32>(mHI);
 			mLO = static_cast<I32>(mLO);
 		}
@@ -542,7 +463,7 @@ namespace esx {
 
 	void VR4300::DDIV()
 	{
-		if (mCP0.isReserved64BitInstruction()) {
+		if (mCP0->isReserved64BitInstruction()) {
 			raiseException(ExceptionType::ReservedInstruction);
 			return;
 		}
@@ -574,7 +495,7 @@ namespace esx {
 
 	void VR4300::DDIVU()
 	{
-		if (mCP0.isReserved64BitInstruction()) {
+		if (mCP0->isReserved64BitInstruction()) {
 			raiseException(ExceptionType::ReservedInstruction);
 			return;
 		}
@@ -613,7 +534,7 @@ namespace esx {
 
 	void VR4300::LD()
 	{
-		if (mCP0.isReserved64BitInstruction()) {
+		if (mCP0->isReserved64BitInstruction()) {
 			raiseException(ExceptionType::ReservedInstruction);
 			return;
 		}
@@ -630,12 +551,12 @@ namespace esx {
 			r = getRegister(mCurrentInstruction.RegisterTarget());
 		}
 
-		addPendingLoad(mCurrentInstruction.RegisterTarget(), r);
+		setRegister(mCurrentInstruction.RegisterTarget(), r);
 	}
 
 	void VR4300::LDL()
 	{
-		if (mCP0.isReserved64BitInstruction()) {
+		if (mCP0->isReserved64BitInstruction()) {
 			raiseException(ExceptionType::ReservedInstruction);
 			return;
 		}
@@ -657,12 +578,12 @@ namespace esx {
 		U64 u = m & 0x7;
 		U64 r = (c & (0x00FFFFFFFFFFFFFF >> (u * 8))) | (aw << (56 - (u * 8)));
 
-		addPendingLoad(mCurrentInstruction.RegisterTarget(), r);
+		setRegister(mCurrentInstruction.RegisterTarget(), r);
 	}
 
 	void VR4300::LDR()
 	{
-		if (mCP0.isReserved64BitInstruction()) {
+		if (mCP0->isReserved64BitInstruction()) {
 			raiseException(ExceptionType::ReservedInstruction);
 			return;
 		}
@@ -684,7 +605,7 @@ namespace esx {
 		U64 u = m & 0x7;
 		U64 r = (c & (0xFFFFFFFFFFFFFF00 << ((0x7 - u) * 8))) | (aw >> (u * 8));
 
-		addPendingLoad(mCurrentInstruction.RegisterTarget(), r);
+		setRegister(mCurrentInstruction.RegisterTarget(), r);
 	}
 
 	void VR4300::LW()
@@ -701,18 +622,18 @@ namespace esx {
 			r = getRegister(mCurrentInstruction.RegisterTarget());
 		}
 
-		if (mCP0.is64BitMode()) {
+		if (mCP0->is64BitMode()) {
 			r = static_cast<I32>(static_cast<U32>(r));
 		} else {
 			r &= 0xFFFFFFFF;
 		}
 
-		addPendingLoad(mCurrentInstruction.RegisterTarget(), r);
+		setRegister(mCurrentInstruction.RegisterTarget(), r);
 	}
 
 	void VR4300::LWU()
 	{
-		if (mCP0.isReserved64BitInstruction()) {
+		if (mCP0->isReserved64BitInstruction()) {
 			raiseException(ExceptionType::ReservedInstruction);
 			return;
 		}
@@ -729,7 +650,7 @@ namespace esx {
 			r = getRegister(mCurrentInstruction.RegisterTarget());
 		}
 
-		addPendingLoad(mCurrentInstruction.RegisterTarget(), r);
+		setRegister(mCurrentInstruction.RegisterTarget(), r);
 	}
 
 	void VR4300::LH()
@@ -747,14 +668,14 @@ namespace esx {
 		} else {
 			r = static_cast<U32>(static_cast<I32>(static_cast<I16>(static_cast<U16>(r))));
 
-			if (mCP0.is64BitMode()) {
+			if (mCP0->is64BitMode()) {
 				r = static_cast<I32>(static_cast<U32>(r));
 			} else {
 				r &= 0xFFFFFFFF;
 			}
 		}
 
-		addPendingLoad(mCurrentInstruction.RegisterTarget(), r);
+		setRegister(mCurrentInstruction.RegisterTarget(), r);
 	}
 
 	void VR4300::LHU()
@@ -771,7 +692,7 @@ namespace esx {
 			r = getRegister(mCurrentInstruction.RegisterTarget());
 		}
 
-		addPendingLoad(mCurrentInstruction.RegisterTarget(), r);
+		setRegister(mCurrentInstruction.RegisterTarget(), r);
 	}
 
 	void VR4300::LB()
@@ -789,14 +710,14 @@ namespace esx {
 		} else {
 			r = static_cast<U32>(static_cast<I32>(static_cast<I8>(static_cast<U8>(r))));
 
-			if (mCP0.is64BitMode()) {
+			if (mCP0->is64BitMode()) {
 				r = static_cast<I32>(static_cast<U32>(r));
 			} else {
 				r &= 0xFFFFFFFF;
 			}
 		}
 
-		addPendingLoad(mCurrentInstruction.RegisterTarget(), r);
+		setRegister(mCurrentInstruction.RegisterTarget(), r);
 	}
 
 	void VR4300::LBU()
@@ -810,7 +731,7 @@ namespace esx {
 
 		U32 r = load<U8>(m, exception);
 
-		addPendingLoad(mCurrentInstruction.RegisterTarget(), r);
+		setRegister(mCurrentInstruction.RegisterTarget(), r);
 	}
 
 	void VR4300::LWL()
@@ -832,13 +753,13 @@ namespace esx {
 		U64 u = m & 0x3;
 		U64 r = (c & (0x00FFFFFF >> (u * 8))) | (aw << (24 - (u * 8)));
 
-		if (mCP0.is64BitMode()) {
+		if (mCP0->is64BitMode()) {
 			r = static_cast<I32>(static_cast<U32>(r));
 		} else {
 			r &= 0xFFFFFFFF;
 		}
 
-		addPendingLoad(mCurrentInstruction.RegisterTarget(), r);
+		setRegister(mCurrentInstruction.RegisterTarget(), r);
 	}
 
 	void VR4300::SWL()
@@ -880,13 +801,13 @@ namespace esx {
 		U64 u = m & 0x3;
 		U64 r = (c & (0xFFFFFF00 << ((0x3 - u) * 8))) | (aw >> (u * 8));
 
-		if (mCP0.is64BitMode()) {
+		if (mCP0->is64BitMode()) {
 			r = static_cast<I32>(static_cast<U32>(r));
 		} else {
 			r &= 0xFFFFFFFF;
 		}
 
-		addPendingLoad(mCurrentInstruction.RegisterTarget(), r);
+		setRegister(mCurrentInstruction.RegisterTarget(), r);
 	}
 
 	void VR4300::SWR()
@@ -921,7 +842,7 @@ namespace esx {
 
 	void VR4300::SCD()
 	{
-		if (mCP0.isReserved64BitInstruction()) {
+		if (mCP0->isReserved64BitInstruction()) {
 			raiseException(ExceptionType::ReservedInstruction);
 			return;
 		}
@@ -969,7 +890,7 @@ namespace esx {
 
 	void VR4300::SD()
 	{
-		if (mCP0.isReserved64BitInstruction()) {
+		if (mCP0->isReserved64BitInstruction()) {
 			raiseException(ExceptionType::ReservedInstruction);
 			return;
 		}
@@ -986,7 +907,7 @@ namespace esx {
 
 	void VR4300::SDL()
 	{
-		if (mCP0.isReserved64BitInstruction()) {
+		if (mCP0->isReserved64BitInstruction()) {
 			raiseException(ExceptionType::ReservedInstruction);
 			return;
 		}
@@ -1010,7 +931,7 @@ namespace esx {
 
 	void VR4300::SDR()
 	{
-		if (mCP0.isReserved64BitInstruction()) {
+		if (mCP0->isReserved64BitInstruction()) {
 			raiseException(ExceptionType::ReservedInstruction);
 			return;
 		}
@@ -1046,7 +967,14 @@ namespace esx {
 
 	void VR4300::LUI()
 	{
-		U32 r = mCurrentInstruction.Immediate() << 16;
+		U64 r = mCurrentInstruction.Immediate() << 16;
+
+		if (mCP0->is64BitMode()) {
+			r = static_cast<I32>(static_cast<U32>(r));
+		} else {
+			r &= 0xFFFFFFFF;
+		}
+
 		setRegister(mCurrentInstruction.RegisterTarget(), r);
 	}
 
@@ -1064,21 +992,21 @@ namespace esx {
 			r = getRegister(mCurrentInstruction.RegisterTarget());
 		}
 
-		if (mCP0.is64BitMode()) {
+		if (mCP0->is64BitMode()) {
 			r = static_cast<I32>(static_cast<U32>(r));
 		}
 		else {
 			r &= 0xFFFFFFFF;
 		}
 
-		addPendingLoad(mCurrentInstruction.RegisterTarget(), r);
+		setRegister(mCurrentInstruction.RegisterTarget(), r);
 		mLLBit = ESX_TRUE;
-		mCP0.setLLAddrToLastTranslation();
+		mCP0->setLLAddrToLastTranslation();
 	}
 
 	void VR4300::LLD()
 	{
-		if (mCP0.isReserved64BitInstruction()) {
+		if (mCP0->isReserved64BitInstruction()) {
 			raiseException(ExceptionType::ReservedInstruction);
 			return;
 		}
@@ -1095,9 +1023,9 @@ namespace esx {
 			r = getRegister(mCurrentInstruction.RegisterTarget());
 		}
 
-		addPendingLoad(mCurrentInstruction.RegisterTarget(), r);
+		setRegister(mCurrentInstruction.RegisterTarget(), r);
 		mLLBit = ESX_TRUE;
-		mCP0.setLLAddrToLastTranslation();
+		mCP0->setLLAddrToLastTranslation();
 	}
 
 	void VR4300::SLT()
@@ -1217,7 +1145,7 @@ namespace esx {
 
 		U64 r = a << s;
 
-		if (mCP0.is64BitMode()) {
+		if (mCP0->is64BitMode()) {
 			r = static_cast<I32>(static_cast<U32>(r));
 		} else {
 			r &= 0xFFFFFFFF;
@@ -1228,7 +1156,7 @@ namespace esx {
 
 	void VR4300::DSLL()
 	{
-		if (mCP0.isReserved64BitInstruction()) {
+		if (mCP0->isReserved64BitInstruction()) {
 			raiseException(ExceptionType::ReservedInstruction);
 			return;
 		}
@@ -1243,7 +1171,7 @@ namespace esx {
 
 	void VR4300::DSLL32()
 	{
-		if (mCP0.isReserved64BitInstruction()) {
+		if (mCP0->isReserved64BitInstruction()) {
 			raiseException(ExceptionType::ReservedInstruction);
 			return;
 		}
@@ -1263,7 +1191,7 @@ namespace esx {
 
 		U64 r = a >> s;
 
-		if (mCP0.is64BitMode()) {
+		if (mCP0->is64BitMode()) {
 			r = static_cast<I32>(static_cast<U32>(r));
 		} else {
 			r &= 0xFFFFFFFF;
@@ -1274,7 +1202,7 @@ namespace esx {
 
 	void VR4300::DSRL()
 	{
-		if (mCP0.isReserved64BitInstruction()) {
+		if (mCP0->isReserved64BitInstruction()) {
 			raiseException(ExceptionType::ReservedInstruction);
 			return;
 		}
@@ -1289,7 +1217,7 @@ namespace esx {
 
 	void VR4300::DSRL32()
 	{
-		if (mCP0.isReserved64BitInstruction()) {
+		if (mCP0->isReserved64BitInstruction()) {
 			raiseException(ExceptionType::ReservedInstruction);
 			return;
 		}
@@ -1309,7 +1237,7 @@ namespace esx {
 
 		U64 r = a >> s;
 
-		if (mCP0.is64BitMode()) {
+		if (mCP0->is64BitMode()) {
 			r = static_cast<I32>(static_cast<U32>(r));
 		} else {
 			r &= 0xFFFFFFFF;
@@ -1320,7 +1248,7 @@ namespace esx {
 
 	void VR4300::DSRA()
 	{
-		if (mCP0.isReserved64BitInstruction()) {
+		if (mCP0->isReserved64BitInstruction()) {
 			raiseException(ExceptionType::ReservedInstruction);
 			return;
 		}
@@ -1335,7 +1263,7 @@ namespace esx {
 
 	void VR4300::DSRA32()
 	{
-		if (mCP0.isReserved64BitInstruction()) {
+		if (mCP0->isReserved64BitInstruction()) {
 			raiseException(ExceptionType::ReservedInstruction);
 			return;
 		}
@@ -1355,7 +1283,7 @@ namespace esx {
 
 		U64 r = a << (s & 0x1F);
 
-		if (mCP0.is64BitMode()) {
+		if (mCP0->is64BitMode()) {
 			r = static_cast<I32>(static_cast<U32>(r));
 		} else {
 			r &= 0xFFFFFFFF;
@@ -1366,7 +1294,7 @@ namespace esx {
 
 	void VR4300::DSLLV()
 	{
-		if (mCP0.isReserved64BitInstruction()) {
+		if (mCP0->isReserved64BitInstruction()) {
 			raiseException(ExceptionType::ReservedInstruction);
 			return;
 		}
@@ -1386,7 +1314,7 @@ namespace esx {
 
 		U64 r = a >> (s & 0x1F);
 
-		if (mCP0.is64BitMode()) {
+		if (mCP0->is64BitMode()) {
 			r = static_cast<I32>(static_cast<U32>(r));
 		} else {
 			r &= 0xFFFFFFFF;
@@ -1397,7 +1325,7 @@ namespace esx {
 
 	void VR4300::DSRLV()
 	{
-		if (mCP0.isReserved64BitInstruction()) {
+		if (mCP0->isReserved64BitInstruction()) {
 			raiseException(ExceptionType::ReservedInstruction);
 			return;
 		}
@@ -1417,7 +1345,7 @@ namespace esx {
 
 		U64 r = a >> (s & 0x1F);
 
-		if (mCP0.is64BitMode()) {
+		if (mCP0->is64BitMode()) {
 			r = static_cast<I32>(static_cast<U32>(r));
 		} else {
 			r &= 0xFFFFFFFF;
@@ -1428,7 +1356,7 @@ namespace esx {
 
 	void VR4300::DSRAV()
 	{
-		if (mCP0.isReserved64BitInstruction()) {
+		if (mCP0->isReserved64BitInstruction()) {
 			raiseException(ExceptionType::ReservedInstruction);
 			return;
 		}
@@ -1785,44 +1713,60 @@ namespace esx {
 		}
 	}
 
-	static const Array<CoprocessorExecuteFunction, 32> cop0decodeRS = {
-		&SystemControlCoprocessor::MF,	&SystemControlCoprocessor::DMF,	&SystemControlCoprocessor::CF,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::MT,	&SystemControlCoprocessor::DMT,	&SystemControlCoprocessor::CT,	&SystemControlCoprocessor::NA,
-		&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,
-		&SystemControlCoprocessor::CO,	&SystemControlCoprocessor::CO,	&SystemControlCoprocessor::CO,	&SystemControlCoprocessor::CO,	&SystemControlCoprocessor::CO,	&SystemControlCoprocessor::CO,	&SystemControlCoprocessor::CO,	&SystemControlCoprocessor::CO,
-		&SystemControlCoprocessor::CO,	&SystemControlCoprocessor::CO,	&SystemControlCoprocessor::CO,	&SystemControlCoprocessor::CO,	&SystemControlCoprocessor::CO,	&SystemControlCoprocessor::CO,	&SystemControlCoprocessor::CO,	&SystemControlCoprocessor::CO
-	};
-
-	static const Array<CoprocessorExecuteFunction, 32> cop0decodeBC = {
-		&SystemControlCoprocessor::BCF,	&SystemControlCoprocessor::BCT,	&SystemControlCoprocessor::BCFL,	&SystemControlCoprocessor::BCTL,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,
-		&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,		&SystemControlCoprocessor::NA,		&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,
-		&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,		&SystemControlCoprocessor::NA,		&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,
-		&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,		&SystemControlCoprocessor::NA,		&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA,	&SystemControlCoprocessor::NA
-	};
-
 	void VR4300::COP0()
 	{
-		CoprocessorExecuteFunction coprocessorFunction = nullptr;
-		if (mCurrentInstruction.RegisterSource().Value != 8) {
-			coprocessorFunction = cop0decodeRS[mCurrentInstruction.RegisterSource().Value];
-		} else {
-			coprocessorFunction = cop0decodeRS[mCurrentInstruction.RegisterTarget().Value];
+		if (mCOPs[0]) {
+			CoprocessorExecuteFunction coprocessorFunction = nullptr;
+			if (mCurrentInstruction.RegisterSource().Value != 8) {
+				coprocessorFunction = copDecodeRS[mCurrentInstruction.RegisterSource().Value];
+			}
+			else {
+				coprocessorFunction = copDecodeBC[mCurrentInstruction.RegisterTarget().Value];
+			}
+			((mCOPs[0].get())->*coprocessorFunction)();
 		}
-		((&mCP0)->*coprocessorFunction)();
 	}
 
 	void VR4300::COP1()
 	{
-		raiseException(ExceptionType::CoprocessorUnusable);
+		if (mCOPs[1]) {
+			CoprocessorExecuteFunction coprocessorFunction = nullptr;
+			if (mCurrentInstruction.RegisterSource().Value != 8) {
+				coprocessorFunction = copDecodeRS[mCurrentInstruction.RegisterSource().Value];
+			}
+			else {
+				coprocessorFunction = copDecodeBC[mCurrentInstruction.RegisterTarget().Value];
+			}
+			((mCOPs[1].get())->*coprocessorFunction)();
+		}
 	}
 
 	void VR4300::COP2()
 	{
-		raiseException(ExceptionType::CoprocessorUnusable);
+		if (mCOPs[2]) {
+			CoprocessorExecuteFunction coprocessorFunction = nullptr;
+			if (mCurrentInstruction.RegisterSource().Value != 8) {
+				coprocessorFunction = copDecodeRS[mCurrentInstruction.RegisterSource().Value];
+			}
+			else {
+				coprocessorFunction = copDecodeBC[mCurrentInstruction.RegisterTarget().Value];
+			}
+			((mCOPs[2].get())->*coprocessorFunction)();
+		}
 	}
 
 	void VR4300::COP3()
 	{
-		raiseException(ExceptionType::CoprocessorUnusable);
+		if (mCOPs[3]) {
+			CoprocessorExecuteFunction coprocessorFunction = nullptr;
+			if (mCurrentInstruction.RegisterSource().Value != 8) {
+				coprocessorFunction = copDecodeRS[mCurrentInstruction.RegisterSource().Value];
+			}
+			else {
+				coprocessorFunction = copDecodeBC[mCurrentInstruction.RegisterTarget().Value];
+			}
+			((mCOPs[3].get())->*coprocessorFunction)();
+		}
 	}
 
 	void VR4300::LDC1()
@@ -1888,34 +1832,6 @@ namespace esx {
 		raiseException(ExceptionType::ReservedInstruction);
 	}
 
-	void VR4300::addPendingLoad(RegisterIndex index, U64 value)
-	{
-		mPendingLoad.first = index;
-		mPendingLoad.second = value;
-
-		if (mMemoryLoad.first == index) {
-			mMemoryLoad = std::make_pair<RegisterIndex, U64>(RegisterIndex(0), 0);
-		}
-	}
-
-	void VR4300::resetPendingLoad()
-	{
-		mPendingLoad.first = RegisterIndex(0);
-		mPendingLoad.second = 0;
-	}
-
-	void VR4300::setRegister(RegisterIndex index, U64 value)
-	{
-		mWriteBack.first = index;
-		mWriteBack.second = value;
-	}
-
-	U64 VR4300::getRegister(RegisterIndex index)
-	{
-		return mRegisters[index.Value];
-	}
-
-
 	void VR4300::iCacheStore(U32 address, U32 value)
 	{
 		U32 cacheLineNumber = address / 32;
@@ -1971,436 +1887,6 @@ namespace esx {
 	}
 
 	void VR4300::raiseException(ExceptionType type, U32 virtualAddress) {
-		mCP0.raiseException(type, virtualAddress);
+		mCP0->raiseException(type, virtualAddress);
 	}
-
-	String Instruction::Mnemonic(const SharedPtr<VR4300>& cpuState) const
-	{
-		constexpr static std::array<StringView,32> registersMnemonics = {
-			ESX_TEXT("$zero"),
-			ESX_TEXT("$at"),
-			ESX_TEXT("$v0"),ESX_TEXT("$v1"),
-			ESX_TEXT("$a0"),ESX_TEXT("$a1"),ESX_TEXT("$a2"),ESX_TEXT("$a3"),
-			ESX_TEXT("$t0"),ESX_TEXT("$t1"),ESX_TEXT("$t2"),ESX_TEXT("$t3"),ESX_TEXT("$t4"),ESX_TEXT("$t5"),ESX_TEXT("$t6"),ESX_TEXT("$t7"),
-			ESX_TEXT("$s0"),ESX_TEXT("$s1"),ESX_TEXT("$s2"),ESX_TEXT("$s3"),ESX_TEXT("$s4"),ESX_TEXT("$s5"),ESX_TEXT("$s6"),ESX_TEXT("$s7"),
-			ESX_TEXT("$t8"),ESX_TEXT("$t9"),
-			ESX_TEXT("$k0"),ESX_TEXT("$k1"),
-			ESX_TEXT("$gp"),
-			ESX_TEXT("$sp"),
-			ESX_TEXT("$fp"),
-			ESX_TEXT("$ra")
-		};
-
-		switch (Opcode()) {
-			//R Type
-			case 0x00: {
-				switch (Function()) {
-					case 0x00: {
-						return FormatString(ESX_TEXT("sll {},{},0x{:02x}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], ShiftAmount());
-					}
-					case 0x02: {
-						return FormatString(ESX_TEXT("srl {},{},0x{:02x}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], ShiftAmount());
-					}
-					case 0x03: {
-						return FormatString(ESX_TEXT("sra {},{},0x{:02x}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], ShiftAmount());
-					}
-					case 0x04: {
-						return FormatString(ESX_TEXT("sllv {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()]);
-					}
-					case 0x06: {
-						return FormatString(ESX_TEXT("srlv {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()]);
-					}
-					case 0x07: {
-						return FormatString(ESX_TEXT("srav {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()]);
-					}
-					case 0x08: {
-						return FormatString(ESX_TEXT("jr {}"), registersMnemonics[(U8)RegisterSource()]);
-					}
-					case 0x09: {
-						return FormatString(ESX_TEXT("jalr {},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()]);
-					}
-					case 0x0C: {
-						return FormatString(ESX_TEXT("syscall"));
-					}
-					case 0x0D: {
-						return FormatString(ESX_TEXT("break"));
-					}
-					case 0x0F: {
-						return FormatString(ESX_TEXT("sync"));
-					}
-					case 0x10: {
-						return FormatString(ESX_TEXT("mfhi {}"), registersMnemonics[(U8)RegisterDestination()]);
-					}
-					case 0x11: {
-						return FormatString(ESX_TEXT("mthi {}"), registersMnemonics[(U8)RegisterSource()]);
-					}
-					case 0x12: {
-						return FormatString(ESX_TEXT("mflo {}"), registersMnemonics[(U8)RegisterDestination()]);
-					}
-					case 0x13: {
-						return FormatString(ESX_TEXT("mtlo {}"), registersMnemonics[(U8)RegisterSource()]);
-					}
-					case 0x14: {
-						return FormatString(ESX_TEXT("dsllv {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()]);
-					}
-					case 0x16: {
-						return FormatString(ESX_TEXT("dsrlv {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()]);
-					}
-					case 0x17: {
-						return FormatString(ESX_TEXT("dsrav {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()]);
-					}
-					case 0x18: {
-						return FormatString(ESX_TEXT("mult {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-					}
-					case 0x19: {
-						return FormatString(ESX_TEXT("multu {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-					}
-					case 0x1A: {
-						return FormatString(ESX_TEXT("div {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-					}
-					case 0x1B: {
-						return FormatString(ESX_TEXT("divu {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-					}
-					case 0x1C: {
-						return FormatString(ESX_TEXT("dmult {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-					}
-					case 0x1D: {
-						return FormatString(ESX_TEXT("dmultu {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-					}
-					case 0x1E: {
-						return FormatString(ESX_TEXT("ddiv {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-					}
-					case 0x1F: {
-						return FormatString(ESX_TEXT("ddivu {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-					}
-					case 0x20: {
-						if (RegisterTarget().Value == 0) {
-							return FormatString(ESX_TEXT("move {},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()]);
-						}
-						else {
-							return FormatString(ESX_TEXT("add {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-						}
-					}
-					case 0x21: {
-						if (RegisterTarget().Value == 0) {
-							return FormatString(ESX_TEXT("move {},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()]);
-						}
-						else {
-							return FormatString(ESX_TEXT("addu {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-						}
-					}
-					case 0x22: {
-						return FormatString(ESX_TEXT("sub {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-					}
-					case 0x23: {
-						return FormatString(ESX_TEXT("subu {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-					}
-					case 0x24: {
-						return FormatString(ESX_TEXT("and {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-					}
-					case 0x25: {
-						return FormatString(ESX_TEXT("or {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-					}
-					case 0x26: {
-						return FormatString(ESX_TEXT("xor {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-					}
-					case 0x27: {
-						return FormatString(ESX_TEXT("nor {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-					}
-					case 0x2A: {
-						return FormatString(ESX_TEXT("slt {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-					}
-					case 0x2B: {
-						return FormatString(ESX_TEXT("sltu {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-					}
-					case 0x2C: {
-						if (RegisterTarget().Value == 0) {
-							return FormatString(ESX_TEXT("dmove {},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()]);
-						}
-						else {
-							return FormatString(ESX_TEXT("dadd {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-						}
-					}
-					case 0x2D: {
-						if (RegisterTarget().Value == 0) {
-							return FormatString(ESX_TEXT("dmove {},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()]);
-						}
-						else {
-							return FormatString(ESX_TEXT("daddu {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-						}
-					}
-					case 0x2E: {
-						return FormatString(ESX_TEXT("dsub {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-					}
-					case 0x2F: {
-						return FormatString(ESX_TEXT("dsubu {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-					}
-					case 0x30: {
-						return FormatString(ESX_TEXT("tge {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-					}
-					case 0x31: {
-						return FormatString(ESX_TEXT("tgeu {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-					}
-					case 0x32: {
-						return FormatString(ESX_TEXT("tlt {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-					}
-					case 0x33: {
-						return FormatString(ESX_TEXT("tltu {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-					}
-					case 0x34: {
-						return FormatString(ESX_TEXT("teq {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-					}
-					case 0x36: {
-						return FormatString(ESX_TEXT("tne {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-					}
-					case 0x38: {
-						return FormatString(ESX_TEXT("dsll {},{},0x{:02x}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], ShiftAmount());
-					}
-					case 0x3A: {
-						return FormatString(ESX_TEXT("dsrl {},{},0x{:02x}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], ShiftAmount());
-					}
-					case 0x3B: {
-						return FormatString(ESX_TEXT("dsra {},{},0x{:02x}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], ShiftAmount());
-					}
-					case 0x3C: {
-						return FormatString(ESX_TEXT("dsll32 {},{},0x{:02x}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], ShiftAmount());
-					}
-					case 0x3E: {
-						return FormatString(ESX_TEXT("dsrl32 {},{},0x{:02x}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], ShiftAmount());
-					}
-					case 0x3F: {
-						return FormatString(ESX_TEXT("dsra32 {},{},0x{:02x}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], ShiftAmount());
-					}
-				}
-
-				break;
-			}
-
-			//J Type
-			case 0x02: {
-				return FormatString(ESX_TEXT("j 0x{:08x}"), ((Address + 4) & 0xF0000000) | (PseudoAddress() << 2));
-			}
-			case 0x03: {
-				return FormatString(ESX_TEXT("jal 0x{:08x}"), ((Address + 4) & 0xF0000000) | (PseudoAddress() << 2));
-			}
-
-			default: {
-				switch (Opcode()) {
-					case 0x01: {
-						switch (RegisterTarget().Value) {
-							case 0x00: {
-								return FormatString(ESX_TEXT("bltz {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
-							}
-							case 0x01: {
-								return FormatString(ESX_TEXT("bgez {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
-							}
-							case 0x02: {
-								return FormatString(ESX_TEXT("bltzl {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
-							}
-							case 0x03: {
-								return FormatString(ESX_TEXT("bgezl {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
-							}
-							case 0x08: {
-								return FormatString(ESX_TEXT("tgei {},,0x{:04x}"), registersMnemonics[(U8)RegisterSource()], (I16)Immediate());
-							}
-							case 0x09: {
-								return FormatString(ESX_TEXT("tgeiu {},,0x{:04x}"), registersMnemonics[(U8)RegisterSource()], Immediate());
-							}
-							case 0x0A: {
-								return FormatString(ESX_TEXT("tlti {},,0x{:04x}"), registersMnemonics[(U8)RegisterSource()], (I16)Immediate());
-							}
-							case 0x0B: {
-								return FormatString(ESX_TEXT("tltiu {},,0x{:04x}"), registersMnemonics[(U8)RegisterSource()], Immediate());
-							}
-							case 0x0C: {
-								return FormatString(ESX_TEXT("teqi {},,0x{:04x}"), registersMnemonics[(U8)RegisterSource()], (I16)Immediate());
-							}
-							case 0x0E: {
-								return FormatString(ESX_TEXT("tnei {},,0x{:04x}"), registersMnemonics[(U8)RegisterSource()], (I16)Immediate());
-							}
-							case 0x10: {
-								return FormatString(ESX_TEXT("bltzal {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
-							}
-							case 0x11: {
-								return FormatString(ESX_TEXT("bgezal {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
-							}
-							case 0x12: {
-								return FormatString(ESX_TEXT("bltzall {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
-							}
-							case 0x13: {
-								return FormatString(ESX_TEXT("bgezall {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
-							}
-						}
-
-						break;
-					}
-					case 0x04: {
-						return FormatString(ESX_TEXT("beq {},{},0x{:08x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
-					}
-					case 0x05: {
-						return FormatString(ESX_TEXT("bne {},{},0x{:08x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
-					}
-					case 0x06: {
-						return FormatString(ESX_TEXT("blez {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
-					}
-					case 0x07: {
-						return FormatString(ESX_TEXT("bgtz {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
-					}
-					case 0x08: {
-						return FormatString(ESX_TEXT("addi {},{},0x{:04x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], (I16)Immediate());
-					}
-					case 0x09: {
-						return FormatString(ESX_TEXT("addiu {},{},0x{:04x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], (I16)Immediate());
-					}
-					case 0x0A: {
-						return FormatString(ESX_TEXT("slti {},{},0x{:04x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], (I16)Immediate());
-					}
-					case 0x0B: {
-						return FormatString(ESX_TEXT("sltiu {},{},0x{:04x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], (I16)Immediate());
-					}
-					case 0x0C: {
-						return FormatString(ESX_TEXT("andi {},{},0x{:04x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], Immediate());
-					}
-					case 0x0D: {
-						return FormatString(ESX_TEXT("ori {},{},0x{:04x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], Immediate());
-					}
-					case 0x0E: {
-						return FormatString(ESX_TEXT("xori {},{},0x{:04x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], Immediate());
-					}
-					case 0x0F: {
-						return FormatString(ESX_TEXT("lui {},0x{:04x}"), registersMnemonics[(U8)RegisterTarget()], Immediate());
-					}
-					case 0x10:
-					case 0x11:
-					case 0x12:
-					case 0x13: {
-						U8 cpn = COP_N(binaryInstruction);
-						if (COP(binaryInstruction) == 0) {
-							switch (RegisterSource().Value) {
-								case 0x00: {
-									return FormatString(ESX_TEXT("mfc{} {},${}"), cpn, registersMnemonics[(U8)RegisterTarget()], (U8)RegisterDestination());
-								}
-								case 0x02: {
-									return FormatString(ESX_TEXT("cfc{} {},${}"), cpn, registersMnemonics[(U8)RegisterTarget()], (U8)RegisterDestination());
-								}
-								case 0x04: {
-									return FormatString(ESX_TEXT("mtc{} {},${}"), cpn, registersMnemonics[(U8)RegisterTarget()], (U8)RegisterDestination());
-								}
-								case 0x06: {
-									return FormatString(ESX_TEXT("ctc{} {},${}"), cpn, registersMnemonics[(U8)RegisterTarget()], (U8)RegisterDestination());
-								}
-								case 0x08: {
-									switch (RegisterTarget()) {
-										case 0: return FormatString(ESX_TEXT("bc{}f 0x{:04x}"), cpn, Immediate());
-										case 1: return FormatString(ESX_TEXT("bc{}t 0x{:04x}"), cpn, Immediate());
-									}
-								}
-							}
-						}
-						else {
-							switch (cpn) {
-								case 0: {
-									switch (COP_FUNC(binaryInstruction)) {
-										case 0x10: {
-											return FormatString(ESX_TEXT("rfe"));
-										}
-									}
-									break;
-								}
-
-								case 2: {
-									return FormatString(ESX_TEXT("cop2 0x{:08x}"), Immediate25());
-								}
-							}
-						}
-						break;
-					}
-					
-					case 0x14: {
-						return FormatString(ESX_TEXT("beql {},{},0x{:08x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
-					}
-					case 0x15: {
-						return FormatString(ESX_TEXT("bnel {},{},0x{:08x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
-					}
-					case 0x16: {
-						return FormatString(ESX_TEXT("blezl {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
-					}
-					case 0x17: {
-						return FormatString(ESX_TEXT("bgtzl {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
-					}
-					case 0x20: {
-						return FormatString(ESX_TEXT("lb {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-					}
-					case 0x21: {
-						return FormatString(ESX_TEXT("lh {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-					}
-					case 0x22: {
-						return FormatString(ESX_TEXT("lwl {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-					}
-					case 0x23: {
-						return FormatString(ESX_TEXT("lw {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-					}
-					case 0x24: {
-						return FormatString(ESX_TEXT("lbu {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-					}
-					case 0x25: {
-						return FormatString(ESX_TEXT("lhu {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-					}
-					case 0x26: {
-						return FormatString(ESX_TEXT("lwr {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-					}
-					case 0x27: {
-						return FormatString(ESX_TEXT("lwu {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-					}
-					case 0x28: {
-						return FormatString(ESX_TEXT("sb {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-					}
-					case 0x29: {
-						return FormatString(ESX_TEXT("sh {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-					}
-					case 0x2A: {
-						return FormatString(ESX_TEXT("swl {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-					}
-					case 0x2B: {
-						return FormatString(ESX_TEXT("sw {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-					}
-					case 0x2C: {
-						return FormatString(ESX_TEXT("sdl {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-					}
-					case 0x2D: {
-						return FormatString(ESX_TEXT("sdr {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-					}
-					case 0x2E: {
-						return FormatString(ESX_TEXT("swr {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-					}
-					case 0x2F: {
-						return FormatString(ESX_TEXT("cache"));
-					}
-
-
-					case 0x30:
-					case 0x31:
-					case 0x32:
-					case 0x33: {
-						U8 cpn = COP_N(binaryInstruction);
-						return FormatString(ESX_TEXT("lwc{} ${},0x{:08x}"), cpn, registersMnemonics[(U8)RegisterTarget()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-						break;
-					}
-
-
-					case 0x38:
-					case 0x39:
-					case 0x3A:
-					case 0x3B: {
-						U8 cpn = COP_N(binaryInstruction);
-						return FormatString(ESX_TEXT("swc{} ${},0x{:08x}"), cpn, registersMnemonics[(U8)RegisterTarget()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-						break;
-					}
-				}
-			}
-		}
-
-		return FormatString(ESX_TEXT("0x{:08x}"), binaryInstruction);
-	}
-
 }

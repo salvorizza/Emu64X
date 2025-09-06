@@ -10,7 +10,7 @@
 #include "Base/Base.h"
 #include "Base/Bus.h"
 
-#include "Coprocessor.h"
+#include "../Common/Coprocessor.h"
 
 namespace esx {
 
@@ -448,14 +448,17 @@ namespace esx {
 	};
 	using TLB = Array<TLBEntry, 32>;
 
-	class SystemControlCoprocessor : public Coprocessor {
+	class SystemControlCoprocessor : public Coprocessor<VR4300> {
 	public:
 		SystemControlCoprocessor(VR4300* cpu);
 		~SystemControlCoprocessor() = default;
 
-		virtual void clock(U64 clocks) override;
+		void clock(U64 clocks) override;
 
-		virtual void CO() override;
+		void CO() override;
+
+		void unusable() override;
+		void reserved() override;
 
 		void TLBR();
 		void TLBWI();
@@ -470,7 +473,7 @@ namespace esx {
 		void watchAddress(U32 physicalAddress, BIT store);
 		U32 AddressTranslation(U32 virtualAddress, BIT store, BIT& cached);
 
-		virtual U64 getRegister(RegisterIndex reg) const override;
+		virtual U64 getRegister(RegisterIndex reg) override;
 		virtual void setRegister(RegisterIndex reg, U64 value) override;
 
 		void clearInterrupt(Interrupt interrupt);

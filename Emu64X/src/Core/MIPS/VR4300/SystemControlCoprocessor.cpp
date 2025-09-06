@@ -62,6 +62,16 @@ namespace esx {
         }
     }
 
+    void SystemControlCoprocessor::unusable()
+    {
+        raiseException(ExceptionType::CoprocessorUnusable);
+    }
+
+    void SystemControlCoprocessor::reserved()
+    {
+        raiseException(ExceptionType::ReservedInstruction);
+    }
+
     void SystemControlCoprocessor::TLBR()
     {
         if (!isCoprocessorUsable(0)) {
@@ -311,7 +321,7 @@ namespace esx {
         return physicalAddress;
     }
 
-    U64 SystemControlCoprocessor::getRegister(RegisterIndex reg) const
+    U64 SystemControlCoprocessor::getRegister(RegisterIndex reg)
     {
         switch (static_cast<SystemControlRegisterType>(reg.Value)) {
             case SystemControlRegisterType::Index:    return mIndexRegister.read();
