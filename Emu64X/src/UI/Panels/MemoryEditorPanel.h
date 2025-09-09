@@ -1,8 +1,8 @@
 #pragma once
 
 #include <Base/Bus.h>
-#include <Core/RAM.h>
-#include <Core/Bios.h>
+#include <Core/RDRAM.h>
+#include <Core/SIExternalBus.h>
 
 #include "Panel.h"
 

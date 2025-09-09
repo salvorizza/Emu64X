@@ -9,20 +9,26 @@
 
 namespace esx {
 
-	class RSP : public BusDevice {
+	class RCP;
+
+	class RSP {
 	public:
-		RSP();
+		RSP(RCP* rcp);
 		~RSP();
 
-		void clock(U64 clocks) override;
+		void clock(U64 clocks);
 
-		void init() override;
+		void init();
 
-		void store(const StringView& busName, U32 address, U32 value) override;
-		void load(const StringView& busName, U32 address, U32& output) override;
+		void store(U32 address, U32 value);
+		U32 load(U32 address);
 
-		void reset() override;
+		void reset() ;
 	private:
+		StringView mName = "RSP";
+
+		RCP* mRCP;
+
 		SharedPtr<R4000> mCore;
 		SharedPtr<ScalarUnit> mSU;
 		SharedPtr<VectorUnit> mVU;

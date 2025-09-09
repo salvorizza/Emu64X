@@ -21,11 +21,11 @@ namespace esx {
 	void MemoryEditorPanel::onImGuiRender() {
 		static MemoryEditor mem_edit;
 
-		const char* items[] = { "RAM", "Bios" };
+		const char* items[] = { "RAM", "Bios RAM" };
 		static int item_current = 0;
 
-		SharedPtr<RAM> ram = mInstance->getDevice<RAM>(ESX_TEXT("RAM"));
-		SharedPtr<Bios> bios = mInstance->getDevice<Bios>(ESX_TEXT("Bios"));
+		SharedPtr<RDRAM> ram = mInstance->getDevice<RDRAM>(ESX_TEXT("RDRAM"));
+		SharedPtr<SIExternalBus> bios = mInstance->getDevice<SIExternalBus>(ESX_TEXT("SIExternalBus"));
 
 		if (ImGui::BeginCombo("##combo", items[item_current])) // The second parameter is the label previewed before opening the combo.
 		{
@@ -59,7 +59,7 @@ namespace esx {
 				break;
 
 			case 1:
-				mem_edit.DrawContents(bios->mMemory.data(), bios->mMemory.size());
+				mem_edit.DrawContents(bios->mPIF_RAM.data(), bios->mPIF_RAM.size());
 				break;
 		}
 	}

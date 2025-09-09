@@ -50,7 +50,7 @@ namespace esx {
 				return cacheMiss(virtualAddress, physicalAddress, cacheLineNumber, tag, index);
 			}
 		} else {
-			return mRootBus->load<U32>(physicalAddress);
+			return mRootBus->load(physicalAddress);
 		}
 	}
 
@@ -62,7 +62,7 @@ namespace esx {
 
 		for (U32 index = 0; index < cacheLine.Instructions.size(); index++) {
 			auto& instruction = cacheLine.Instructions[index];
-			instruction.Word = mRootBus->load<U32>(baseAddr + index * sizeof(U32));
+			instruction.Word = mRootBus->load(baseAddr + index * sizeof(U32));
 		}
 
 		cacheLine.Tag = tag;
@@ -806,9 +806,9 @@ namespace esx {
 	void R4000::doWriteQueueOperation(const StoreOperation& writeOp)
 	{
 		switch (writeOp.Size) {
-			case sizeof(U8)  :  mRootBus->store<U8> (writeOp.Address, static_cast<U8> (writeOp.Data)); break;
-			case sizeof(U16) :	mRootBus->store<U16>(writeOp.Address, static_cast<U16>(writeOp.Data)); break;
-			case sizeof(U32) :	mRootBus->store<U32>(writeOp.Address, static_cast<U32>(writeOp.Data)); break;
+			case sizeof(U8)  :  mRootBus->store(writeOp.Address, static_cast<U8> (writeOp.Data)); break;
+			case sizeof(U16) :	mRootBus->store(writeOp.Address, static_cast<U16>(writeOp.Data)); break;
+			case sizeof(U32) :	mRootBus->store(writeOp.Address, static_cast<U32>(writeOp.Data)); break;
 		}
 	}
 

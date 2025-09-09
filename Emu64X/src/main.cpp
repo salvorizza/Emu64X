@@ -19,15 +19,10 @@
 #include "Base/Base.h"
 #include "Base/Bus.h"
 #include "Core/MIPS/VR4300/VR4300.h"
-#include "Core/Interfaces/AudioInterface.h"
-#include "Core/Interfaces/MIPSInterface.h"
-#include "Core/Interfaces/PeripheralInterface.h"
-#include "Core/Interfaces/RDRAMInterface.h"
-#include "Core/Interfaces/SerialInterface.h"
-#include "Core/Interfaces/VideoInterface.h"
-#include "Core/Bios.h"
-#include "Core/RAM.h"
-#include "Core/RCP/RSP/RSP.h"
+#include "Core/SIExternalBus.h"
+#include "Core/RDRAM.h"
+#include "Core/PIExternalBus.h"
+#include "Core/RCP/RCP.h"
 
 
 #ifdef ESX_PLATFORM_WINDOWS
@@ -162,60 +157,31 @@ public:
 
 		constexpr size_t t = MIBI(8);
 		root = MakeShared<Bus>(ESX_TEXT("Root"));
-		cpu = MakeShared<VR4300>();
-		mainRAM = MakeShared<RAM>("RAM", 0x00000000, 0x04000000, MIBI(4));
-		DMEM = MakeShared<RAM>("DMEM", 0x04000000, KIBI(4), KIBI(4));
-		IMEM = MakeShared<RAM>("IMEM", 0x04001000, KIBI(4), KIBI(4));
-		rsp = MakeShared<RSP>();
-		mAudioInterface = MakeShared<AudioInterface>();
-		mMIPSInterface = MakeShared<MIPSInterface>();
-		mPeripheralInterface = MakeShared<PeripheralInterface>();
-		mRDRAMInterface = MakeShared<RDRAMInterface>();
-		mSerialInterface = MakeShared<SerialInterface>();
-		mVideoInterface = MakeShared<VideoInterface>();
+		mVR4300 = MakeShared<VR4300>();
+		mRDRAM = MakeShared<RDRAM>();
+		mRCP = MakeShared<RCP>();
+		mPIExternalBus = MakeShared<PIExternalBus>();
+		mSIExternalBus = MakeShared<SIExternalBus>("commons/bios/boot.rom");
 
-		bios = MakeShared<Bios>("commons/bios/boot.rom");
+		root->connectDevice(mVR4300);
+		mVR4300->connectToBus(root);
 
-		root->connectDevice(cpu);
-		cpu->connectToBus(root);
+		root->connectDevice(mRDRAM);
+		mRDRAM->connectToBus(root);
 
-		root->connectDevice(bios);
-		bios->connectToBus(root);
+		root->connectDevice(mRCP);
+		mRCP->connectToBus(root);
 
-		root->connectDevice(mainRAM);
-		mainRAM->connectToBus(root);
+		root->connectDevice(mPIExternalBus);
+		mPIExternalBus->connectToBus(root);
 
-		root->connectDevice(rsp);
-		rsp->connectToBus(root);
-
-		root->connectDevice(mAudioInterface);
-		mAudioInterface->connectToBus(root);
-
-		root->connectDevice(mMIPSInterface);
-		mMIPSInterface->connectToBus(root);
-
-		root->connectDevice(mPeripheralInterface);
-		mPeripheralInterface->connectToBus(root);
-
-		root->connectDevice(mRDRAMInterface);
-		mRDRAMInterface->connectToBus(root);
-
-		root->connectDevice(mSerialInterface);
-		mSerialInterface->connectToBus(root);
-
-		root->connectDevice(mVideoInterface);
-		mVideoInterface->connectToBus(root);
-
-		root->connectDevice(DMEM);
-		DMEM->connectToBus(root);
-
-		root->connectDevice(IMEM);
-		IMEM->connectToBus(root);
+		root->connectDevice(mSIExternalBus);
+		mSIExternalBus->connectToBus(root);
 
 		root->sortRanges();
 
-		mCPUStatusPanel->setInstance(cpu);
-		mDisassemblerPanel->setInstance(cpu);
+		mCPUStatusPanel->setInstance(mVR4300);
+		mDisassemblerPanel->setInstance(mVR4300);
 		mDisassemblerPanel->setBus(root);
 		mMemoryEditorPanel->setInstance(root);
 
@@ -242,7 +208,8 @@ public:
 
 
 	void onFileSelected(const std::filesystem::path& filePath) {
-		
+		mPIExternalBus->loadGame(filePath.string());
+		mCurrentGame = mPIExternalBus->getGameCode();
 	}
 
 	static void audioCallback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount)
@@ -351,9 +318,10 @@ public:
 
 	void hardReset() {
 		fpsCounter.Init();
-		cpu->reset();
-		mainRAM->reset();
-		bios->reset();
+		mVR4300->reset();
+		mRDRAM->reset();
+		mPIExternalBus->reset();
+		mSIExternalBus->reset();
 		mConsolePanel->getInternalConsole().System().Items().clear();
 		if (mDisassemblerPanel->getDebugState() == DebugState::Breakpoint) {
 			mDisassemblerPanel->onPlay();
@@ -363,16 +331,11 @@ public:
 private:
 	SharedPtr<Bus> root;
 
-	SharedPtr<VR4300> cpu;
-	SharedPtr<RAM> mainRAM, DMEM, IMEM;
-	SharedPtr<RSP> rsp;
-	SharedPtr<AudioInterface>		mAudioInterface;
-	SharedPtr<MIPSInterface>		mMIPSInterface;
-	SharedPtr<PeripheralInterface>	mPeripheralInterface;
-	SharedPtr<RDRAMInterface>		mRDRAMInterface;
-	SharedPtr<SerialInterface>		mSerialInterface;
-	SharedPtr<VideoInterface>		mVideoInterface;
-	SharedPtr<Bios> bios;
+	SharedPtr<VR4300> mVR4300;
+	SharedPtr<RDRAM> mRDRAM;
+	SharedPtr<RCP> mRCP;
+	SharedPtr<PIExternalBus> mPIExternalBus;
+	SharedPtr<SIExternalBus> mSIExternalBus;
 	FPSCounter fpsCounter;
 
 

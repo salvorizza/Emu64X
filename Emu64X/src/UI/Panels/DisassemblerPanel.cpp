@@ -56,6 +56,7 @@ namespace esx {
 			case DebugState::Running: {
 				//U64 startClocks = mInstance->getClocks();
 				//while (mInstance->getClocks() < Scheduler::NextEvent().ClockTarget) {
+				for (I32 i = 0; i < 1000; i++) {
 					if (breakFunction(mInstance->mPC)) {
 						mScrollToCurrent = true;
 						mCurrent = mInstance->mPC;
@@ -65,6 +66,7 @@ namespace esx {
 					}
 
 					mInstance->clock();
+				}
 				//}
 
 				/*if (mInstance->getClocks() >= Scheduler::NextEvent().ClockTarget) {
@@ -140,9 +142,24 @@ namespace esx {
 				break;
 		}
 
+
+		U32 baseAddress = 0x00000000;
+		U32 adressingSize = 0x03F80000;
 		if (ImGui::BeginTabBar("SelectDisassembleRom"))
 		{
 			if (ImGui::BeginTabItem("Instructions")) {
+				baseAddress = 0x00000000;
+				adressingSize = 0x03F80000;
+				ImGui::EndTabItem();
+			}
+			if (ImGui::BeginTabItem("Bios")) {
+				baseAddress = 0x1FC00000;
+				adressingSize = 0x000007C0;
+				ImGui::EndTabItem();
+			}
+			if (ImGui::BeginTabItem("IMEM")) {
+				baseAddress = 0x04001000;
+				adressingSize = 0x00001000;
 				ImGui::EndTabItem();
 			}
 
@@ -160,21 +177,17 @@ namespace esx {
 				ImGui::TableSetupColumn("Mnemonic", ImGuiTableColumnFlags_WidthFixed, contentCellsWidth);
 				ImGui::TableHeadersRow();
 
-				constexpr size_t numInstructionsRAM = 0x03F80000 / 4;
-				constexpr size_t numInstructionsBios = 0x000007C0 / 4;
+				size_t numInstructions = adressingSize / 4;
 
 				ImGuiListClipper clipper;
-				clipper.Begin(numInstructionsRAM + numInstructionsBios);
+				clipper.Begin(numInstructions);
 				if (mScrollToCurrent) {
 					U32 index = 0;
 
 					mCurrent = Bus::toPhysicalAddress(mCurrent);
 					
-					if (mCurrent >= 0x1FC00000) {
-						index = numInstructionsRAM + (mCurrent - 0x1FC00000) / 4;
-					} else if (mCurrent >= 0x00000000) {
-						index = (mCurrent - 0x00000000) / 4;
-					} 
+					index = numInstructions + (mCurrent - baseAddress) / 4;
+
 					clipper.ForceDisplayRangeByIndices(index, index + 1);
 				}
 				while (clipper.Step())
@@ -182,14 +195,10 @@ namespace esx {
 					for (int row = clipper.DisplayStart; row < clipper.DisplayEnd; row++) {
 						esx::VR4300Instruction cpuInstruction;
 						
-						U32 physAddress = row * 4;
-						U32 translatedAddress = 0x00000000 + physAddress;
-						if (row >= numInstructionsRAM) {
-							physAddress = 0x1FC00000 + (row - numInstructionsRAM) * 4;
-							translatedAddress = 0x1FC00000 + (row - numInstructionsRAM) * 4;
-						}
+						U32 physAddress = baseAddress + row * 4;
+						U32 translatedAddress = physAddress;
 
-						U32 opcode = mInstance->getBus(ESX_TEXT("Root"))->load<U32>(physAddress);
+						U32 opcode = mInstance->getBus(ESX_TEXT("Root"))->load(physAddress);
 						mInstance->decode(cpuInstruction, opcode, physAddress, ESX_TRUE);
 
 						Instruction instruction;
@@ -330,7 +339,7 @@ namespace esx {
 
 			if ((physAddress >= 0x00000000 && physAddress <= KIBI(2048)) || (physAddress >= 0x1FC00000 && physAddress < 0x1FC00000 + KIBI(512))) {
 
-				U32 opcode = mInstance->getBus(ESX_TEXT("Root"))->load<U32>(physAddress);
+				U32 opcode = mInstance->getBus(ESX_TEXT("Root"))->load(physAddress);
 				mInstance->decode(cpuInstruction, opcode, physAddress, ESX_TRUE);
 
 				Instruction instruction;

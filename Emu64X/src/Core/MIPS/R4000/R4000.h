@@ -54,7 +54,7 @@ namespace esx {
 
 			PRINT_LOAD(physicalAddress);
 
-			T output = mRootBus->load<T>(physicalAddress);
+			U32 output = mRootBus->load(physicalAddress);
 
 			PRINT_IO_LOAD(physicalAddress, output);
 
@@ -78,7 +78,7 @@ namespace esx {
 			}
 			else {
 				flushWriteQueueAll(); //TODO: Stall cause by write queue
-				mRootBus->store<T>(physicalAddress, value);
+				mRootBus->store(physicalAddress, value);
 			}
 		}
 

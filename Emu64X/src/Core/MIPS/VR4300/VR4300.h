@@ -1,22 +1,18 @@
 #pragma once
 
-#include <cstdint>
-#include <array>
-#include <string>
-#include <functional>
-#include <format>
-#include <queue>
+#include <limits>
 
 #include "Base/Base.h"
 #include "Base/Bus.h"
 #include "../Common/Common.h"
 
 #include "SystemControlCoprocessor.h"
+#include "Core/RCP/RCP.h"
 
 namespace esx {
 
 	class VR4300;
-	typedef void(VR4300::*VR4300ExecuteFunction)();
+	typedef void(VR4300::* VR4300ExecuteFunction)();
 	using VR4300Instruction = MIPSInstruction<VR4300ExecuteFunction>;
 
 	class CPUStatusPanel;
@@ -25,7 +21,7 @@ namespace esx {
 	using iCache = Cache<512, 8>;
 	using dCache = Cache<512, 4>;
 
-	class VR4300 : public MIPSProcessor<U32,U64,VR4300ExecuteFunction> {
+	class VR4300 : public MIPSProcessor<U32, U64, VR4300ExecuteFunction> {
 	public:
 		friend class CPUStatusPanel;
 		friend class DisassemblerPanel;
@@ -44,8 +40,8 @@ namespace esx {
 		void reset() override;
 
 		template<typename T>
-		U32 load(U32 virtualAddress, BIT& exception) {
-			if (ADDRESS_UNALIGNED(virtualAddress,T)) {
+		T load(U32 virtualAddress, BIT& exception) {
+			if (ADDRESS_UNALIGNED(virtualAddress, T)) {
 				raiseException(ExceptionType::AddressErrorLoad, virtualAddress);
 				exception = ESX_TRUE;
 				return 0;
@@ -60,21 +56,32 @@ namespace esx {
 				if (flushWriteQueue(physicalAddress) == ESX_FALSE) {
 					flushWriteQueueFirst();
 				}
-			} else {
+			}
+			else {
 				flushWriteQueueAll(); //TODO: Write queue stall
 			}
 
 			PRINT_LOAD(physicalAddress);
 
-			T output = mRootBus->load<T>(physicalAddress);
+			T result = 0;
+			if constexpr (sizeof(T) == 8) {
+				U32 lo = mRCP->SysADLoad(physicalAddress & ~0x7, sizeof(T) * 8);
+				U32 hi = mRCP->SysADLoad((physicalAddress & ~0x7) + 4, sizeof(T) * 8);
 
-			PRINT_IO_LOAD(physicalAddress, output);
+				result = (static_cast<U64>(hi) << 32) | lo;
+			} else {
+				U32 output = mRCP->SysADLoad(physicalAddress, sizeof(T) * 8);
+				constexpr T mask = std::numeric_limits<T>::max();
+				result = output >> ((physicalAddress & 0x3) * 8) & mask;
+			}
+
+			PRINT_IO_LOAD(physicalAddress, result);
 			
-			return output;
+			return result;
 		}
 
 		template<typename T>
-		void store(U32 virtualAddress, U32 value) {
+		void store(U32 virtualAddress, U64 value) {
 			if (ADDRESS_UNALIGNED(virtualAddress, T)) {
 				raiseException(ExceptionType::AddressErrorStore, virtualAddress);
 				return;
@@ -88,16 +95,8 @@ namespace esx {
 			PRINT_STORE(physicalAddress, value);
 			PRINT_IO_STORE(physicalAddress,value);
 
-			if (isWriteQueueActive(physicalAddress)) {
-				if (isWriteQueueFull()) {
-					flushWriteQueueAll();
-				}
-
-				addWriteQueueOperation({ .Address = physicalAddress, .Data = value, .Size = sizeof(T) });
-			} else {
-				flushWriteQueueAll(); //TODO: Stall cause by write queue
-				mRootBus->store<T>(physicalAddress, value);
-			}
+			value <<= (physicalAddress & 0x3) * 8;
+			mRCP->SysADStore(physicalAddress, sizeof(T) * 8, value);
 		}
 
 		static inline BIT isCacheActive(U32 address) {
@@ -274,6 +273,7 @@ namespace esx {
 		void flushWriteQueueAll();
 	private:
 		SharedPtr<Bus> mRootBus;
+		SharedPtr<RCP> mRCP;
 		SharedPtr<SystemControlCoprocessor> mCP0;
 		iCache mICache = {};
 		dCache mDCache = {};

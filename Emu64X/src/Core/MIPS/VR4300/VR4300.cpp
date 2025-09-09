@@ -5,6 +5,7 @@
 #include <fstream>
 #include <intrin.h>
 
+
 #include "optick.h"
 
 #pragma intrinsic(_mul128)
@@ -26,6 +27,7 @@ namespace esx {
 	{
 
 		mRootBus = getBus(ESX_TEXT("Root"));
+		mRCP = mRootBus->getDevice<RCP>("RCP");
 	}
 
 	void VR4300::clock()
@@ -59,7 +61,7 @@ namespace esx {
 				return cacheMiss(virtualAddress, physicalAddress, cacheLineNumber, tag, index);
 			}
 		} else {
-			return mRootBus->load<U32>(physicalAddress);
+			return mRootBus->load(physicalAddress);
 		}
 	}
 
@@ -72,7 +74,7 @@ namespace esx {
 
 		for (U32 index = 0; index < cacheLine.Instructions.size(); index++) {
 			auto& instruction = cacheLine.Instructions[index];
-			instruction.Word = mRootBus->load<U32>(baseAddr + index * sizeof(U32));
+			instruction.Word = mRootBus->load(baseAddr + index * sizeof(U32));
 		}
 
 		cacheLine.Tag = tag;
@@ -1852,11 +1854,7 @@ namespace esx {
 
 	void VR4300::doWriteQueueOperation(const StoreOperation& writeOp)
 	{
-		switch (writeOp.Size) {
-			case sizeof(U8)  :  mRootBus->store<U8> (writeOp.Address, static_cast<U8> (writeOp.Data)); break;
-			case sizeof(U16) :	mRootBus->store<U16>(writeOp.Address, static_cast<U16>(writeOp.Data)); break;
-			case sizeof(U32) :	mRootBus->store<U32>(writeOp.Address, static_cast<U32>(writeOp.Data)); break;
-		}
+		mRootBus->store(writeOp.Address, static_cast<U32>(writeOp.Data));
 	}
 
 	BIT VR4300::flushWriteQueue(U32 address)
