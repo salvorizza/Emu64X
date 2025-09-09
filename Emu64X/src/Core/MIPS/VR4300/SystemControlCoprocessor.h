@@ -7,6 +7,34 @@
 #include <format>
 #include <queue>
 
+#define INDEX_FIELDS(M)  M(Index, 0, 5)	M(Probe, 31, 31)
+#define RANDOM_FIELDS(M) M(Random,0,5)
+#define ENTRYLO_FIELDS(M) M(G,0,0) M(V,1,1) M(D,2,2) M(C,3,5) M(PFN,6,25)
+#define ENTRYHI_FIELDS(M) M(ASID,0,7) M(G,12,13) M(VPN2,13,31)
+#define PAGEMASK_FIELDS(M) M(MASK,13,24)
+#define WIRED_FIELDS(M) M(Wired,0,5)
+#define PRID_FIELDS(M) M(Rev,0,7) M(Imp,8,15)
+#define CONFIG_FIELDS(M) M(K0,0,2) M(CU,3,4) M(BE,15,15) M(EP,24,27) M(EC,28,30)
+#define LLADDR_FIELDS(M) M(Value,0,31)
+#define TAGLO_FIELDS(M) M(PState,6,7) M(PTagLo,8,27)
+#define TAGHI_FIELDS(M) M(Value,0,31)
+#define CONTEXT_FIELDS(M) M(BadVPN2,4,22) M(PTEBase,23,63)
+#define BADVADDR_FIELDS(M) M(Value,0,63)
+#define COUNT_FIELDS(M) M(Value,0,31)
+#define COMPARE_FIELDS(M) M(Value,0,31)
+#define STATUS_FIELDS(M) \
+    M(IE,0,0) M(EXL,1,1) M(ERL,2,2) M(KSU,3,4) M(UX,5,5) M(SX,6,6) M(KX,7,7) \
+    M(IM,8,15) M(DE,16,16) M(CR,17,17) M(CH,18,18) M(SR,20,20) M(TS,21,21) \
+    M(BEV,22,22) M(ITS,24,24) M(RE,25,25) M(FR,26,26) M(RP,27,27) M(CU,28,31)
+#define CAUSE_FIELDS(M) M(ExcCode,2,6) M(IP,8,15) M(CE,28,29) M(BD,31,31)
+#define EPC_FIELDS(M) M(Value,0,31)
+#define WATCHLO_FIELDS(M) M(W,0,0) M(R,1,1) M(PAddr0,3,31)
+#define WATCHHI_FIELDS(M) M(PAddr1,0,3)
+#define XCONTEXT_FIELDS(M) M(BadVPN2,4,30) M(R,31,32) M(PTEBase,33,63)
+#define PERR_FIELDS(M) M(Diagnostic,0,7)
+#define CACHEERR_FIELDS(M) M(Value,0,31)
+#define ERROREPC_FIELDS(M) M(Value,0,63)
+
 #include "Base/Base.h"
 #include "Base/Bus.h"
 
@@ -15,6 +43,31 @@
 namespace esx {
 
 	class VR4300;
+
+	DEFINE_REGISTER_LAYOUT(IndexRegister, U32, INDEX_FIELDS)
+	DEFINE_REGISTER_LAYOUT(RandomRegister, U32, RANDOM_FIELDS)
+	DEFINE_REGISTER_LAYOUT(EntryLoRegister, U32, ENTRYLO_FIELDS)
+	DEFINE_REGISTER_LAYOUT(EntryHiRegister, U32, ENTRYHI_FIELDS)
+	DEFINE_REGISTER_LAYOUT(PageMaskRegister, U32, PAGEMASK_FIELDS)
+	DEFINE_REGISTER_LAYOUT(WiredRegister, U32, WIRED_FIELDS)
+	DEFINE_REGISTER_LAYOUT(PRIdRegister, U32, PRID_FIELDS)
+	DEFINE_REGISTER_LAYOUT(ConfigRegister, U32, CONFIG_FIELDS)
+	DEFINE_REGISTER_LAYOUT(LLAddrRegister, U32, LLADDR_FIELDS)
+	DEFINE_REGISTER_LAYOUT(TagLoRegister, U32, TAGLO_FIELDS)
+	DEFINE_REGISTER_LAYOUT(TagHiRegister, U32, TAGHI_FIELDS)
+	DEFINE_REGISTER_LAYOUT(ContextRegister, U64, CONTEXT_FIELDS)
+	DEFINE_REGISTER_LAYOUT(BadVAddrRegister, U64, BADVADDR_FIELDS)
+	DEFINE_REGISTER_LAYOUT(CountRegister, U32, COUNT_FIELDS)
+	DEFINE_REGISTER_LAYOUT(CompareRegister, U32, COMPARE_FIELDS)
+	DEFINE_REGISTER_LAYOUT(StatusRegister, U32, STATUS_FIELDS)
+	DEFINE_REGISTER_LAYOUT(CauseRegister, U32, CAUSE_FIELDS)
+	DEFINE_REGISTER_LAYOUT(EPCRegister, U32, EPC_FIELDS)
+	DEFINE_REGISTER_LAYOUT(WatchLoRegister, U32, WATCHLO_FIELDS)
+	DEFINE_REGISTER_LAYOUT(WatchHiRegister, U32, WATCHHI_FIELDS)
+	DEFINE_REGISTER_LAYOUT(XContextRegister, U64, XCONTEXT_FIELDS)
+	DEFINE_REGISTER_LAYOUT(PErrRegister, U32, PERR_FIELDS)
+	DEFINE_REGISTER_LAYOUT(CacheErrRegister, U32, CACHEERR_FIELDS)
+	DEFINE_REGISTER_LAYOUT(ErrorEPCRegister, U64, ERROREPC_FIELDS)
 
 	enum class SystemControlRegisterType : U8 {
 		Index = 0,
@@ -43,357 +96,6 @@ namespace esx {
 		TagHi = 29,
 		ErrorEPC = 30
 	};
-
-	struct IndexRegisterLayout {
-		enum class Field { Index, Probe };
-
-		static constexpr U32 Mask = 0xFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-				case Field::Index: return { 0, 5 };
-				case Field::Probe: return { 30, 31 };
-			}
-		}
-	};
-	using IndexRegister = Register<IndexRegisterLayout, U32>;
-
-	struct RandomRegisterLayout {
-		enum class Field { Random };
-
-		static constexpr U32 Mask = 0xFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-				case Field::Random: return { 0, 5 };
-			}
-		}
-	};
-	using RandomRegister = Register<RandomRegisterLayout, U32>;
-
-	struct EntryLoRegisterLayout {
-		enum class Field { G, V, D, C, PFN };
-
-		static constexpr U32 Mask = 0xFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-				case Field::G: return { 0, 1 };
-				case Field::V: return { 1, 2 };
-				case Field::D: return { 2, 3 };
-				case Field::C: return { 3, 5 };
-				case Field::PFN: return { 6, 25 };
-			}
-		}
-	};
-	using EntryLoRegister = Register<EntryLoRegisterLayout, U32>;
-
-	struct EntryHiRegisterLayout {
-		enum class Field { VPN2, G, ASID };
-
-		static constexpr U32 Mask = 0xFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-				case Field::ASID: return { 0, 7 };
-				case Field::G: return { 12, 13 };
-				case Field::VPN2: return { 13, 31 };
-			}
-		}
-	};
-	using EntryHiRegister = Register<EntryHiRegisterLayout, U32>;
-
-	struct PageMaskRegisterLayout {
-		enum class Field { MASK };
-
-		static constexpr U32 Mask = 0xFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-			case Field::MASK: return { 13, 24 };
-			}
-		}
-	};
-	using PageMaskRegister = Register<PageMaskRegisterLayout, U32>;
-
-	struct WiredRegisterLayout {
-		enum class Field { Wired };
-
-		static constexpr U32 Mask = 0xFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-				case Field::Wired: return { 0, 5 };
-			}
-		}
-	};
-	using WiredRegister = Register<WiredRegisterLayout, U32>;
-
-	struct PRIdRegisterLayout {
-		enum class Field { Rev, Imp };
-
-		static constexpr U32 Mask = 0xFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-				case Field::Rev: return { 0, 7 };
-				case Field::Imp: return { 8, 15 };
-			}
-		}
-	};
-	using PRIdRegister = Register<PRIdRegisterLayout, U32>;
-
-	struct ConfigRegisterLayout {
-		enum class Field { K0,CU,BE,EP,EC };
-
-		static constexpr U32 Mask = 0xFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-			case Field::K0: return { 0, 2 };
-			case Field::CU: return { 3, 4 };
-			case Field::BE: return { 14, 15 };
-			case Field::EP: return { 24, 27 };
-			case Field::EC: return { 28, 30 };
-			}
-		}
-	};
-	using ConfigRegister = Register<ConfigRegisterLayout, U32>;
-	
-	struct LLAddrRegisterLayout {
-		enum class Field { Value };
-
-		static constexpr U32 Mask = 0xFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-			case Field::Value: return { 0, 31 };
-			}
-		}
-	};
-	using LLAddrRegister = Register<LLAddrRegisterLayout, U32>;
-
-	struct TagLoRegisterLayout {
-		enum class Field { PTagLo,PState };
-
-		static constexpr U32 Mask = 0xFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-				case Field::PState: return { 6, 7 };
-				case Field::PTagLo: return { 8, 27 };
-			}
-		}
-	};
-	using TagLoRegister = Register<TagLoRegisterLayout, U32>;
-
-	struct TagHiRegisterLayout {
-		enum class Field { Value };
-
-		static constexpr U32 Mask = 0xFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-			case Field::Value: return { 0, 31 };
-			}
-		}
-	};
-	using TagHiRegister = Register<TagHiRegisterLayout, U32>;
-
-	struct ContextRegisterLayout {
-		enum class Field { BadVPN2, PTEBase };
-
-		static constexpr U64 Mask = 0xFFFFFFFFFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-			case Field::BadVPN2: return { 4, 22 };
-			case Field::PTEBase: return { 23, 63 };
-			}
-		}
-	};
-	using ContextRegister = Register<ContextRegisterLayout, U64>;
-
-	struct BadVAddrRegisterLayout {
-		enum class Field { Value };
-
-		static constexpr U64 Mask = 0xFFFFFFFFFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-			case Field::Value: return { 0, 63 };
-			}
-		}
-	};
-	using BadVAddrRegister = Register<BadVAddrRegisterLayout, U64>;
-
-	struct CountRegisterLayout {
-		enum class Field { Value };
-
-		static constexpr U32 Mask = 0xFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-			case Field::Value: return { 0, 31 };
-			}
-		}
-	};
-	using CountRegister = Register<CountRegisterLayout, U32>;
-
-	struct CompareRegisterLayout {
-		enum class Field { Value };
-
-		static constexpr U32 Mask = 0xFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-			case Field::Value: return { 0, 31 };
-			}
-		}
-	};
-	using CompareRegister = Register<CompareRegisterLayout, U32>;
-
-	struct StatusRegisterLayout {
-		enum class Field { IE, EXL, ERL, KSU, UX, SX, KX, IM, DE, CR, CH, SR, TS, BEV, ITS, RE, FR, RP, CU };
-
-		static constexpr U32 Mask = 0xFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-				case Field::IE: return { 0, 1 };
-				case Field::EXL: return { 1, 2 };
-				case Field::ERL: return { 2, 3 };
-				case Field::KSU: return { 3, 4 };
-				case Field::UX: return { 4, 5 };
-				case Field::SX: return { 5, 6 };
-				case Field::KX: return { 6, 7 };
-				case Field::IM: return { 8, 15 };
-				case Field::DE: return { 15, 16 };
-				case Field::CR: return { 16, 17 };
-				case Field::CH: return { 17, 18 };
-				case Field::SR: return { 19, 20 };
-				case Field::TS: return { 20, 21 };
-				case Field::BEV: return { 21, 22 };
-				case Field::ITS: return { 23, 24 };
-				case Field::RE: return { 25, 26 };
-				case Field::FR: return { 26, 27 };
-				case Field::RP: return { 27, 28 };
-				case Field::CU: return { 28, 31 };
-			}
-		}
-	};
-	using StatusRegister = Register<StatusRegisterLayout, U32>;
-
-	struct CauseRegisterLayout {
-		enum class Field { ExcCode, IP, CE, BD };
-
-		static constexpr U32 Mask = 0xFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-			case Field::ExcCode: return { 2, 6 };
-			case Field::IP: return { 8, 15 };
-			case Field::CE: return { 28, 29 };
-			case Field::BD: return { 30, 31 };
-			}
-		}
-	};
-	using CauseRegister = Register<CauseRegisterLayout, U32>;
-
-	struct EPCRegisterLayout {
-		enum class Field { Value };
-
-		static constexpr U64 Mask = 0xFFFFFFFFFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-			case Field::Value: return { 0, 31 };
-			}
-		}
-	};
-	using EPCRegister = Register<EPCRegisterLayout, U64>;
-
-	struct WatchLoRegisterLayout {
-		enum class Field { W,R,PAddr0 };
-
-		static constexpr U32 Mask = 0xFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-			case Field::W: return { 0, 1 };
-			case Field::R: return { 1, 2 };
-			case Field::PAddr0: return { 3, 31 };
-			}
-		}
-	};
-	using WatchLoRegister = Register<WatchLoRegisterLayout, U32>;
-
-	struct WatchHiRegisterLayout {
-		enum class Field { PAddr1 };
-
-		static constexpr U32 Mask = 0xFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-			case Field::PAddr1: return { 0, 3 };
-			}
-		}
-	};
-	using WatchHiRegister = Register<WatchHiRegisterLayout, U32>;
-
-	struct XContextRegisterLayout {
-		enum class Field { BadVPN2, R, PTEBase };
-
-		static constexpr U64 Mask = 0xFFFFFFFFFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-			case Field::BadVPN2: return { 4, 30 };
-			case Field::R: return { 31, 32 };
-			case Field::PTEBase: return { 33, 63 };
-			}
-		}
-	};
-	using XContextRegister = Register<XContextRegisterLayout, U64>;
-
-	struct PErrRegisterLayout {
-		enum class Field { Diagnostic };
-
-		static constexpr U32 Mask = 0xFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-			case Field::Diagnostic: return { 0, 7 };
-			}
-		}
-	};
-	using PErrRegister = Register<PErrRegisterLayout, U32>;
-
-	struct CacheErrRegisterLayout {
-		enum class Field { Value };
-
-		static constexpr U32 Mask = 0xFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-			case Field::Value: return { 0, 31 };
-			}
-		}
-	};
-	using CacheErrRegister = Register<CacheErrRegisterLayout, U32>;
-
-	struct ErrorEPCRegisterLayout {
-		enum class Field { Value };
-
-		static constexpr U64 Mask = 0xFFFFFFFFFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-			case Field::Value: return { 0, 63 };
-			}
-		}
-	};
-	using ErrorEPCRegister = Register<ErrorEPCRegisterLayout, U64>;
 
 	enum class ExceptionType : U8 {
 		Interrupt = 0,
@@ -438,7 +140,6 @@ namespace esx {
 		IP6 = 1 << 6,
 		IP7 = 1 << 7
 	};
-
 
 	struct TLBEntry {
 		EntryLoRegister	   EntryLo0;

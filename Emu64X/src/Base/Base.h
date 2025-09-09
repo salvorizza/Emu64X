@@ -219,15 +219,8 @@ namespace esx {
 	template<typename Storage>
 	class RegisterField {
 	public:
-		RegisterField(Storage value)
-			: mValue(value)
-		{
-		}
-
-		template<typename T>
-		T as() {
-			return static_cast<T>(mValue);
-		}
+		explicit RegisterField(Storage value) : mValue(value) {}
+		template<typename T> T as() { return static_cast<T>(mValue); }
 	private:
 		Storage mValue;
 	};
@@ -235,43 +228,28 @@ namespace esx {
 	template <typename Layout, typename Storage = U32>
 	class Register {
 	public:
-		Register()
-			: mValue(0)
-		{
-		}
-
-		Register(Storage& value)
-			: mValue(value)
-		{
-		}
-
-		~Register() = default;
+		Register() : mValue(0) {}
+		explicit Register(Storage value) : mValue(value& Layout::template Mask<Storage>()) {}
 
 		Storage read() const {
-			return mValue;
+			return mValue & Layout::template Mask<Storage>();
 		}
-
 		void write(Storage v) {
-			mValue = v & Layout::Mask;
+			mValue = v & Layout::template Mask<Storage>();
 		}
 
 		RegisterField<Storage> get(typename Layout::Field fieldName) const {
 			auto [start, end] = Layout::info(fieldName);
 			I32 len = (end - start) + 1;
-			
-			Storage mask = ((Storage(1) << len) - 1) << start;
-			return (mValue & mask) >> start;
+			Storage mask = (Layout::template ones<Storage>(len)) << start;
+			return RegisterField<Storage>((mValue & mask) >> start);
 		}
-
 		void set(typename Layout::Field fieldName, Storage fieldValue) {
 			auto [start, end] = Layout::info(fieldName);
 			I32 len = (end - start) + 1;
-
-			Storage mask = ((Storage(1) << len) - 1) << start;
-
+			Storage mask = (Layout::template ones<Storage>(len)) << start;
 			mValue = (mValue & ~mask) | ((fieldValue << start) & mask);
 		}
-
 	private:
 		Storage mValue = 0;
 	};
@@ -292,6 +270,46 @@ namespace esx {
 			return Value;
 		}
 	};
+
+	// Voci enum
+#define REG_ENUM_ITEM(name, start, end) name,
+
+// case dello switch info()
+#define REG_INFO_CASE(name, start, end) case Field::name: return {start, end};
+
+// accumulo mask (safe anche se len == bitwidth)
+#define REG_MASK_ACCUM(name, start, end)                               \
+    {                                                                  \
+        constexpr int _start = start;                                  \
+        constexpr int _end   = end;                                    \
+        constexpr int _len   = (_end - _start + 1);                    \
+        mask |= (ones<Storage>(_len) << _start);                        \
+    }
+
+#define DEFINE_REGISTER_LAYOUT(Name, S, FIELDS_MACRO)                     \
+namespace layouts { struct Name {                                                          \
+    enum class Field { FIELDS_MACRO(REG_ENUM_ITEM)None };             \
+                                                                       \
+    static constexpr std::pair<int,int> info(Field f) {                \
+        switch (f) { FIELDS_MACRO(REG_INFO_CASE) }                     \
+        return {0, 31};                                                \
+    }                                                                  \
+                                                                       \
+    template<typename Storage>                                         \
+    static constexpr Storage ones(int len) {                           \
+        return (len >= int(sizeof(Storage)*8))                         \
+            ? Storage(~Storage(0))                                     \
+            : (Storage(1) << len) - 1;                                 \
+    }                                                                  \
+                                                                       \
+    template<typename Storage>                                         \
+    static constexpr Storage Mask() {                                  \
+        Storage mask = 0;                                              \
+        FIELDS_MACRO(REG_MASK_ACCUM)                                   \
+        return mask;                                                   \
+    }                                                                  \
+};}																	   \
+using Name = Register<esx::layouts::Name, S>;								   \
 
 
 

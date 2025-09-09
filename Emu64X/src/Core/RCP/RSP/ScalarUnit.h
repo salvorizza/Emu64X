@@ -1,5 +1,16 @@
 #pragma once
 
+#define SP_DMA_SPADDR_FIELDS(M) M(MEM_ADDR,0,11) M(MEM_BANK,12,12)
+#define SP_DMA_RAMADDR_FIELDS(M) M(DRAM_ADDR,0,23)
+#define SP_DMA_RDLEN_FIELDS(M) M(RDLEN,0,11) M(COUNT,12,19) M(SKIP,20,31)
+#define SP_DMA_WRLEN_FIELDS(M) M(WRLEN,0,11) M(COUNT,12,19) M(SKIP,20,31)
+#define SP_STATUS_FIELDS(M) M(HALTED,0,0) M(BROKE,1,1) M(DMA_BUSY,2,2) M(DMA_FULL,3,3) \
+                           M(IO_BUSY,4,4) M(SSTEP,5,5) M(INTBREAK,6,6) M(SIG,7,14)
+#define SP_SEMAPHORE_FIELDS(M) M(SEMAPHORE,0,0)
+#define SP_STATUS_WRITE_FIELDS(M) \
+    M(CLR_HALT,0,0) M(SET_HALT,1,1) M(CLR_BROKE,2,2) M(CLR_INTR,3,3) M(SET_INTR,4,4) \
+    M(CLR_SSTEP,5,5) M(SET_SSTEP,6,6) M(CLR_INTBREAK,7,7) M(SET_INTBREAK,8,8) M(CLR_SET_SIG,9,24)
+
 #include "Base/Base.h"
 
 #include "Core/MIPS/Common/Coprocessor.h"
@@ -8,6 +19,14 @@ namespace esx {
 
 	class R4000;
 	class RSP;
+
+	DEFINE_REGISTER_LAYOUT(SP_DMA_SPADDR_Register, U32, SP_DMA_SPADDR_FIELDS)
+	DEFINE_REGISTER_LAYOUT(SP_DMA_RAMADDR_Register, U32, SP_DMA_RAMADDR_FIELDS)
+	DEFINE_REGISTER_LAYOUT(SP_DMA_RDLEN_Register, U32, SP_DMA_RDLEN_FIELDS)
+	DEFINE_REGISTER_LAYOUT(SP_DMA_WRLEN_Register, U32, SP_DMA_WRLEN_FIELDS)
+	DEFINE_REGISTER_LAYOUT(SP_STATUS_Register, U32, SP_STATUS_FIELDS)
+	DEFINE_REGISTER_LAYOUT(SP_SEMAPHORE_Register, U32, SP_SEMAPHORE_FIELDS)
+	DEFINE_REGISTER_LAYOUT(SP_STATUS_Write_Register, U32, SP_STATUS_WRITE_FIELDS)
 
 	enum class ScalarUnitRegisterType : U8 {
 		c0 = 0,
@@ -19,122 +38,6 @@ namespace esx {
 		c6 = 6,
 		c7 = 7
 	};
-
-	struct SP_DMA_SPADDR_RegisterLayout {
-		enum class Field { MEM_ADDR, MEM_BANK };
-
-		static constexpr U32 Mask = 0xFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-			case Field::MEM_ADDR: return { 0, 11 };
-			case Field::MEM_BANK: return { 12, 12 };
-			}
-		}
-	};
-	using SP_DMA_SPADDR_Register = Register<SP_DMA_SPADDR_RegisterLayout, U32>;
-
-	struct SP_DMA_RAMADDR_RegisterLayout {
-		enum class Field { DRAM_ADDR };
-
-		static constexpr U32 Mask = 0xFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-			case Field::DRAM_ADDR: return { 0, 23 };
-			}
-		}
-	};
-	using SP_DMA_RAMADDR_Register = Register<SP_DMA_RAMADDR_RegisterLayout, U32>;
-
-	struct SP_DMA_RDLEN_RegisterLayout {
-		enum class Field { RDLEN, COUNT, SKIP };
-
-		static constexpr U32 Mask = 0xFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-			case Field::RDLEN: return { 0, 11 };
-			case Field::COUNT: return { 12, 19 };
-			case Field::SKIP: return { 20, 31 };
-			}
-		}
-	};
-	using SP_DMA_RDLEN_Register = Register<SP_DMA_RDLEN_RegisterLayout, U32>;
-
-	struct SP_DMA_WRLEN_RegisterLayout {
-		enum class Field { WRLEN, COUNT, SKIP };
-
-		static constexpr U32 Mask = 0xFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-			case Field::WRLEN: return { 0, 11 };
-			case Field::COUNT: return { 12, 19 };
-			case Field::SKIP: return { 20, 31 };
-			}
-		}
-	};
-	using SP_DMA_WRLEN_Register = Register<SP_DMA_WRLEN_RegisterLayout, U32>;
-
-	struct SP_STATUS_RegisterLayout {
-		enum class Field { HALTED, BROKE, DMA_BUSY, DMA_FULL, IO_BUSY, SSTEP, INTBREAK, SIG };
-
-		static constexpr U32 Mask = 0xFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-			case Field::HALTED: return { 0, 0 };
-			case Field::BROKE: return { 1, 1 };
-			case Field::DMA_BUSY: return { 2, 2 };
-			case Field::DMA_FULL: return { 3, 3 };
-			case Field::IO_BUSY: return { 4, 4 };
-			case Field::SSTEP: return { 5, 5 };
-			case Field::INTBREAK: return { 6, 6 };
-			case Field::SIG: return { 7, 14 };
-			}
-		}
-	};
-	using SP_STATUS_Register = Register<SP_STATUS_RegisterLayout, U32>;
-
-	struct SP_SEMAPHORE_RegisterLayout {
-		enum class Field { SEMAPHORE };
-
-		static constexpr U32 Mask = 0xFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-			case Field::SEMAPHORE: return { 0, 0 };
-			}
-		}
-	};
-	using SP_SEMAPHORE_Register = Register<SP_SEMAPHORE_RegisterLayout, U32>;
-
-	struct SP_STATUS_Write_RegisterLayout {
-		enum class Field { 
-			CLR_HALT, SET_HALT, CLR_BROKE, CLR_INTR, SET_INTR, CLR_SSTEP, SET_SSTEP, CLR_INTBREAK,
-			SET_INTBREAK, CLR_SET_SIG
-		};
-
-		static constexpr U32 Mask = 0xFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-				case Field::CLR_HALT:		return { 0, 0 };
-				case Field::SET_HALT:		return { 1, 1 };
-				case Field::CLR_BROKE:		return { 2, 2 };
-				case Field::CLR_INTR:		return { 3, 3 };
-				case Field::SET_INTR:		return { 4, 4 };
-				case Field::CLR_SSTEP:		return { 5, 5 };
-				case Field::SET_SSTEP:		return { 6, 6 };
-				case Field::CLR_INTBREAK:	return { 7, 7 };
-				case Field::SET_INTBREAK:	return { 8, 8 };
-				case Field::CLR_SET_SIG:	return { 9, 24 };
-			}
-		}
-	};
-	using SP_STATUS_Write_Register = Register<SP_STATUS_Write_RegisterLayout, U32>;
-
 
 	class ScalarUnit : public Coprocessor<R4000> {
 	public:

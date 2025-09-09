@@ -46,9 +46,6 @@
     <Filter Include="src\Core">
       <UniqueIdentifier>{A5D31CCF-91A0-77DA-BAB9-6582A6E5AC68}</UniqueIdentifier>
     </Filter>
-    <Filter Include="src\Core\Interfaces">
-      <UniqueIdentifier>{D886D6F6-44E8-B304-CD55-FAB639B6EAC3}</UniqueIdentifier>
-    </Filter>
     <Filter Include="src\Core\MIPS">
       <UniqueIdentifier>{CDDC7955-399D-F58B-02D8-3E096E573A68}</UniqueIdentifier>
     </Filter>
@@ -63,6 +60,9 @@
     </Filter>
     <Filter Include="src\Core\RCP">
       <UniqueIdentifier>{B94913F3-A5AC-A297-4E32-DB4D3A746E1A}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\Core\RCP\Interfaces">
+      <UniqueIdentifier>{6C881AF5-D8BF-628C-E1C9-C6AF4D808985}</UniqueIdentifier>
     </Filter>
     <Filter Include="src\Core\RCP\RSP">
       <UniqueIdentifier>{DDABBE7A-C9A4-DDCC-F2D6-C251DE2EBDD8}</UniqueIdentifier>
@@ -99,29 +99,8 @@
     <ClInclude Include="src\Base\PlatformDetection.h">
       <Filter>src\Base</Filter>
     </ClInclude>
-    <ClInclude Include="src\Core\SIExternalBus.h">
-      <Filter>src\Core</Filter>
-    </ClInclude>
     <ClInclude Include="src\Core\IRenderer.h">
       <Filter>src\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Core\RCP\Interfaces\AudioInterface.h">
-      <Filter>src\Core\Interfaces</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Core\RCP\Interfaces\MIPSInterface.h">
-      <Filter>src\Core\Interfaces</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Core\RCP\Interfaces\PeripheralInterface.h">
-      <Filter>src\Core\Interfaces</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Core\RCP\Interfaces\RDRAMInterface.h">
-      <Filter>src\Core\Interfaces</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Core\RCP\Interfaces\SerialInterface.h">
-      <Filter>src\Core\Interfaces</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Core\RCP\Interfaces\VideoInterface.h">
-      <Filter>src\Core\Interfaces</Filter>
     </ClInclude>
     <ClInclude Include="src\Core\MIPS\Common\Common.h">
       <Filter>src\Core\MIPS\Common</Filter>
@@ -138,8 +117,29 @@
     <ClInclude Include="src\Core\MIPS\VR4300\VR4300.h">
       <Filter>src\Core\MIPS\VR4300</Filter>
     </ClInclude>
-    <ClInclude Include="src\Core\RDRAM.h">
+    <ClInclude Include="src\Core\PIExternalBus.h">
       <Filter>src\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\RCP\Interfaces\AudioInterface.h">
+      <Filter>src\Core\RCP\Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\RCP\Interfaces\MIPSInterface.h">
+      <Filter>src\Core\RCP\Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\RCP\Interfaces\PeripheralInterface.h">
+      <Filter>src\Core\RCP\Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\RCP\Interfaces\RDRAMInterface.h">
+      <Filter>src\Core\RCP\Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\RCP\Interfaces\SerialInterface.h">
+      <Filter>src\Core\RCP\Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\RCP\Interfaces\VideoInterface.h">
+      <Filter>src\Core\RCP\Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\RCP\RCP.h">
+      <Filter>src\Core\RCP</Filter>
     </ClInclude>
     <ClInclude Include="src\Core\RCP\RSP\RSP.h">
       <Filter>src\Core\RCP\RSP</Filter>
@@ -149,6 +149,12 @@
     </ClInclude>
     <ClInclude Include="src\Core\RCP\RSP\VectorUnit.h">
       <Filter>src\Core\RCP\RSP</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\RDRAM.h">
+      <Filter>src\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\SIExternalBus.h">
+      <Filter>src\Core</Filter>
     </ClInclude>
     <ClInclude Include="src\Core\Scheduler.h">
       <Filter>src\Core</Filter>
@@ -237,33 +243,10 @@
     <ClInclude Include="src\Utils\LoggingSystem.h">
       <Filter>src\Utils</Filter>
     </ClInclude>
-    <ClInclude Include="src\Core\PIExternalBus.h" />
-    <ClInclude Include="src\Core\RCP\RCP.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Base\Bus.cpp">
       <Filter>src\Base</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Core\SIExternalBus.cpp">
-      <Filter>src\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Core\RCP\Interfaces\AudioInterface.cpp">
-      <Filter>src\Core\Interfaces</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Core\RCP\Interfaces\MIPSInterface.cpp">
-      <Filter>src\Core\Interfaces</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Core\RCP\Interfaces\PeripheralInterface.cpp">
-      <Filter>src\Core\Interfaces</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Core\RCP\Interfaces\RDRAMInterface.cpp">
-      <Filter>src\Core\Interfaces</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Core\RCP\Interfaces\SerialInterface.cpp">
-      <Filter>src\Core\Interfaces</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Core\RCP\Interfaces\VideoInterface.cpp">
-      <Filter>src\Core\Interfaces</Filter>
     </ClCompile>
     <ClCompile Include="src\Core\MIPS\R4000\R4000.cpp">
       <Filter>src\Core\MIPS\R4000</Filter>
@@ -274,8 +257,29 @@
     <ClCompile Include="src\Core\MIPS\VR4300\VR4300.cpp">
       <Filter>src\Core\MIPS\VR4300</Filter>
     </ClCompile>
-    <ClCompile Include="src\Core\RDRAM.cpp">
+    <ClCompile Include="src\Core\PIExternalBus.cpp">
       <Filter>src\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Core\RCP\Interfaces\AudioInterface.cpp">
+      <Filter>src\Core\RCP\Interfaces</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Core\RCP\Interfaces\MIPSInterface.cpp">
+      <Filter>src\Core\RCP\Interfaces</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Core\RCP\Interfaces\PeripheralInterface.cpp">
+      <Filter>src\Core\RCP\Interfaces</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Core\RCP\Interfaces\RDRAMInterface.cpp">
+      <Filter>src\Core\RCP\Interfaces</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Core\RCP\Interfaces\SerialInterface.cpp">
+      <Filter>src\Core\RCP\Interfaces</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Core\RCP\Interfaces\VideoInterface.cpp">
+      <Filter>src\Core\RCP\Interfaces</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Core\RCP\RCP.cpp">
+      <Filter>src\Core\RCP</Filter>
     </ClCompile>
     <ClCompile Include="src\Core\RCP\RSP\RSP.cpp">
       <Filter>src\Core\RCP\RSP</Filter>
@@ -285,6 +289,12 @@
     </ClCompile>
     <ClCompile Include="src\Core\RCP\RSP\VectorUnit.cpp">
       <Filter>src\Core\RCP\RSP</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Core\RDRAM.cpp">
+      <Filter>src\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Core\SIExternalBus.cpp">
+      <Filter>src\Core</Filter>
     </ClCompile>
     <ClCompile Include="src\Core\Scheduler.cpp">
       <Filter>src\Core</Filter>
@@ -364,8 +374,6 @@
     <ClCompile Include="src\main.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\Core\PIExternalBus.cpp" />
-    <ClCompile Include="src\Core\RCP\RCP.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="commons\icons\Logo.ico">

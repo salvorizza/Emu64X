@@ -1,39 +1,31 @@
 #pragma once
 
+#define PI_STATUS_FIELDS(M)       \
+    M(DMA_BUSY,0,0)               \
+    M(IO_BUSY,1,1)                \
+    M(DMA_ERROR,2,2)              \
+    M(DMA_COMPLETED,3,3)
+
+#define PI_STATUS_WRITE_FIELDS(M) \
+    M(RESET_DMA,0,0)              \
+    M(CLEAR_INTERRUPT,1,1)
+
+#define PI_BSD_DOM_LAT(M) M(LAT, 0, 7)
+#define PI_BSD_DOM_PWD(M) M(PWD, 0, 7)
+#define PI_BSD_DOM_PGS(M) M(PGS, 0, 3)
+#define PI_BSD_DOM_RLS(M) M(RLS, 0, 1)
+
 #include "Base/Base.h"
 #include "Base/Bus.h"
 
 namespace esx {
 
-	struct PI_STATUS_RegisterLayout {
-		enum class Field { DMA_BUSY, IO_BUSY, DMA_ERROR, DMA_COMPLETED };
-
-		static constexpr U32 Mask = 0xFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-			case Field::DMA_BUSY: return { 0, 0 };
-			case Field::IO_BUSY: return { 1, 1 };
-			case Field::DMA_ERROR: return { 2, 2 };
-			case Field::DMA_COMPLETED: return { 3, 3 };
-			}
-		}
-	};
-	using PI_STATUS_Register = Register<PI_STATUS_RegisterLayout, U32>;
-
-	struct PI_STATUS_Write_RegisterLayout {
-		enum class Field { RESET_DMA, CLEAR_INTERRUPT };
-
-		static constexpr U32 Mask = 0xFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-			case Field::RESET_DMA: return { 0, 0 };
-			case Field::CLEAR_INTERRUPT: return { 1, 1 };
-			}
-		}
-	};
-	using PI_STATUS_Write_Register = Register<PI_STATUS_Write_RegisterLayout, U32>;
+	DEFINE_REGISTER_LAYOUT(PI_STATUS_Register, U32, PI_STATUS_FIELDS)
+	DEFINE_REGISTER_LAYOUT(PI_STATUS_Write_Register, U32, PI_STATUS_WRITE_FIELDS)
+	DEFINE_REGISTER_LAYOUT(PI_BSD_DOM_LAT_Register, U32, PI_BSD_DOM_LAT)
+	DEFINE_REGISTER_LAYOUT(PI_BSD_DOM_PWD_Register, U32, PI_BSD_DOM_PWD)
+	DEFINE_REGISTER_LAYOUT(PI_BSD_DOM_PGS_Register, U32, PI_BSD_DOM_PGS)
+	DEFINE_REGISTER_LAYOUT(PI_BSD_DOM_RLS_Register, U32, PI_BSD_DOM_RLS)
 
 	class RCP;
 
@@ -54,7 +46,11 @@ namespace esx {
 
 		RCP* mRCP;
 
-		PI_STATUS_Register mPI_STATUS;
+		PI_STATUS_Register PI_STATUS;
+		PI_BSD_DOM_LAT_Register PI_BSD_DOM1_LAT, PI_BSD_DOM2_LAT;
+		PI_BSD_DOM_PWD_Register PI_BSD_DOM1_PWD, PI_BSD_DOM2_PWD;
+		PI_BSD_DOM_PGS_Register PI_BSD_DOM1_PGS, PI_BSD_DOM2_PGS;
+		PI_BSD_DOM_RLS_Register PI_BSD_DOM1_RLS, PI_BSD_DOM2_RLS;
 	};
 
 }

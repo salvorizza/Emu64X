@@ -162,6 +162,11 @@ namespace esx {
 				adressingSize = 0x00001000;
 				ImGui::EndTabItem();
 			}
+			if (ImGui::BeginTabItem("DMEM")) {
+				baseAddress = 0x04000000;
+				adressingSize = 0x00001000;
+				ImGui::EndTabItem();
+			}
 
 			ImGui::EndTabBar();
 		}
@@ -186,7 +191,7 @@ namespace esx {
 
 					mCurrent = Bus::toPhysicalAddress(mCurrent);
 					
-					index = numInstructions + (mCurrent - baseAddress) / 4;
+					index = (mCurrent - baseAddress) / 4;
 
 					clipper.ForceDisplayRangeByIndices(index, index + 1);
 				}
@@ -375,6 +380,8 @@ namespace esx {
 	void DisassemblerPanel::onStepForward() {
 		if (mDebugState == DebugState::Breakpoint) {
 			setDebugState(DebugState::Step);
+			mScrollToCurrent = true;
+			mCurrent = mInstance->mPC;
 		}
 	}
 
@@ -383,6 +390,8 @@ namespace esx {
 		if (mDebugState == DebugState::Breakpoint) {
 			mNextPC = mInstance->mPC + 4;
 			setDebugState(DebugState::StepOver);
+			mScrollToCurrent = true;
+			mCurrent = mInstance->mPC;
 		}
 	}
 

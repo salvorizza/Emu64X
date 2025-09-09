@@ -60,10 +60,10 @@ namespace esx {
 	void RCP::store(const StringView& busName, U32 address, U32 value)
 	{
 		if (address >= 0x04000000 && address <= 0x04000FFF) {
-			*reinterpret_cast<U32*>(&mDMEM[address - 0x04000000]) = value;
+			*reinterpret_cast<U32*>(&mDMEM[address - 0x04000000]) = _byteswap_ulong(value);
 		} 
 		else if (address >= 0x04001000 && address <= 0x04001FFF) {
-			*reinterpret_cast<U32*>(&mIMEM[address - 0x04001000]) = value;
+			*reinterpret_cast<U32*>(&mIMEM[address - 0x04001000]) = _byteswap_ulong(value);
 		}
 		else if (address >= 0x04040000 && address <= 0x040BFFFF) {
 			mRSP->store(address, value);
@@ -105,10 +105,10 @@ namespace esx {
 		output = 0;
 
 		if (address >= 0x04000000 && address <= 0x04000FFF) {
-			output = *reinterpret_cast<U32*>(&mDMEM[address - 0x04000000]);
+			output = _byteswap_ulong(*reinterpret_cast<U32*>(&mDMEM[address - 0x04000000]));
 		}
 		else if (address >= 0x04001000 && address <= 0x04001FFF) {
-			output = *reinterpret_cast<U32*>(&mIMEM[address - 0x04001000]);
+			output = _byteswap_ulong(*reinterpret_cast<U32*>(&mIMEM[address - 0x04001000]));
 		}
 		else if (address >= 0x04040000 && address <= 0x040BFFFF) {
 			output = mRSP->load(address);

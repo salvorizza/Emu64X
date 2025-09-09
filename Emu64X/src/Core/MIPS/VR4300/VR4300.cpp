@@ -356,7 +356,7 @@ namespace esx {
 	void VR4300::MULT()
 	{
 		I64 a = static_cast<I64>(static_cast<I32>(getRegister(mCurrentInstruction.RegisterSource())));
-		I64 b = static_cast<I64>(static_cast<I32>(getRegister(mCurrentInstruction.RegisterTarget())));
+		I64 b = static_cast<I64>(getRegister(mCurrentInstruction.RegisterTarget()) << 29) >> 29; //Sign extension bugs
 
 		U64 r = static_cast<U64>(a * b);
 
@@ -418,7 +418,7 @@ namespace esx {
 	void VR4300::DIV()
 	{
 		I32 a = getRegister(mCurrentInstruction.RegisterSource());
-		I32 b = getRegister(mCurrentInstruction.RegisterTarget());
+		I64 b = static_cast<I64>(getRegister(mCurrentInstruction.RegisterTarget()) << 29) >> 29; //Sign extension bugs
 
 		if (b != 0) {
 			if (a == 0x80000000 && b == -1) {
@@ -1234,7 +1234,8 @@ namespace esx {
 
 	void VR4300::SRA()
 	{
-		I32 a = getRegister(mCurrentInstruction.RegisterTarget());
+		//32-bit Shift Right Arithmetic Bug
+		I64 a = getRegister(mCurrentInstruction.RegisterTarget());
 		U32 s = mCurrentInstruction.ShiftAmount();
 
 		U64 r = a >> s;
@@ -1342,7 +1343,8 @@ namespace esx {
 
 	void VR4300::SRAV()
 	{
-		I32 a = getRegister(mCurrentInstruction.RegisterTarget());
+		//32-bit Shift Right Arithmetic Bug
+		I64 a = getRegister(mCurrentInstruction.RegisterTarget());
 		U32 s = getRegister(mCurrentInstruction.RegisterSource());
 
 		U64 r = a >> (s & 0x1F);

@@ -28,10 +28,10 @@ namespace esx {
 
     void ScalarUnit::signalBreak()
     {
-        SP_STATUS.set(SP_STATUS_RegisterLayout::Field::BROKE, ESX_TRUE);
+        SP_STATUS.set(layouts::SP_STATUS_Register::Field::BROKE, ESX_TRUE);
         mCPU->setHalt(ESX_TRUE);
 
-        if (SP_STATUS.get(SP_STATUS_RegisterLayout::Field::INTBREAK).as<BIT>() == ESX_TRUE) {
+        if (SP_STATUS.get(layouts::SP_STATUS_Register::Field::INTBREAK).as<BIT>() == ESX_TRUE) {
             //TODO: Interrupt MI
         }
     }
@@ -45,12 +45,12 @@ namespace esx {
             case ScalarUnitRegisterType::c3:    return SP_DMA_WRLEN.read();
 
             case ScalarUnitRegisterType::c4: {
-                SP_STATUS.set(SP_STATUS_RegisterLayout::Field::HALTED, mCPU->getHalt());
+                SP_STATUS.set(layouts::SP_STATUS_Register::Field::HALTED, mCPU->getHalt());
                 return SP_STATUS.read();
             }
 
-            case ScalarUnitRegisterType::c5:    return SP_STATUS.get(SP_STATUS_RegisterLayout::Field::DMA_FULL).as<BIT>();
-            case ScalarUnitRegisterType::c6:    return SP_STATUS.get(SP_STATUS_RegisterLayout::Field::DMA_BUSY).as<BIT>();
+            case ScalarUnitRegisterType::c5:    return SP_STATUS.get(layouts::SP_STATUS_Register::Field::DMA_FULL).as<BIT>();
+            case ScalarUnitRegisterType::c6:    return SP_STATUS.get(layouts::SP_STATUS_Register::Field::DMA_BUSY).as<BIT>();
             case ScalarUnitRegisterType::c7:    return SP_SEMAPHORE.read();
         }
         return 0;
@@ -68,16 +68,16 @@ namespace esx {
                 SP_STATUS_Write_Register writeReg;
                 writeReg.write(value);
 
-                if (writeReg.get(SP_STATUS_Write_RegisterLayout::Field::CLR_HALT).as<BIT>() == ESX_TRUE) mCPU->setHalt(ESX_FALSE);
-                if (writeReg.get(SP_STATUS_Write_RegisterLayout::Field::SET_HALT).as<BIT>() == ESX_TRUE) mCPU->setHalt(ESX_TRUE);
-                if (writeReg.get(SP_STATUS_Write_RegisterLayout::Field::CLR_BROKE).as<BIT>() == ESX_TRUE) SP_STATUS.set(SP_STATUS_RegisterLayout::Field::BROKE, ESX_FALSE);
-                if (writeReg.get(SP_STATUS_Write_RegisterLayout::Field::CLR_SSTEP).as<BIT>() == ESX_TRUE) SP_STATUS.set(SP_STATUS_RegisterLayout::Field::SSTEP, ESX_FALSE);
-                if (writeReg.get(SP_STATUS_Write_RegisterLayout::Field::SET_SSTEP).as<BIT>() == ESX_TRUE) SP_STATUS.set(SP_STATUS_RegisterLayout::Field::SSTEP, ESX_TRUE);
-                if (writeReg.get(SP_STATUS_Write_RegisterLayout::Field::CLR_INTBREAK).as<BIT>() == ESX_TRUE) SP_STATUS.set(SP_STATUS_RegisterLayout::Field::INTBREAK, ESX_FALSE);
-                if (writeReg.get(SP_STATUS_Write_RegisterLayout::Field::SET_INTBREAK).as<BIT>() == ESX_TRUE) SP_STATUS.set(SP_STATUS_RegisterLayout::Field::INTBREAK, ESX_TRUE);
+                if (writeReg.get(layouts::SP_STATUS_Write_Register::Field::CLR_HALT).as<BIT>() == ESX_TRUE) mCPU->setHalt(ESX_FALSE);
+                if (writeReg.get(layouts::SP_STATUS_Write_Register::Field::SET_HALT).as<BIT>() == ESX_TRUE) mCPU->setHalt(ESX_TRUE);
+                if (writeReg.get(layouts::SP_STATUS_Write_Register::Field::CLR_BROKE).as<BIT>() == ESX_TRUE) SP_STATUS.set(layouts::SP_STATUS_Register::Field::BROKE, ESX_FALSE);
+                if (writeReg.get(layouts::SP_STATUS_Write_Register::Field::CLR_SSTEP).as<BIT>() == ESX_TRUE) SP_STATUS.set(layouts::SP_STATUS_Register::Field::SSTEP, ESX_FALSE);
+                if (writeReg.get(layouts::SP_STATUS_Write_Register::Field::SET_SSTEP).as<BIT>() == ESX_TRUE) SP_STATUS.set(layouts::SP_STATUS_Register::Field::SSTEP, ESX_TRUE);
+                if (writeReg.get(layouts::SP_STATUS_Write_Register::Field::CLR_INTBREAK).as<BIT>() == ESX_TRUE) SP_STATUS.set(layouts::SP_STATUS_Register::Field::INTBREAK, ESX_FALSE);
+                if (writeReg.get(layouts::SP_STATUS_Write_Register::Field::SET_INTBREAK).as<BIT>() == ESX_TRUE) SP_STATUS.set(layouts::SP_STATUS_Register::Field::INTBREAK, ESX_TRUE);
 
-                U16 clrSetSig = writeReg.get(SP_STATUS_Write_RegisterLayout::Field::CLR_SET_SIG).as<U16>();
-                U8 sig = SP_STATUS.get(SP_STATUS_RegisterLayout::Field::SIG).as<U8>();
+                U16 clrSetSig = writeReg.get(layouts::SP_STATUS_Write_Register::Field::CLR_SET_SIG).as<U16>();
+                U8 sig = SP_STATUS.get(layouts::SP_STATUS_Register::Field::SIG).as<U8>();
 
                 for (I32 i = 0; i < 8; i++) {
                     if (clrSetSig & (1 << (i * 2))) {
@@ -89,7 +89,7 @@ namespace esx {
                     }
                 }
 
-                SP_STATUS.set(SP_STATUS_RegisterLayout::Field::SIG, sig);
+                SP_STATUS.set(layouts::SP_STATUS_Register::Field::SIG, sig);
                 break;
             }
 

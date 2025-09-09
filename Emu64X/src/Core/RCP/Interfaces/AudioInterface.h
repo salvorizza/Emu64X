@@ -1,5 +1,8 @@
 #pragma once
 
+#define AI_DRAM_ADDR_FIELDS(M) M(DRAM_ADDR, 3, 23)
+#define AI_LENGTH_FIELDS(M)    M(LENGTH, 3, 17)
+
 #include "Base/Base.h"
 #include "Base/Bus.h"
 
@@ -7,31 +10,8 @@ namespace esx {
 
 	class RCP;
 
-	struct AI_DRAM_ADDR_RegisterLayout {
-		enum class Field { DRAM_ADDR };
-
-		static constexpr U32 Mask = 0xFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-				case Field::DRAM_ADDR: return { 3, 23 };
-			}
-		}
-	};
-	using AI_DRAM_ADDR_Register = Register<AI_DRAM_ADDR_RegisterLayout, U32>;
-
-	struct AI_LENGTH_RegisterLayout {
-		enum class Field { LENGTH };
-
-		static constexpr U32 Mask = 0xFFFFFFFF;
-
-		static constexpr Pair<I32, I32> info(Field f) {
-			switch (f) {
-			case Field::LENGTH: return { 3, 17 };
-			}
-		}
-	};
-	using AI_LENGTH_Register = Register<AI_LENGTH_RegisterLayout, U32>;
+	DEFINE_REGISTER_LAYOUT(AI_DRAM_ADDR_Register, U32, AI_DRAM_ADDR_FIELDS)
+	DEFINE_REGISTER_LAYOUT(AI_LENGTH_Register, U32, AI_LENGTH_FIELDS)
 
 	class AudioInterface {
 	public:
