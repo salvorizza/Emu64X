@@ -115,7 +115,7 @@ namespace esx {
 		String Mnemonic(const SharedPtr<T>& cpuState) const;
 	};
 
-	struct InstructionCache {
+	struct CacheWord {
 		U32 Word = 0;
 	};
 
@@ -124,12 +124,15 @@ namespace esx {
 		U32 Tag = 0;
 		BIT Valid = ESX_FALSE;
 		BIT Dirty = ESX_FALSE;
-		Array<InstructionCache, W> Instructions = {};
+		Array<CacheWord, W> Words = {};
 	};
 
 	template<size_t L, size_t W>
 	struct Cache {
 		Array<CacheLine<W>, L> CacheLines = {};
+
+		constexpr size_t CacheLineSize() const { return L; }
+		constexpr size_t NumWords() const { return W; }
 	};
 
 	struct StoreOperation {
@@ -265,10 +268,44 @@ namespace esx {
 			mCOPs[number] = cop;
 			return cop;
 		}
+	protected:
+		template<typename T>
+		U32 accessCache(T& cache, U32 virtualAddress, U32 physicalAddress)
+		{
+			U32 index = (virtualAddress >> 2) & (cache.NumWords() - 1);
+			U32 cacheLineNumber = (virtualAddress >> (2 + std::popcount(cache.NumWords() - 1))) & (cache.CacheLineSize() - 1);
+			U32 tag = physicalAddress >> 12;
+
+			auto& cacheLine = cache.CacheLines[cacheLineNumber];
+			if (cacheLine.Tag == tag && cacheLine.Valid) {
+				return cacheLine.Words[index].Word;
+			}
+			else {
+				return cacheMiss(cache, virtualAddress, physicalAddress, cacheLineNumber, tag, index);
+			}
+		}
+
+		template<typename T>
+		U32 cacheMiss(T& cache, U32 virtualAddress, U32 physicalAddress, U32 cacheLineNumber, U32 tag, U32 startIndex)
+		{
+			auto& cacheLine = cache.CacheLines[cacheLineNumber];
+
+			U32 baseAddr = physicalAddress & ~((1 << (std::popcount(cache.NumWords() - 1) + 2)) - 1);
+			for (U32 index = 0; index < cacheLine.Words.size(); index++) {
+				auto& word = cacheLine.Words[index];
+				word.Word = mRootBus->load(baseAddr + index * sizeof(U32));
+			}
+
+			cacheLine.Tag = tag;
+			cacheLine.Valid = ESX_TRUE;
+
+			return cacheLine.Words[startIndex].Word;
+		}
 	public:
 		MIPSInstruction<Execute> mCurrentInstruction;
 		Array<SharedPtr<ICoprocessor>, 4> mCOPs;
 	protected:
+		SharedPtr<Bus> mRootBus;
 		Array<Register, 32> mRegisters;
 
 		Pair<RegisterIndex, Register> mPendingLoad;

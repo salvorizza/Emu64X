@@ -49,38 +49,10 @@ namespace esx {
 		U32 physicalAddress = mCP0->AddressTranslation(virtualAddress, ESX_FALSE, cached);
 
 		if (cached) {
-			U32 index = (virtualAddress >> 2) & 0x7;
-			U32 cacheLineNumber = (virtualAddress >> 5) & 0x1FF;
-			U32 tag = physicalAddress >> 12;
-
-			auto& cacheLine = mICache.CacheLines[cacheLineNumber];
-			if (cacheLine.Tag == tag && cacheLine.Valid) {
-				auto& instruction = cacheLine.Instructions[index];
-				return instruction.Word;
-			} else {
-				return cacheMiss(virtualAddress, physicalAddress, cacheLineNumber, tag, index);
-			}
+			return accessCache(mICache, virtualAddress, physicalAddress);
 		} else {
 			return mRootBus->load(physicalAddress);
 		}
-	}
-
-
-	U32 VR4300::cacheMiss(U32 virtualAddress, U32 physicalAddress, U32 cacheLineNumber, U32 tag, U32 startIndex)
-	{
-		auto& cacheLine = mICache.CacheLines[cacheLineNumber];
-
-		U32 baseAddr = physicalAddress & ~0x1F;
-
-		for (U32 index = 0; index < cacheLine.Instructions.size(); index++) {
-			auto& instruction = cacheLine.Instructions[index];
-			instruction.Word = mRootBus->load(baseAddr + index * sizeof(U32));
-		}
-
-		cacheLine.Tag = tag;
-		cacheLine.Valid = ESX_TRUE;
-
-		return cacheLine.Instructions[startIndex].Word;
 	}
 
 	static const Array<VR4300ExecuteFunction, 64> primaryOpCodeDecode = {
@@ -157,8 +129,8 @@ namespace esx {
 
 	void VR4300::ADD()
 	{
-		I32 a = getRegister(mCurrentInstruction.RegisterSource());
-		I32 b = getRegister(mCurrentInstruction.RegisterTarget());
+		I32 a = static_cast<I32>(static_cast<U32>(getRegister(mCurrentInstruction.RegisterSource())));
+		I32 b = static_cast<I32>(static_cast<U32>(getRegister(mCurrentInstruction.RegisterTarget())));
 
 		I32 r = a + b;
 
@@ -172,8 +144,8 @@ namespace esx {
 
 	void VR4300::ADDU()
 	{
-		U32 a = getRegister(mCurrentInstruction.RegisterSource());
-		U32 b = getRegister(mCurrentInstruction.RegisterTarget());
+		U64 a = getRegister(mCurrentInstruction.RegisterSource());
+		U64 b = getRegister(mCurrentInstruction.RegisterTarget());
 
 		U64 r = a + b;
 
@@ -223,8 +195,8 @@ namespace esx {
 
 	void VR4300::SUB()
 	{
-		I32 a = getRegister(mCurrentInstruction.RegisterSource());
-		I32 b = getRegister(mCurrentInstruction.RegisterTarget());
+		I32 a = static_cast<I32>(static_cast<U32>(getRegister(mCurrentInstruction.RegisterSource())));
+		I32 b = static_cast<I32>(static_cast<U32>(getRegister(mCurrentInstruction.RegisterTarget())));
 
 		I32 r = a - b;
 
@@ -238,8 +210,8 @@ namespace esx {
 
 	void VR4300::SUBU()
 	{
-		U32 a = getRegister(mCurrentInstruction.RegisterSource());
-		U32 b = getRegister(mCurrentInstruction.RegisterTarget());
+		U64 a = getRegister(mCurrentInstruction.RegisterSource());
+		U64 b = getRegister(mCurrentInstruction.RegisterTarget());
 
 		U64 r = a - b;
 
@@ -289,7 +261,7 @@ namespace esx {
 
 	void VR4300::ADDI()
 	{
-		I32 a = getRegister(mCurrentInstruction.RegisterSource());
+		I32 a = static_cast<I32>(static_cast<U32>(getRegister(mCurrentInstruction.RegisterSource())));
 		I32 b = mCurrentInstruction.ImmediateSE();
 
 		I32 r = a + b;
@@ -417,7 +389,7 @@ namespace esx {
 
 	void VR4300::DIV()
 	{
-		I32 a = getRegister(mCurrentInstruction.RegisterSource());
+		I32 a = static_cast<I32>(static_cast<U32>(getRegister(mCurrentInstruction.RegisterSource())));
 		I64 b = static_cast<I64>(getRegister(mCurrentInstruction.RegisterTarget()) << 29) >> 29; //Sign extension bugs
 
 		if (b != 0) {
@@ -510,7 +482,7 @@ namespace esx {
 			mLO = a / b;
 		} else {
 			mHI = a;
-			mLO = 0x7FFFFFFF;
+			mLO = 0xFFFFFFFFFFFFFFFF;
 		}
 	}
 
@@ -947,7 +919,7 @@ namespace esx {
 		U64 m = a + b;
 
 		U64 am = m & ~(0x7);
-		U64 aw = load<U32>(am, exception);
+		U64 aw = load<U64>(am, exception);
 
 		U64 u = m & 0x7;
 		U64 mr = (aw & (0x00FFFFFFFFFFFFFF >> ((0x7 - u) * 8))) | (c << (u * 8));
@@ -1032,8 +1004,8 @@ namespace esx {
 
 	void VR4300::SLT()
 	{
-		I32 a = getRegister(mCurrentInstruction.RegisterSource());
-		I32 b = getRegister(mCurrentInstruction.RegisterTarget());
+		I32 a = static_cast<I32>(static_cast<U32>(getRegister(mCurrentInstruction.RegisterSource())));
+		I32 b = static_cast<I32>(static_cast<U32>(getRegister(mCurrentInstruction.RegisterTarget())));
 
 		U32 r = a < b;
 
@@ -1052,7 +1024,7 @@ namespace esx {
 
 	void VR4300::SLTI()
 	{
-		I32 a = getRegister(mCurrentInstruction.RegisterSource());
+		I32 a = static_cast<I32>(static_cast<U32>(getRegister(mCurrentInstruction.RegisterSource())));
 		I32 b = mCurrentInstruction.ImmediateSE();
 
 		U32 r = a < b;
@@ -1072,70 +1044,70 @@ namespace esx {
 
 	void VR4300::AND()
 	{
-		U32 a = getRegister(mCurrentInstruction.RegisterSource());
-		U32 b = getRegister(mCurrentInstruction.RegisterTarget());
+		U64 a = getRegister(mCurrentInstruction.RegisterSource());
+		U64 b = getRegister(mCurrentInstruction.RegisterTarget());
 
-		U32 r = a & b;
+		U64 r = a & b;
 
 		setRegister(mCurrentInstruction.RegisterDestination(), r);
 	}
 
 	void VR4300::ANDI()
 	{
-		U32 a = getRegister(mCurrentInstruction.RegisterSource());
+		U64 a = getRegister(mCurrentInstruction.RegisterSource());
 		U32 b = mCurrentInstruction.Immediate();
 
-		U32 r = a & b;
+		U64 r = a & b;
 
 		setRegister(mCurrentInstruction.RegisterTarget(), r);
 	}
 
 	void VR4300::OR()
 	{
-		U32 a = getRegister(mCurrentInstruction.RegisterSource());
-		U32 b = getRegister(mCurrentInstruction.RegisterTarget());
+		U64 a = getRegister(mCurrentInstruction.RegisterSource());
+		U64 b = getRegister(mCurrentInstruction.RegisterTarget());
 
-		U32 r = a | b;
+		U64 r = a | b;
 
 		setRegister(mCurrentInstruction.RegisterDestination(), r);
 	}
 
 	void VR4300::ORI()
 	{
-		U32 a = getRegister(mCurrentInstruction.RegisterSource());
+		U64 a = getRegister(mCurrentInstruction.RegisterSource());
 		U32 b = mCurrentInstruction.Immediate();
 
-		U32 r = a | b;
+		U64 r = a | b;
 
 		setRegister(mCurrentInstruction.RegisterTarget(), r);
 	}
 
 	void VR4300::XOR()
 	{
-		U32 a = getRegister(mCurrentInstruction.RegisterSource());
-		U32 b = getRegister(mCurrentInstruction.RegisterTarget());
+		U64 a = getRegister(mCurrentInstruction.RegisterSource());
+		U64 b = getRegister(mCurrentInstruction.RegisterTarget());
 
-		U32 r = a ^ b;
+		U64 r = a ^ b;
 
 		setRegister(mCurrentInstruction.RegisterDestination(), r);
 	}
 
 	void VR4300::XORI()
 	{
-		U32 a = getRegister(mCurrentInstruction.RegisterSource());
+		U64 a = getRegister(mCurrentInstruction.RegisterSource());
 		U32 b = mCurrentInstruction.Immediate();
 
-		U32 r = a ^ b;
+		U64 r = a ^ b;
 
 		setRegister(mCurrentInstruction.RegisterTarget(), r);
 	}
 
 	void VR4300::NOR()
 	{
-		U32 a = getRegister(mCurrentInstruction.RegisterSource());
-		U32 b = getRegister(mCurrentInstruction.RegisterTarget());
+		U64 a = getRegister(mCurrentInstruction.RegisterSource());
+		U64 b = getRegister(mCurrentInstruction.RegisterTarget());
 
-		U32 r = ~(a | b);
+		U64 r = ~(a | b);
 
 		setRegister(mCurrentInstruction.RegisterDestination(), r);
 	}
@@ -1590,6 +1562,7 @@ namespace esx {
 	void VR4300::CACHE()
 	{
 		//TODO: All caching system
+		ESX_CORE_LOG_ERROR("CACHE not implemented yet");
 	}
 
 	void VR4300::SYNC()
@@ -1775,64 +1748,67 @@ namespace esx {
 
 	void VR4300::LDC1()
 	{
+		ESX_CORE_LOG_ERROR("LDC1 not implemented yet");
 	}
 
 	void VR4300::LDC2()
 	{
+		ESX_CORE_LOG_ERROR("LDC2 not implemented yet");
 	}
 
 	void VR4300::LWC0()
 	{
-		raiseException(ExceptionType::CoprocessorUnusable);
+		ESX_CORE_LOG_ERROR("LWC0 not implemented yet");
 	}
 
 	void VR4300::LWC1()
 	{
-		raiseException(ExceptionType::CoprocessorUnusable);
+		ESX_CORE_LOG_ERROR("LWC1 not implemented yet");
 	}
 
 	void VR4300::LWC2()
 	{
-		raiseException(ExceptionType::CoprocessorUnusable);
+		ESX_CORE_LOG_ERROR("LWC2 not implemented yet");
 	}
 
 	void VR4300::LWC3()
 	{
-		raiseException(ExceptionType::CoprocessorUnusable);
+		ESX_CORE_LOG_ERROR("LWC3 not implemented yet");
 	}
 
 	void VR4300::SDC1()
 	{
-		raiseException(ExceptionType::CoprocessorUnusable);
+		ESX_CORE_LOG_ERROR("SDC1 not implemented yet");
 	}
 
 	void VR4300::SDC2()
 	{
-		raiseException(ExceptionType::CoprocessorUnusable);
+		ESX_CORE_LOG_ERROR("SDC2 not implemented yet");
 	}
 
 	void VR4300::SWC0()
 	{
-		raiseException(ExceptionType::CoprocessorUnusable);
+		ESX_CORE_LOG_ERROR("SWC0 not implemented yet");
 	}
 
 	void VR4300::SWC1()
 	{
-		raiseException(ExceptionType::CoprocessorUnusable);
+		ESX_CORE_LOG_ERROR("SWC1 not implemented yet");
 	}
 
 	void VR4300::SWC2()
 	{
-		raiseException(ExceptionType::CoprocessorUnusable);
+		ESX_CORE_LOG_ERROR("SWC2 not implemented yet");
 	}
 
 	void VR4300::SWC3()
 	{
-		raiseException(ExceptionType::CoprocessorUnusable);
+		ESX_CORE_LOG_ERROR("SWC3 not implemented yet");
 	}
 
 	void VR4300::NA()
 	{
+		ESX_CORE_LOG_ERROR("VR4300 Reserved instruction {:08x}h", mCurrentInstruction.binaryInstruction);
 		raiseException(ExceptionType::ReservedInstruction);
 	}
 
@@ -1841,16 +1817,13 @@ namespace esx {
 		U32 cacheLineNumber = address / 32;
 		U32 wordAddress = (address & 0xF) / 4;
 
-		InstructionCache& instruction = mICache.CacheLines[cacheLineNumber].Instructions[wordAddress];
+		auto& instruction = mICache.CacheLines[cacheLineNumber].Words[wordAddress];
 		instruction.Word = value;
 		mICache.CacheLines[cacheLineNumber].Valid = ESX_FALSE;
 	}
 
 	void VR4300::addWriteQueueOperation(const StoreOperation& writeOp)
 	{
-		if (writeOp.Address == 0x80) {
-			ESX_CORE_LOG_ERROR("{:08x}h", mCurrentInstruction.Address);
-		}
 		mWriteQueue.push_back(writeOp);
 	}
 

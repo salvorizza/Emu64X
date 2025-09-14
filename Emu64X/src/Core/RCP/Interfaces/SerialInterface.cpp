@@ -32,6 +32,9 @@ namespace esx {
 	U32 SerialInterface::load(U32 address)
 	{
 		switch (address) {
+			case 0x04800018: {
+				return SI_STATUS.read();
+			}
 			default: {
 				ESX_CORE_LOG_WARNING("{} - Load from address 0x{:08x} not implemented yet", mName, address);
 				break;

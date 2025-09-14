@@ -3,6 +3,7 @@
 #include <Base/Bus.h>
 #include <Core/RDRAM.h>
 #include <Core/SIExternalBus.h>
+#include <Core/RCP/RCP.h>
 
 #include "Panel.h"
 

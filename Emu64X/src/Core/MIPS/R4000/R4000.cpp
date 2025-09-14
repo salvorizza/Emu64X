@@ -38,37 +38,10 @@ namespace esx {
 		U32 physicalAddress = 0x04001000 + (virtualAddress & 0xFFF);
 
 		if (cached) {
-			U32 index = (virtualAddress >> 2) & 0x7;
-			U32 cacheLineNumber = (virtualAddress >> 5) & 0x1FF;
-			U32 tag = physicalAddress >> 12;
-
-			auto& cacheLine = mICache.CacheLines[cacheLineNumber];
-			if (cacheLine.Tag == tag && cacheLine.Valid) {
-				auto& instruction = cacheLine.Instructions[index];
-				return instruction.Word;
-			} else {
-				return cacheMiss(virtualAddress, physicalAddress, cacheLineNumber, tag, index);
-			}
+			return accessCache(mICache, virtualAddress, physicalAddress);
 		} else {
 			return mRootBus->load(physicalAddress);
 		}
-	}
-
-	U32 R4000::cacheMiss(U32 virtualAddress, U32 physicalAddress, U32 cacheLineNumber, U32 tag, U32 startIndex)
-	{
-		auto& cacheLine = mICache.CacheLines[cacheLineNumber];
-
-		U32 baseAddr = physicalAddress & ~0x1F;
-
-		for (U32 index = 0; index < cacheLine.Instructions.size(); index++) {
-			auto& instruction = cacheLine.Instructions[index];
-			instruction.Word = mRootBus->load(baseAddr + index * sizeof(U32));
-		}
-
-		cacheLine.Tag = tag;
-		cacheLine.Valid = ESX_TRUE;
-
-		return cacheLine.Instructions[startIndex].Word;
 	}
 
 	static const Array<R4000ExecuteFunction, 64> primaryOpCodeDecode = {
@@ -790,16 +763,13 @@ namespace esx {
 		U32 cacheLineNumber = address / 32;
 		U32 wordAddress = (address & 0xF) / 4;
 
-		InstructionCache& instruction = mICache.CacheLines[cacheLineNumber].Instructions[wordAddress];
+		auto& instruction = mICache.CacheLines[cacheLineNumber].Words[wordAddress];
 		instruction.Word = value;
 		mICache.CacheLines[cacheLineNumber].Valid = ESX_FALSE;
 	}
 
 	void R4000::addWriteQueueOperation(const StoreOperation& writeOp)
 	{
-		if (writeOp.Address == 0x80) {
-			ESX_CORE_LOG_ERROR("{:08x}h", mCurrentInstruction.Address);
-		}
 		mWriteQueue.push_back(writeOp);
 	}
 

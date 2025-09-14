@@ -165,8 +165,6 @@ namespace esx {
 
 		void NA();
 	private:
-		U32 cacheMiss(U32 virtualAddress, U32 physicalAddress, U32 cacheLineNumber, U32 tag, U32 startIndex);
-
 		void iCacheStore(U32 address, U32 value);
 
 		inline BIT isWriteQueueFull() { return (mWriteQueue.size() == 4) ? ESX_TRUE : ESX_FALSE; }
@@ -176,7 +174,6 @@ namespace esx {
 		void flushWriteQueueFirst();
 		void flushWriteQueueAll();
 	private:
-		SharedPtr<Bus> mRootBus;
 		R4000iCache mICache = {};
 		Vector<StoreOperation> mWriteQueue = {};
 	};

@@ -14,6 +14,7 @@
 namespace esx {
 
 	class RCP : public BusDevice {
+		friend class MemoryEditorPanel;
 	public:
 		RCP();
 		~RCP();

@@ -210,6 +210,7 @@ public:
 	void onFileSelected(const std::filesystem::path& filePath) {
 		mPIExternalBus->loadGame(filePath.string());
 		mCurrentGame = mPIExternalBus->getGameCode();
+		hardReset();
 	}
 
 	static void audioCallback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount)

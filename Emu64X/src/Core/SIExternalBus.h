@@ -18,6 +18,18 @@ namespace esx {
 		Chip7106
 	};
 
+	enum class PIF_CommandBits : U8 {
+		ConfigureJoybusFrame = 1 << 0,
+		Challenge = 1 << 1,
+		JoybusFlagBit = 1 << 2,
+		TerminateBootProcess = 1 << 3,
+		ROMLockout = 1 << 4,
+		AcquireChecksum = 1 << 5,
+		RunChecksum = 1 << 6,
+		Complete = 1 << 7
+	};
+
+
 	class SIExternalBus : public BusDevice {
 		friend class MemoryEditorPanel;
 	public:
@@ -37,6 +49,9 @@ namespace esx {
 		Vector<U8> mPIF_RAM;
 		Vector<U8> mPIF_ROM;
 		StringView mPIF_Path;
+
+		BIT mLockPIF_ROM;
+		U64 mAcquiredChecksum;
 	};
 
 }

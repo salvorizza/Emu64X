@@ -32,8 +32,6 @@ namespace esx {
 			mCIC(CIC::Chip6105)
 	{
 		addRange(ESX_TEXT("Root"), 0x1FC00000, 0xFFFFF, 0xFFFFFFFF);
-
-		reset();
 	}
 
 	SIExternalBus::~SIExternalBus()
@@ -48,21 +46,15 @@ namespace esx {
 		input.close();
 
 		mPIF_RAM.resize(0x40);
-
-		const CICData& cicData = sCICData.at(mCIC);
-
-		mPIF_RAM[0x26] = cicData.IPL2Seed;
-		mPIF_RAM[0x27] = cicData.IPL3Seed;
-		mPIF_RAM[0x3F] = 0x80;
 	}
 
 	void SIExternalBus::load(const StringView& busName, U32 address, U32& output)
 	{
 		if (address >= 0x1FC00000 && address <= 0x1FC007BF) {
-			output = _byteswap_ulong(*reinterpret_cast<U32*>(&mPIF_ROM[address - 0x1FC00000]));
+			output = mLockPIF_ROM == ESX_TRUE ? 0x00000000 : _byteswap_ulong(*reinterpret_cast<U32*>(&mPIF_ROM[address - 0x1FC00000]));
 		}
 		else if (address >= 0x1FC007C0 && address <= 0x1FC007FF) {
-			output = *reinterpret_cast<U32*>(&mPIF_RAM[address - 0x1FC007C0]);
+			output = _byteswap_ulong(*reinterpret_cast<U32*>(&mPIF_RAM[address - 0x1FC007C0]));
 		}
 		else if (address >= 0x1FC00800 && address <= 0x1FCFFFFF) {
 			ESX_CORE_LOG_ERROR("Load {} - Reserved address 0x{:08x}", mName, address);
@@ -76,6 +68,37 @@ namespace esx {
 		}
 		else if (address >= 0x1FC007C0 && address <= 0x1FC007FF) {
 			*reinterpret_cast<U32*>(&mPIF_RAM[address - 0x1FC007C0]) = _byteswap_ulong(value);
+
+			U8 commandByte = mPIF_RAM[0x3F];
+			if (commandByte != 0) {
+				if ((commandByte & static_cast<U8>(PIF_CommandBits::TerminateBootProcess)) != 0) {
+
+					commandByte &= ~(static_cast<U8>(PIF_CommandBits::TerminateBootProcess));
+				}
+
+				if ((commandByte & static_cast<U8>(PIF_CommandBits::ROMLockout)) != 0) {
+					mLockPIF_ROM = ESX_TRUE;
+
+					commandByte &= ~(static_cast<U8>(PIF_CommandBits::ROMLockout));
+				}
+
+				if ((commandByte & static_cast<U8>(PIF_CommandBits::AcquireChecksum)) != 0) {
+					mAcquiredChecksum = _byteswap_uint64(*reinterpret_cast<U64*>(&mPIF_RAM[0x30]));
+
+					commandByte &= ~(static_cast<U8>(PIF_CommandBits::AcquireChecksum));
+					commandByte |= static_cast<U8>(PIF_CommandBits::Complete);
+				}
+
+				if ((commandByte & static_cast<U8>(PIF_CommandBits::RunChecksum)) != 0) {
+					if (mAcquiredChecksum != sCICData.at(mCIC).IPL2Checksum) {
+						//TODO: Halt CPU using NMI
+					}
+
+					commandByte &= ~(static_cast<U8>(PIF_CommandBits::RunChecksum));
+				}
+
+				mPIF_RAM[0x3F] = commandByte;
+			}
 		}
 		else if (address >= 0x1FC00800 && address <= 0x1FCFFFFF) {
 			ESX_CORE_LOG_ERROR("Store {} - Reserved address 0x{:08x}", mName, address);
@@ -86,6 +109,12 @@ namespace esx {
 	void SIExternalBus::reset()
 	{
 		std::fill(mPIF_RAM.begin(), mPIF_RAM.end(), 0);
+
+		const CICData& cicData = sCICData.at(mCIC);
+		*reinterpret_cast<U32*>(&mPIF_RAM[0x1FC007E4 - 0x1FC007C0]) = _byteswap_ulong(static_cast<U32>(cicData.IPL2Seed) << 8 | cicData.IPL3Seed);
+
+		mAcquiredChecksum = 0;
+		mLockPIF_ROM = ESX_FALSE;
 	}
 
 	void SIExternalBus::setCIC(CIC cic)

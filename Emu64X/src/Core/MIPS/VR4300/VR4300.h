@@ -261,8 +261,6 @@ namespace esx {
 		BIT isCoprocessorUsable(U8 copNumber) const { return mCP0->isCoprocessorUsable(copNumber); }
 		BIT isReserved64BitInstruction() const { return mCP0->isReserved64BitInstruction(); }
 	private:
-		U32 cacheMiss(U32 virtualAddress, U32 physicalAddress, U32 cacheLineNumber, U32 tag, U32 startIndex);
-
 		void iCacheStore(U32 address, U32 value);
 
 		inline BIT isWriteQueueFull() { return (mWriteQueue.size() == 4) ? ESX_TRUE : ESX_FALSE; }
@@ -272,7 +270,6 @@ namespace esx {
 		void flushWriteQueueFirst();
 		void flushWriteQueueAll();
 	private:
-		SharedPtr<Bus> mRootBus;
 		SharedPtr<RCP> mRCP;
 		SharedPtr<SystemControlCoprocessor> mCP0;
 		iCache mICache = {};

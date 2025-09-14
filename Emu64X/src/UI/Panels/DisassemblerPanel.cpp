@@ -56,7 +56,7 @@ namespace esx {
 			case DebugState::Running: {
 				//U64 startClocks = mInstance->getClocks();
 				//while (mInstance->getClocks() < Scheduler::NextEvent().ClockTarget) {
-				for (I32 i = 0; i < 1000; i++) {
+				for (I32 i = 0; i < 10000; i++) {
 					if (breakFunction(mInstance->mPC)) {
 						mScrollToCurrent = true;
 						mCurrent = mInstance->mPC;
