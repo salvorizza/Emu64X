@@ -45,6 +45,9 @@ namespace esx {
 	U32 MIPSInterface::load(U32 address)
 	{
 		switch (address) {
+			case 0x04300004: {
+				return MI_VERSION.read();
+			}
 			case 0x04300008: {
 				return getInterruptStatus();
 				break;
@@ -62,6 +65,7 @@ namespace esx {
 
 	void MIPSInterface::reset()
 	{
+		MI_VERSION.write(0x02020102);
 	}
 
 	void MIPSInterface::setInterrupt(InterruptType type, BIT prevValue, BIT newValue, U64 delay)

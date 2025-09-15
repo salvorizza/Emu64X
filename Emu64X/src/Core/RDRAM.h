@@ -13,6 +13,7 @@ namespace esx {
 	public:
 		friend class MemoryEditorPanel;
 		friend class DisassemblerPanel;
+		friend class PeripheralInterface;
 
 		RDRAM();
 		~RDRAM();

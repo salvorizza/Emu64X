@@ -24,7 +24,9 @@ namespace esx {
 	void RDRAM::store(const StringView& busName, U32 address, U32 value)
 	{
 		if (address >= 0x00000000 && address <= 0x03EFFFFF) {
-			*reinterpret_cast<U32*>(&mMemory[address & (mMemory.size() - 1)]) = _byteswap_ulong(value);
+			if (address < mMemory.size()) {
+				*reinterpret_cast<U32*>(&mMemory[address]) = _byteswap_ulong(value);
+			}
 		}
 		else if (address >= 0x03F00000 && address <= 0x03FFFFFF) {
 			//TODO: RDRAM Registers + RDRAM Registers (broadcast)
@@ -35,7 +37,9 @@ namespace esx {
 	{
 		output = 0;
 		if (address >= 0x00000000 && address <= 0x03EFFFFF) {
-			output = _byteswap_ulong(*reinterpret_cast<U32*>(&mMemory[address & (mMemory.size() - 1)]));
+			if (address < mMemory.size()) {
+				output = _byteswap_ulong(*reinterpret_cast<U32*>(&mMemory[address]));
+			}
 		}
 		else if (address >= 0x03F00000 && address <= 0x03F7FFFF) {
 			//TODO: RDRAM Registers

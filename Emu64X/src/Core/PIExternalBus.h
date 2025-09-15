@@ -11,6 +11,7 @@ namespace esx {
 
 
 	class PIExternalBus : public BusDevice {
+		friend class PeripheralInterface;
 	public:
 		PIExternalBus();
 		~PIExternalBus();

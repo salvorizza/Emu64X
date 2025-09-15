@@ -24,6 +24,26 @@ namespace esx {
 	void PeripheralInterface::store(U32 address, U32 value)
 	{
 		switch (address) {
+			case 0x04600000: {
+				PI_DRAM_ADDR.write(value);
+				break;
+			}
+			case 0x04600004: {
+				PI_CART_ADDR.write(value);
+				break;
+			}
+			case 0x04600008: {
+				PI_RD_LEN.write(value);
+				//Start DMA from RDRAM to PI
+				break;
+			}
+			case 0x0460000C: {
+				PI_WR_LEN.write(value);
+				
+				startDMAToRDRAM();
+				//Start DMA from PI to RDRAM
+				break;
+			}
 			case 0x04600010: {
 				PI_STATUS_Write_Register writeReg;
 				writeReg.write(value);
@@ -87,6 +107,20 @@ namespace esx {
 	U32 PeripheralInterface::load(U32 address)
 	{
 		switch (address) {
+			case 0x04600000: {
+				return PI_DRAM_ADDR.read();
+				break;
+			}
+			case 0x04600004: {
+				return PI_CART_ADDR.read();
+				break;
+			}
+			case 0x04600008: {
+				return 0x7F;
+			}
+			case 0x0460000C: {
+				return 0x7F;
+			}
 			case 0x04600010: {
 				return PI_STATUS.read();
 				break;
@@ -132,6 +166,20 @@ namespace esx {
 
 	void PeripheralInterface::reset()
 	{
+	}
+
+	void PeripheralInterface::startDMAToRDRAM()
+	{
+		U32 DRAM_Address = PI_DRAM_ADDR.get(layouts::PI_DRAM_ADDR_Register::Field::DRAM_ADDR).as<U32>();
+		U32 CART_Address = PI_CART_ADDR.get(layouts::PI_CART_ADDR_Register::Field::CART_ADDR).as<U32>();
+		U32 Length = PI_WR_LEN.get(layouts::PI_WR_LEN_Register::Field::WR_LEN).as<U32>() + 1;
+		U8 Buffer[128];
+
+		if (CART_Address >= 0x10000000) {
+			int i = 0;
+		}
+
+		PI_STATUS.set(layouts::PI_STATUS_Register::Field::DMA_COMPLETED, ESX_TRUE);
 	}
 
 }
