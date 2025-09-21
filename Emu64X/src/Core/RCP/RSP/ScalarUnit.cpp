@@ -2,9 +2,12 @@
 
 #include "Core/MIPS/R4000/R4000.h"
 
+#include "Core/RCP/RCP.h"
+
 namespace esx {
-    ScalarUnit::ScalarUnit(R4000* cpu)
-        : Coprocessor(cpu, 0)
+    ScalarUnit::ScalarUnit(R4000* cpu, RCP* rcp)
+        :   Coprocessor(cpu, 0),
+            mRCP(rcp)
     {
     }
 
@@ -32,7 +35,7 @@ namespace esx {
         mCPU->setHalt(ESX_TRUE);
 
         if (SP_STATUS.get(layouts::SP_STATUS_Register::Field::INTBREAK).as<BIT>() == ESX_TRUE) {
-            //TODO: Interrupt MI
+            mRCP->setInterrupt(InterruptType::SP, ESX_FALSE, ESX_TRUE, 0);
         }
     }
 

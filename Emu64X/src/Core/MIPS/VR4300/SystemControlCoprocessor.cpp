@@ -14,7 +14,7 @@ namespace esx {
         if (mCountRegister.read() == mCompareRegister.read()) {
             generateInterrupt(Interrupt::IP7);
         }
-        mCountRegister.write(mCountRegister.read() + 2);
+        mCountRegister.write(clocks * 2);
 
         U8 random = mRandomRegister.get(layouts::RandomRegister::Field::Random).as<U8>();
         U8 wired = mWiredRegister.get(layouts::WiredRegister::Field::Wired).as<U8>();
@@ -190,6 +190,7 @@ namespace esx {
         mCauseRegister.set(layouts::CauseRegister::Field::ExcCode, (U8)type);
         if(type == ExceptionType::CoprocessorUnusable) mCauseRegister.set(layouts::CauseRegister::Field::CE, 0);
 
+        U32 vecOffset = 0x180;
         if (mStatusRegister.get(layouts::StatusRegister::Field::EXL).as<BIT>() == ESX_FALSE) {
             if (mCPU->mBranchSlot == ESX_FALSE) {
                 mCauseRegister.set(layouts::CauseRegister::Field::BD, ESX_FALSE);
@@ -203,11 +204,12 @@ namespace esx {
         mStatusRegister.set(layouts::StatusRegister::Field::EXL, ESX_TRUE);
 
         if (mStatusRegister.get(layouts::StatusRegister::Field::BEV).as<BIT>() == ESX_TRUE) {
-            mCPU->mPC = 0xBFC00200 + 180;
+            mCPU->mPC = 0xBFC00200 + vecOffset;
         } else {
-            mCPU->mPC = 0x80000000 + 180;
+            mCPU->mPC = 0x80000000 + vecOffset;
         }
 
+        mCPU->mPC = static_cast<I32>(mCPU->mPC);
         mCPU->mNextPC = mCPU->mPC + 4;
     }
 
@@ -235,10 +237,10 @@ namespace esx {
                 mCauseRegister.set(layouts::CauseRegister::Field::BD, ESX_TRUE);
                 mEPCRegister.set(layouts::EPCRegister::Field::Value, mCPU->mCurrentPC - 4);
             }
-            vecOffset = 0x000;
-        }
-        else {
-            vecOffset = 0x080;
+
+            vecOffset = is64BitMode() ? 0x080 : 0x000;
+        } else {
+            vecOffset = 0x180;
         }
 
         mStatusRegister.set(layouts::StatusRegister::Field::EXL, ESX_TRUE);
@@ -250,6 +252,7 @@ namespace esx {
             mCPU->mPC = 0x80000000 + vecOffset;
         }
 
+        mCPU->mPC = static_cast<I32>(mCPU->mPC);
         mCPU->mNextPC = mCPU->mPC + 4;
     }
 

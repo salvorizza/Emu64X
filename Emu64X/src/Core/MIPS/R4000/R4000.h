@@ -13,6 +13,8 @@
 
 namespace esx {
 
+	class RCP;
+
 	class R4000;
 	typedef void(R4000::*R4000ExecuteFunction)();
 	using R4000Instruction = MIPSInstruction<R4000ExecuteFunction>;
@@ -28,7 +30,7 @@ namespace esx {
 		friend class DisassemblerPanel;
 		friend class TTYPanel;
 
-		R4000();
+		R4000(RCP* rcp);
 		~R4000();
 
 		void init() override;
@@ -38,49 +40,8 @@ namespace esx {
 		void execute(R4000Instruction& instruction) override;
 		void reset() override;
 
-		template<typename T>
-		U32 load(U32 virtualAddress, BIT& exception) {
-			BIT cached = ESX_FALSE;
-			U32 physicalAddress = 0x04000000 + (virtualAddress & 0xFFF);
-
-			if (isWriteQueueActive(physicalAddress)) {
-				if (flushWriteQueue(physicalAddress) == ESX_FALSE) {
-					flushWriteQueueFirst();
-				}
-			}
-			else {
-				flushWriteQueueAll(); //TODO: Write queue stall
-			}
-
-			PRINT_LOAD(physicalAddress);
-
-			U32 output = mRootBus->load(physicalAddress);
-
-			PRINT_IO_LOAD(physicalAddress, output);
-
-			return output;
-		}
-
-		template<typename T>
-		void store(U32 virtualAddress, U32 value) {
-			BIT cached = ESX_FALSE;
-			U32 physicalAddress = 0x04000000 + (virtualAddress & 0xFFF);
-
-			PRINT_STORE(physicalAddress, value);
-			PRINT_IO_STORE(physicalAddress, value);
-
-			if (isWriteQueueActive(physicalAddress)) {
-				if (isWriteQueueFull()) {
-					flushWriteQueueAll();
-				}
-
-				addWriteQueueOperation({ .Address = physicalAddress, .Data = value, .Size = sizeof(T) });
-			}
-			else {
-				flushWriteQueueAll(); //TODO: Stall cause by write queue
-				mRootBus->store(physicalAddress, value);
-			}
-		}
+		U32 load(U32 virtualAddress, BIT& exception, size_t accessSize);
+		void store(U32 virtualAddress, U64 value, size_t accessSize);
 
 		inline BIT isWriteQueueActive(U32 address) {
 			return ESX_FALSE;
@@ -174,6 +135,7 @@ namespace esx {
 		void flushWriteQueueFirst();
 		void flushWriteQueueAll();
 	private:
+		RCP* mRCP;
 		R4000iCache mICache = {};
 		Vector<StoreOperation> mWriteQueue = {};
 	};

@@ -1,3 +1,4 @@
+#include "Core/RCP/RCP.h"
 #include "R4000.h"
 
 #include <iostream>
@@ -8,8 +9,9 @@
 
 namespace esx {
 
-	R4000::R4000()
-		:	MIPSProcessor(ESX_TEXT("R4000"))
+	R4000::R4000(RCP* rcp)
+		:	MIPSProcessor(ESX_TEXT("R4000")),
+			mRCP(rcp)
 	{
 	}
 
@@ -19,8 +21,6 @@ namespace esx {
 
 	void R4000::init()
 	{
-
-		mRootBus = getBus(ESX_TEXT("Root"));
 	}
 
 	void R4000::clock()
@@ -40,7 +40,7 @@ namespace esx {
 		if (cached) {
 			return accessCache(mICache, virtualAddress, physicalAddress);
 		} else {
-			return mRootBus->load(physicalAddress);
+			return mRCP->SysADLoad(physicalAddress, 32);
 		}
 	}
 
@@ -108,6 +108,51 @@ namespace esx {
 	void R4000::execute(R4000Instruction& instruction)
 	{
 		(this->*instruction.Execute)();
+	}
+
+	U32 R4000::load(U32 virtualAddress, BIT& exception, size_t accessSize) {
+		BIT cached = ESX_FALSE;
+		U32 physicalAddress = 0x04000000 + (virtualAddress & 0xFFF);
+
+		if (isWriteQueueActive(physicalAddress)) {
+			if (flushWriteQueue(physicalAddress) == ESX_FALSE) {
+				flushWriteQueueFirst();
+			}
+		}
+		else {
+			flushWriteQueueAll(); //TODO: Write queue stall
+		}
+
+		PRINT_LOAD(physicalAddress);
+
+		U32 result = 0;
+		if (accessSize == 8) {
+			U32 lo = mRCP->SysADLoad(physicalAddress & ~0x7, sizeof(U32) * 8);
+			U32 hi = mRCP->SysADLoad((physicalAddress & ~0x7) + 4, sizeof(U32) * 8);
+
+			result = (static_cast<U64>(hi) << 32) | lo;
+		}
+		else {
+			U32 output = mRCP->SysADLoad(physicalAddress, sizeof(U32) * 8);
+			constexpr U32 mask = std::numeric_limits<U32>::max();
+			result = output >> ((physicalAddress & 0x3) * 8) & mask;
+		}
+
+		PRINT_IO_LOAD(physicalAddress, result);
+
+		return result;
+	}
+
+	void R4000::store(U32 virtualAddress, U64 value, size_t accessSize) {
+		BIT cached = ESX_FALSE;
+		U32 physicalAddress = 0x04000000 + (virtualAddress & 0xFFF);
+
+
+		PRINT_STORE(physicalAddress, value);
+		PRINT_IO_STORE(physicalAddress, value);
+
+		value <<= (physicalAddress & 0x3) * 8;
+		mRCP->SysADStore(physicalAddress, accessSize, value);
 	}
 
 	void R4000::reset()
@@ -186,7 +231,7 @@ namespace esx {
 
 		U64 m = a + b;
 
-		U64 r = load<U32>(m, exception);
+		U64 r = load(m, exception, sizeof(U32));
 		if (exception) {
 			r = getRegister(mCurrentInstruction.RegisterTarget());
 		}
@@ -203,7 +248,7 @@ namespace esx {
 
 		U64 m = a + b;
 
-		U64 r = load<U16>(m, exception);
+		U64 r = load(m, exception, sizeof(U16));
 		if (exception) {
 			r = getRegister(mCurrentInstruction.RegisterTarget());
 		} else {
@@ -222,7 +267,7 @@ namespace esx {
 
 		U64 m = a + b;
 
-		U32 r = load<U16>(m, exception);
+		U32 r = load(m, exception, sizeof(U16));
 		if (exception) {
 			r = getRegister(mCurrentInstruction.RegisterTarget());
 		}
@@ -239,7 +284,7 @@ namespace esx {
 
 		U64 m = a + b;
 
-		U64 r = load<U8>(m, exception);
+		U64 r = load(m, exception, sizeof(U8));
 		if (exception) {
 			r = getRegister(mCurrentInstruction.RegisterTarget());
 		} else {
@@ -258,7 +303,7 @@ namespace esx {
 
 		U64 m = a + b;
 
-		U32 r = load<U8>(m, exception);
+		U32 r = load(m, exception, sizeof(U16));
 
 		addPendingLoad(mCurrentInstruction.RegisterTarget(), r);
 	}
@@ -271,7 +316,7 @@ namespace esx {
 
 		U64 m = a + b;
 
-		store<U8>(m, v);
+		store(m, v, sizeof(U8));
 	}
 
 	void R4000::SH()
@@ -282,7 +327,7 @@ namespace esx {
 
 		U64 m = a + b;
 
-		store<U16>(m, v);
+		store(m, v, sizeof(U16));
 	}
 
 	void R4000::SC()
@@ -295,7 +340,7 @@ namespace esx {
 		U64 v = getRegister(mCurrentInstruction.RegisterTarget());
 
 		if (mLLBit == ESX_TRUE) {
-			store<U32>(m, v);
+			store(m, v, sizeof(U32));
 		}
 
 		setRegister(mCurrentInstruction.RegisterTarget(), mLLBit);
@@ -310,7 +355,7 @@ namespace esx {
 
 		U64 v = getRegister(mCurrentInstruction.RegisterTarget());
 
-		store<U32>(m, v);
+		store(m, v, sizeof(U32));
 	}
 
 	void R4000::LUI()
@@ -329,7 +374,7 @@ namespace esx {
 
 		U64 m = a + b;
 
-		U64 r = load<U32>(m, exception);
+		U64 r = load(m, exception, sizeof(U32));
 		if (exception) {
 			r = getRegister(mCurrentInstruction.RegisterTarget());
 		}

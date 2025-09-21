@@ -38,6 +38,7 @@ namespace esx {
 
 		void setInterrupt(InterruptType type, BIT prevValue, BIT newValue, U64 delay);
 		void clearInterrupt(InterruptType type);
+		BIT interruptPending();
 	private:
 		void setInterruptMask(U32 value);
 		U32 getInterruptMask();

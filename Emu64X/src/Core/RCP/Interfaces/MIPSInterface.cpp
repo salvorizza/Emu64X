@@ -82,6 +82,11 @@ namespace esx {
 		mInterruptStatus &= ~(1 << static_cast<U8>(type));
 	}
 
+	BIT MIPSInterface::interruptPending()
+	{
+		return (mInterruptStatus & mInterruptMask) != 0 ? ESX_TRUE : ESX_FALSE;
+	}
+
 	void MIPSInterface::setInterruptMask(U32 value)
 	{
 		for (I32 i = 0; i < 5; i++) {

@@ -18,7 +18,7 @@
 namespace esx {
 
 	class R4000;
-	class RSP;
+	class RCP;
 
 	DEFINE_REGISTER_LAYOUT(SP_DMA_SPADDR_Register, U32, SP_DMA_SPADDR_FIELDS)
 	DEFINE_REGISTER_LAYOUT(SP_DMA_RAMADDR_Register, U32, SP_DMA_RAMADDR_FIELDS)
@@ -43,7 +43,7 @@ namespace esx {
 	public:
 		friend class RSP;
 
-		ScalarUnit(R4000* cpu);
+		ScalarUnit(R4000* cpu, RCP* rcp);
 		~ScalarUnit() = default;
 
 		void clock(U64 clocks) override;
@@ -57,6 +57,8 @@ namespace esx {
 		virtual U64 getRegister(RegisterIndex reg) override;
 		virtual void setRegister(RegisterIndex reg, U64 value) override;
 	private:
+		RCP* mRCP;
+
 		SP_DMA_SPADDR_Register SP_DMA_SPADDR;
 		SP_DMA_RAMADDR_Register SP_DMA_RAMADDR;
 		SP_DMA_RDLEN_Register SP_DMA_RDLEN;

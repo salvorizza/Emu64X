@@ -7,6 +7,7 @@
 #include "../Common/Common.h"
 
 #include "SystemControlCoprocessor.h"
+#include "FloatingPointUnit.h"
 #include "Core/RCP/RCP.h"
 
 namespace esx {
@@ -28,6 +29,7 @@ namespace esx {
 		friend class TTYPanel;
 		friend class Coprocessor<VR4300>;
 		friend class SystemControlCoprocessor;
+		friend class FloatingPointUnit;
 
 		VR4300();
 		~VR4300();
@@ -65,8 +67,8 @@ namespace esx {
 
 			T result = 0;
 			if constexpr (sizeof(T) == 8) {
-				U32 lo = mRCP->SysADLoad(physicalAddress & ~0x7, sizeof(T) * 8);
-				U32 hi = mRCP->SysADLoad((physicalAddress & ~0x7) + 4, sizeof(T) * 8);
+				U32 lo = mRCP->SysADLoad((physicalAddress & ~0x7) + 4, sizeof(T) * 8);
+				U32 hi = mRCP->SysADLoad((physicalAddress & ~0x7) + 0, sizeof(T) * 8);
 
 				result = (static_cast<U64>(hi) << 32) | lo;
 			} else {
@@ -96,7 +98,13 @@ namespace esx {
 			PRINT_IO_STORE(physicalAddress,value);
 
 			value <<= (physicalAddress & 0x3) * 8;
-			mRCP->SysADStore(physicalAddress, sizeof(T) * 8, value);
+
+			if constexpr (sizeof(T) == 8) {
+				mRCP->SysADStore((physicalAddress & ~0x7) + 4, sizeof(T) * 8, value);
+				mRCP->SysADStore((physicalAddress & ~0x7) + 0, sizeof(T) * 8, value >> 32);
+			} else {
+				mRCP->SysADStore(physicalAddress, sizeof(T) * 8, value);
+			}
 		}
 
 		static inline BIT isCacheActive(U32 address) {
@@ -272,6 +280,7 @@ namespace esx {
 	private:
 		SharedPtr<RCP> mRCP;
 		SharedPtr<SystemControlCoprocessor> mCP0;
+		SharedPtr<FloatingPointUnit> mCP1;
 		iCache mICache = {};
 		dCache mDCache = {};
 		Vector<StoreOperation> mWriteQueue = {};

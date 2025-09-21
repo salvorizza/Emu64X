@@ -12,6 +12,8 @@
 #include "Interfaces/VideoInterface.h"
 
 namespace esx {
+	
+	class R4000;
 
 	class RCP : public BusDevice {
 		friend class MemoryEditorPanel;
@@ -33,8 +35,10 @@ namespace esx {
 
 		void setInterrupt(InterruptType type, BIT prevValue, BIT newValue, U64 delay);
 		void clearInterrupt(InterruptType type);
+		BIT interruptPending();
 	private:
 		SharedPtr<Bus> mRoot;
+		SharedPtr<R4000> mCore;
 
 		Vector<U8> mIMEM;
 		Vector<U8> mDMEM;

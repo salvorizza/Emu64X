@@ -225,7 +225,7 @@ namespace esx {
 		Storage mValue;
 	};
 
-	template <typename Layout, typename Storage = U32>
+	template <typename Layout, typename Storage>
 	class Register {
 	public:
 		Register() : mValue(0) {}
@@ -244,6 +244,7 @@ namespace esx {
 			Storage mask = (Layout::template ones<Storage>(len)) << start;
 			return RegisterField<Storage>((mValue & mask) >> start);
 		}
+
 		void set(typename Layout::Field fieldName, Storage fieldValue) {
 			auto [start, end] = Layout::info(fieldName);
 			I32 len = (end - start) + 1;
@@ -277,6 +278,9 @@ namespace esx {
 // case dello switch info()
 #define REG_INFO_CASE(name, start, end) case Field::name: return {start, end};
 
+// case dello switch fieldName()
+#define REG_INFO_NAME(name, start, end) case Field::name: return #name;
+
 // accumulo mask (safe anche se len == bitwidth)
 #define REG_MASK_ACCUM(name, start, end)                               \
     {                                                                  \
@@ -294,6 +298,11 @@ namespace layouts { struct Name {                                               
         switch (f) { FIELDS_MACRO(REG_INFO_CASE) }                     \
         return {0, 31};                                                \
     }                                                                  \
+	static constexpr StringView id = #Name;                            \
+	static constexpr StringView name(Field f) {                   \
+        switch (f) { FIELDS_MACRO(REG_INFO_NAME) }                     \
+        return "None";                                                 \
+    }																   \
                                                                        \
     template<typename Storage>                                         \
     static constexpr Storage ones(int len) {                           \

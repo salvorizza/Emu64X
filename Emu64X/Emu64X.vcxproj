@@ -161,6 +161,7 @@
     <ClInclude Include="src\Core\MIPS\Common\Common.h" />
     <ClInclude Include="src\Core\MIPS\Common\Coprocessor.h" />
     <ClInclude Include="src\Core\MIPS\R4000\R4000.h" />
+    <ClInclude Include="src\Core\MIPS\VR4300\FloatingPointUnit.h" />
     <ClInclude Include="src\Core\MIPS\VR4300\SystemControlCoprocessor.h" />
     <ClInclude Include="src\Core\MIPS\VR4300\VR4300.h" />
     <ClInclude Include="src\Core\PIExternalBus.h" />
@@ -209,6 +210,7 @@
   <ItemGroup>
     <ClCompile Include="src\Base\Bus.cpp" />
     <ClCompile Include="src\Core\MIPS\R4000\R4000.cpp" />
+    <ClCompile Include="src\Core\MIPS\VR4300\FloatingPointUnit.cpp" />
     <ClCompile Include="src\Core\MIPS\VR4300\SystemControlCoprocessor.cpp" />
     <ClCompile Include="src\Core\MIPS\VR4300\VR4300.cpp" />
     <ClCompile Include="src\Core\PIExternalBus.cpp" />

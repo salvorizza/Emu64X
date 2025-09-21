@@ -17,6 +17,7 @@ namespace esx {
 		:	MIPSProcessor(ESX_TEXT("VR4300"))
 	{
 		mCP0 = registerCoprocessor<SystemControlCoprocessor>(0, this);
+		mCP1 = registerCoprocessor<FloatingPointUnit>(1, this);
 	}
 
 	VR4300::~VR4300()
@@ -34,6 +35,11 @@ namespace esx {
 	{
 		MIPSProcessor::clock();
 		mCP0->clock(mCycles);
+		mRCP->clock(mCycles);
+
+		if (mRCP->interruptPending()) {
+			mCP0->generateInterrupt(Interrupt::IP2);
+		}
 		mCP0->handleInterrupts();
 	}
 
@@ -124,7 +130,11 @@ namespace esx {
 	void VR4300::reset()
 	{
 		MIPSProcessor::reset();
-		mCP0->setRegister(SystemControlRegisterType::PRId, 0x000000B0);
+
+		mCP0->setRegister(SystemControlRegisterType::PRId, 0x00000B00);
+
+		mPC = static_cast<I64>(0xBFC00000);
+		mNextPC = mPC + 4;
 	}
 
 	void VR4300::ADD()
@@ -132,11 +142,17 @@ namespace esx {
 		I32 a = static_cast<I32>(static_cast<U32>(getRegister(mCurrentInstruction.RegisterSource())));
 		I32 b = static_cast<I32>(static_cast<U32>(getRegister(mCurrentInstruction.RegisterTarget())));
 
-		I32 r = a + b;
+		U64 r = a + b;
 
 		if (OVERFLOW_ADD32(a, b, r)) {
 			raiseException(ExceptionType::ArithmeticOverflow);
 			return;
+		}
+
+		if (mCP0->is64BitMode()) {
+			r = static_cast<I32>(static_cast<U32>(r));
+		} else {
+			r &= 0xFFFFFFFF;
 		}
 
 		setRegister(mCurrentInstruction.RegisterDestination(), r);
@@ -144,8 +160,8 @@ namespace esx {
 
 	void VR4300::ADDU()
 	{
-		U64 a = getRegister(mCurrentInstruction.RegisterSource());
-		U64 b = getRegister(mCurrentInstruction.RegisterTarget());
+		U32 a = static_cast<U32>(getRegister(mCurrentInstruction.RegisterSource()));
+		U32 b = static_cast<U32>(getRegister(mCurrentInstruction.RegisterTarget()));
 
 		U64 r = a + b;
 
@@ -198,11 +214,17 @@ namespace esx {
 		I32 a = static_cast<I32>(static_cast<U32>(getRegister(mCurrentInstruction.RegisterSource())));
 		I32 b = static_cast<I32>(static_cast<U32>(getRegister(mCurrentInstruction.RegisterTarget())));
 
-		I32 r = a - b;
+		U64 r = a - b;
 
 		if (OVERFLOW_SUB32(a, b, r)) {
 			raiseException(ExceptionType::ArithmeticOverflow);
 			return;
+		}
+
+		if (mCP0->is64BitMode()) {
+			r = static_cast<I32>(static_cast<U32>(r));
+		} else {
+			r &= 0xFFFFFFFF;
 		}
 
 		setRegister(mCurrentInstruction.RegisterDestination(), r);
@@ -210,8 +232,8 @@ namespace esx {
 
 	void VR4300::SUBU()
 	{
-		U64 a = getRegister(mCurrentInstruction.RegisterSource());
-		U64 b = getRegister(mCurrentInstruction.RegisterTarget());
+		U32 a = getRegister(mCurrentInstruction.RegisterSource());
+		U32 b = getRegister(mCurrentInstruction.RegisterTarget());
 
 		U64 r = a - b;
 
@@ -264,11 +286,17 @@ namespace esx {
 		I32 a = static_cast<I32>(static_cast<U32>(getRegister(mCurrentInstruction.RegisterSource())));
 		I32 b = mCurrentInstruction.ImmediateSE();
 
-		I32 r = a + b;
+		U64 r = a + b;
 
 		if (OVERFLOW_ADD32(a, b, r)) {
 			raiseException(ExceptionType::ArithmeticOverflow);
 			return;
+		}
+
+		if (mCP0->is64BitMode()) {
+			r = static_cast<I32>(static_cast<U32>(r));
+		} else {
+			r &= 0xFFFFFFFF;
 		}
 
 		setRegister(mCurrentInstruction.RegisterTarget(), r);
@@ -277,7 +305,7 @@ namespace esx {
 	void VR4300::ADDIU()
 	{
 		U32 a = getRegister(mCurrentInstruction.RegisterSource());
-		U32 b = mCurrentInstruction.ImmediateSE();
+		I32 b = mCurrentInstruction.ImmediateSE();
 
 		U64 r = a + b;
 
@@ -1562,7 +1590,7 @@ namespace esx {
 	void VR4300::CACHE()
 	{
 		//TODO: All caching system
-		ESX_CORE_LOG_ERROR("CACHE not implemented yet");
+		//ESX_CORE_LOG_ERROR("CACHE not implemented yet");
 	}
 
 	void VR4300::SYNC()
@@ -1701,6 +1729,8 @@ namespace esx {
 				coprocessorFunction = copDecodeBC[mCurrentInstruction.RegisterTarget().Value];
 			}
 			((mCOPs[0].get())->*coprocessorFunction)();
+		} else {
+			ESX_CORE_LOG_ERROR("COP0 not implemented yet");
 		}
 	}
 
@@ -1715,6 +1745,8 @@ namespace esx {
 				coprocessorFunction = copDecodeBC[mCurrentInstruction.RegisterTarget().Value];
 			}
 			((mCOPs[1].get())->*coprocessorFunction)();
+		} else {
+			ESX_CORE_LOG_ERROR("COP1 not implemented yet");
 		}
 	}
 
@@ -1729,6 +1761,8 @@ namespace esx {
 				coprocessorFunction = copDecodeBC[mCurrentInstruction.RegisterTarget().Value];
 			}
 			((mCOPs[2].get())->*coprocessorFunction)();
+		} else {
+			ESX_CORE_LOG_ERROR("COP2 not implemented yet");
 		}
 	}
 
@@ -1743,6 +1777,8 @@ namespace esx {
 				coprocessorFunction = copDecodeBC[mCurrentInstruction.RegisterTarget().Value];
 			}
 			((mCOPs[3].get())->*coprocessorFunction)();
+		} else {
+			ESX_CORE_LOG_ERROR("COP3 not implemented yet");
 		}
 	}
 

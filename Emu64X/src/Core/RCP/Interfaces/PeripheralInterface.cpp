@@ -1,6 +1,8 @@
 #include "PeripheralInterface.h"
 
 #include "../RCP.h"
+#include "Core/RDRAM.h"
+#include "Core/PIExternalBus.h"
 
 namespace esx {
 
@@ -15,6 +17,8 @@ namespace esx {
 
 	void PeripheralInterface::init()
 	{
+		mRDRAM = mRCP->getBus("Root")->getDevice<RDRAM>("RDRAM");
+		mPIExtBus = mRCP->getBus("Root")->getDevice<PIExternalBus>("PIExternalBus");
 	}
 
 	void PeripheralInterface::clock(U64 clocks)
@@ -170,15 +174,17 @@ namespace esx {
 
 	void PeripheralInterface::startDMAToRDRAM()
 	{
-		U32 DRAM_Address = PI_DRAM_ADDR.get(layouts::PI_DRAM_ADDR_Register::Field::DRAM_ADDR).as<U32>();
-		U32 CART_Address = PI_CART_ADDR.get(layouts::PI_CART_ADDR_Register::Field::CART_ADDR).as<U32>();
+		U32 DRAM_Address = PI_DRAM_ADDR.get(layouts::PI_DRAM_ADDR_Register::Field::DRAM_ADDR).as<U32>() << 1;
+		U32 CART_Address = PI_CART_ADDR.get(layouts::PI_CART_ADDR_Register::Field::CART_ADDR).as<U32>() << 1;
 		U32 Length = PI_WR_LEN.get(layouts::PI_WR_LEN_Register::Field::WR_LEN).as<U32>() + 1;
 		U8 Buffer[128];
 
 		if (CART_Address >= 0x10000000) {
-			int i = 0;
+			fseek(mPIExtBus->mCartridge, CART_Address - 0x10000000, SEEK_SET);
+			fread_s(&mRDRAM->mMemory[DRAM_Address], Length, Length, 1, mPIExtBus->mCartridge);
 		}
 
+		mRCP->setInterrupt(InterruptType::PI, PI_STATUS.get(layouts::PI_STATUS_Register::Field::DMA_COMPLETED).as<BIT>(), ESX_TRUE, 0);
 		PI_STATUS.set(layouts::PI_STATUS_Register::Field::DMA_COMPLETED, ESX_TRUE);
 	}
 

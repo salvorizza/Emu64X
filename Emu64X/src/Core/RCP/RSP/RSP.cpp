@@ -22,8 +22,8 @@ namespace esx {
 
 	void RSP::init()
 	{
-		mCore = MakeShared<R4000>();
-		mSU = mCore->registerCoprocessor<ScalarUnit>(0, mCore.get());
+		mCore = MakeShared<R4000>(mRCP);
+		mSU = mCore->registerCoprocessor<ScalarUnit>(0, mCore.get(), mRCP);
 		mVU = mCore->registerCoprocessor<VectorUnit>(2, mCore.get());
 
 		mCore->setHalt(ESX_TRUE);

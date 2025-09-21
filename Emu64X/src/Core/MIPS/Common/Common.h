@@ -217,12 +217,7 @@ namespace esx {
 			mTookBranch = ESX_FALSE;
 			mTookBranchSlot = ESX_FALSE;
 
-
 			mCycles = 0;
-
-			mPC = 0xBFC00000;
-			mNextPC = mPC + 4;
-			resetPendingLoad();
 
 			mMemoryLoad = std::make_pair<RegisterIndex, U64>(RegisterIndex(0), 0);
 			mPendingLoad = std::make_pair<RegisterIndex, U64>(RegisterIndex(0), 0);
@@ -740,21 +735,42 @@ namespace esx {
 
 			case 0x30:
 			case 0x31:
-			case 0x32:
-			case 0x33: {
+			case 0x32: {
 				U8 cpn = COP_N(binaryInstruction);
 				return FormatString(ESX_TEXT("lwc{} ${},0x{:08x}"), cpn, registersMnemonics[(U8)RegisterTarget()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
 				break;
 			}
 
+			case 0x34:
+			case 0x35:
+			case 0x36: {
+				U8 cpn = COP_N(binaryInstruction);
+				return FormatString(ESX_TEXT("ldc{} ${},0x{:08x}"), cpn, registersMnemonics[(U8)RegisterTarget()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
+				break;
+			}
+
+			case 0x37: {
+				return FormatString(ESX_TEXT("ld {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
+			}
 
 			case 0x38:
 			case 0x39:
-			case 0x3A:
-			case 0x3B: {
+			case 0x3A: {
 				U8 cpn = COP_N(binaryInstruction);
 				return FormatString(ESX_TEXT("swc{} ${},0x{:08x}"), cpn, registersMnemonics[(U8)RegisterTarget()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
 				break;
+			}
+
+			case 0x3C:
+			case 0x3D:
+			case 0x3E: {
+				U8 cpn = COP_N(binaryInstruction);
+				return FormatString(ESX_TEXT("sdc{} ${},0x{:08x}"), cpn, registersMnemonics[(U8)RegisterTarget()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
+				break;
+			}
+
+			case 0x3F: {
+				return FormatString(ESX_TEXT("sd {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
 			}
 			}
 		}

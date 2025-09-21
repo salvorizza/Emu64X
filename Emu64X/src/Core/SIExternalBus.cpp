@@ -70,32 +70,41 @@ namespace esx {
 			*reinterpret_cast<U32*>(&mPIF_RAM[address - 0x1FC007C0]) = _byteswap_ulong(value);
 
 			U8 commandByte = mPIF_RAM[0x3F];
+
+			auto manageCommand = [&](PIF_CommandBits command, auto callback) {
+				if ((commandByte & static_cast<U8>(command)) != 0) {
+					callback();
+					commandByte &= ~(static_cast<U8>(command));
+				}
+			};
+
 			if (commandByte != 0) {
-				if ((commandByte & static_cast<U8>(PIF_CommandBits::TerminateBootProcess)) != 0) {
-
-					commandByte &= ~(static_cast<U8>(PIF_CommandBits::TerminateBootProcess));
-				}
-
-				if ((commandByte & static_cast<U8>(PIF_CommandBits::ROMLockout)) != 0) {
-					mLockPIF_ROM = ESX_TRUE;
-
-					commandByte &= ~(static_cast<U8>(PIF_CommandBits::ROMLockout));
-				}
-
-				if ((commandByte & static_cast<U8>(PIF_CommandBits::AcquireChecksum)) != 0) {
-					mAcquiredChecksum = _byteswap_uint64(*reinterpret_cast<U64*>(&mPIF_RAM[0x30]));
-
-					commandByte &= ~(static_cast<U8>(PIF_CommandBits::AcquireChecksum));
-					commandByte |= static_cast<U8>(PIF_CommandBits::Complete);
-				}
-
-				if ((commandByte & static_cast<U8>(PIF_CommandBits::RunChecksum)) != 0) {
-					if (mAcquiredChecksum != sCICData.at(mCIC).IPL2Checksum) {
-						//TODO: Halt CPU using NMI
+				manageCommand(PIF_CommandBits::TerminateBootProcess, 
+					[&]() {
 					}
+				);
 
-					commandByte &= ~(static_cast<U8>(PIF_CommandBits::RunChecksum));
-				}
+				manageCommand(PIF_CommandBits::ROMLockout, 
+					[&]() {
+						mLockPIF_ROM = ESX_TRUE; 
+					}
+				);
+
+				manageCommand(PIF_CommandBits::AcquireChecksum, 
+					[&]() { 
+						mAcquiredChecksum = _byteswap_uint64(*reinterpret_cast<U64*>(&mPIF_RAM[0x30]));  
+						commandByte |= static_cast<U8>(PIF_CommandBits::Complete); 
+					}
+				);
+
+				manageCommand(PIF_CommandBits::RunChecksum, 
+					[&]() {
+						if (mAcquiredChecksum != sCICData.at(mCIC).IPL2Checksum) {
+							//TODO: Halt CPU using NMI
+						}
+					}
+				);
+
 
 				mPIF_RAM[0x3F] = commandByte;
 			}

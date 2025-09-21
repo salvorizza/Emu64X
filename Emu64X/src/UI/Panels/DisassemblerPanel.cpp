@@ -30,14 +30,14 @@ namespace esx {
 		switch (mDebugState) {
 			case DebugState::Running:
 				if (mBreakpoints.size() > 0) {
-					auto it = std::find_if(mBreakpoints.begin(), mBreakpoints.end(), [&](Breakpoint& b) { return b.PhysAddress == Bus::toPhysicalAddress(address) && b.Enabled; });
+					auto it = std::find_if(mBreakpoints.begin(), mBreakpoints.end(), [&](Breakpoint& b) { return Bus::toPhysicalAddress(b.PhysAddress) == Bus::toPhysicalAddress(address) && b.Enabled; });
 					return it != mBreakpoints.end();
 				}
 				return false;
 
 			case DebugState::Step:
 			case DebugState::StepOver:
-				return mInstance->mPC == mNextPC;
+				return Bus::toPhysicalAddress(mInstance->mPC) == mNextPC;
 		}
 
 		return false;
@@ -56,11 +56,11 @@ namespace esx {
 			case DebugState::Running: {
 				//U64 startClocks = mInstance->getClocks();
 				//while (mInstance->getClocks() < Scheduler::NextEvent().ClockTarget) {
-				for (I32 i = 0; i < 10000; i++) {
+				for (I32 i = 0; i < 100000; i++) {
 					if (breakFunction(mInstance->mPC)) {
 						mScrollToCurrent = true;
-						mCurrent = mInstance->mPC;
-						mNextPC = mInstance->mNextPC;
+						mCurrent = Bus::toPhysicalAddress(mInstance->mPC);
+						mNextPC = Bus::toPhysicalAddress(mInstance->mNextPC);
 						setDebugState(DebugState::Breakpoint);
 						break;
 					}
@@ -116,6 +116,11 @@ namespace esx {
 			if (ImGui::Button(ICON_FA_STEP_FORWARD)) onStepForward();
 			ImGui::SameLine();
 			if (ImGui::Button(ICON_FA_ARROWS_TURN_DOWN)) onStepOver();
+			ImGui::SameLine();
+			if (ImGui::Button(ICON_FA_GOLF_BALL)) {
+				mScrollToCurrent = true;
+				mCurrent = Bus::toPhysicalAddress(mInstance->mPC);
+			}
 		}
 		
 		switch (mDebugState)
@@ -188,10 +193,8 @@ namespace esx {
 				clipper.Begin(numInstructions);
 				if (mScrollToCurrent) {
 					U32 index = 0;
-
-					mCurrent = Bus::toPhysicalAddress(mCurrent);
 					
-					index = (mCurrent - baseAddress) / 4;
+					index = (mCurrent - Bus::toPhysicalAddress(baseAddress)) / 4;
 
 					clipper.ForceDisplayRangeByIndices(index, index + 1);
 				}
@@ -374,24 +377,24 @@ namespace esx {
 		setDebugState(DebugState::Breakpoint);
 		//disassemble(mInstance->mPC - 4 * disassembleRange, 4 * disassembleRange * 2);
 		mScrollToCurrent = true;
-		mCurrent = mInstance->mPC;
+		mCurrent = Bus::toPhysicalAddress(mInstance->mPC);
 	}
 
 	void DisassemblerPanel::onStepForward() {
 		if (mDebugState == DebugState::Breakpoint) {
 			setDebugState(DebugState::Step);
 			mScrollToCurrent = true;
-			mCurrent = mInstance->mPC;
+			mCurrent = Bus::toPhysicalAddress(mInstance->mPC);
 		}
 	}
 
 	void DisassemblerPanel::onStepOver()
 	{
 		if (mDebugState == DebugState::Breakpoint) {
-			mNextPC = mInstance->mPC + 4;
+			mNextPC = Bus::toPhysicalAddress(mInstance->mPC + 4);
 			setDebugState(DebugState::StepOver);
 			mScrollToCurrent = true;
-			mCurrent = mInstance->mPC;
+			mCurrent = Bus::toPhysicalAddress(mInstance->mPC);
 		}
 	}
 

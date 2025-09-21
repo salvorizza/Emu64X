@@ -9,7 +9,7 @@
 
 namespace esx {
 	RCP::RCP()
-		: BusDevice("RCP")
+		:	BusDevice("RCP")
 	{
 		addRange(ESX_TEXT("Root"), 0x04000000, 0x00FFFFFF, 0xFFFFFFFF);
 	}
@@ -20,6 +20,8 @@ namespace esx {
 
 	void RCP::clock(U64 clocks)
 	{
+		mRSP->clock(clocks);
+		mMIPSInterface->clock(clocks);
 	}
 
 	void RCP::init()
@@ -165,5 +167,10 @@ namespace esx {
 
 	void RCP::clearInterrupt(InterruptType type) {
 		mMIPSInterface->clearInterrupt(type);
+	}
+
+	BIT RCP::interruptPending()
+	{
+		return mMIPSInterface->interruptPending();
 	}
 }
