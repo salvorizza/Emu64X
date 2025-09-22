@@ -111,6 +111,9 @@
     <ClInclude Include="src\Core\MIPS\R4000\R4000.h">
       <Filter>src\Core\MIPS\R4000</Filter>
     </ClInclude>
+    <ClInclude Include="src\Core\MIPS\VR4300\FloatingPointUnit.h">
+      <Filter>src\Core\MIPS\VR4300</Filter>
+    </ClInclude>
     <ClInclude Include="src\Core\MIPS\VR4300\SystemControlCoprocessor.h">
       <Filter>src\Core\MIPS\VR4300</Filter>
     </ClInclude>
@@ -243,7 +246,6 @@
     <ClInclude Include="src\Utils\LoggingSystem.h">
       <Filter>src\Utils</Filter>
     </ClInclude>
-    <ClInclude Include="src\Core\MIPS\VR4300\FloatingPointUnit.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Base\Bus.cpp">
@@ -251,6 +253,9 @@
     </ClCompile>
     <ClCompile Include="src\Core\MIPS\R4000\R4000.cpp">
       <Filter>src\Core\MIPS\R4000</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Core\MIPS\VR4300\FloatingPointUnit.cpp">
+      <Filter>src\Core\MIPS\VR4300</Filter>
     </ClCompile>
     <ClCompile Include="src\Core\MIPS\VR4300\SystemControlCoprocessor.cpp">
       <Filter>src\Core\MIPS\VR4300</Filter>
@@ -375,7 +380,6 @@
     <ClCompile Include="src\main.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\Core\MIPS\VR4300\FloatingPointUnit.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="commons\icons\Logo.ico">

@@ -7,10 +7,55 @@ namespace esx {
 	FloatingPointUnit::FloatingPointUnit(VR4300* cpu)
 		: Coprocessor(cpu, 1)
 	{
+		FCR0.set(layouts::FCR0Register::Field::Imp, 0x0B);
 	}
 
 	void FloatingPointUnit::clock(U64 clocks)
 	{
+	}
+
+	void FloatingPointUnit::CF()
+	{
+		if (!mCPU->isCoprocessorUsable(1)) {
+			unusable();
+			return;
+		}
+
+		RegisterIndex fs = mCPU->mCurrentInstruction.RegisterDestination();
+
+		if (fs.Value != 31) {
+			return;
+		}
+
+		U64 temp = FCR31.read();
+		
+		if (mCPU->is64BitMode()) {
+			temp = static_cast<I32>(static_cast<U32>(temp));
+		}
+
+
+		mCPU->setRegister(mCPU->mCurrentInstruction.RegisterTarget(), temp);
+	}
+
+	void FloatingPointUnit::CT()
+	{
+		if (!mCPU->isCoprocessorUsable(1)) {
+			unusable();
+			return;
+		}
+
+		U64 temp = mCPU->getRegister(mCPU->mCurrentInstruction.RegisterTarget());
+		RegisterIndex fs = mCPU->mCurrentInstruction.RegisterDestination();
+		
+		if (fs.Value != 31) {
+			return;
+		}
+
+		FCR31.write(temp);
+
+		if (FCR31.get(layouts::FCR31Register::Field::Cause).as<U8>() & FCR31.get(layouts::FCR31Register::Field::Enables).as<U8>()) {
+			mCPU->raiseException(ExceptionType::FloatingPoint);
+		}
 	}
 
 	void FloatingPointUnit::CO()
@@ -236,6 +281,7 @@ namespace esx {
 
 	void FloatingPointUnit::setRegister(RegisterIndex reg, U64 value)
 	{
+		int i = 0;
 	}
 
 }
