@@ -54,21 +54,12 @@ namespace esx {
 
 			mCP0->watchAddress(physicalAddress, ESX_FALSE);
 
-			if (isWriteQueueActive(physicalAddress)) {
-				if (flushWriteQueue(physicalAddress) == ESX_FALSE) {
-					flushWriteQueueFirst();
-				}
-			}
-			else {
-				flushWriteQueueAll(); //TODO: Write queue stall
-			}
-
 			PRINT_LOAD(physicalAddress);
 
 			T result = 0;
 			if constexpr (sizeof(T) == 8) {
-				U32 lo = mRCP->SysADLoad((physicalAddress & ~0x7) + 4, sizeof(T) * 8);
-				U32 hi = mRCP->SysADLoad((physicalAddress & ~0x7) + 0, sizeof(T) * 8);
+				U32 lo = mRCP->SysADLoad((physicalAddress & ~0x7) + 4, sizeof(U32) * 8);
+				U32 hi = mRCP->SysADLoad((physicalAddress & ~0x7) + 0, sizeof(U32) * 8);
 
 				result = (static_cast<U64>(hi) << 32) | lo;
 			} else {
@@ -119,8 +110,6 @@ namespace esx {
 		}
 
 		void raiseException(ExceptionType type, U32 virtualAddress = 0);
-
-		inline U64 getClocks() const { return mCycles; }
 
 		//Arithmetic
 		void ADD();

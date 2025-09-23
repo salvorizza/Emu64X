@@ -16,7 +16,7 @@ namespace esx {
 		PIExternalBus();
 		~PIExternalBus();
 
-		void load(const StringView& busName, U32 address, U32& output) override;
+		void load(const StringView& busName, U32 address, U32& output, U8 lowerBits, U8 accessSize) override;
 
 		void reset() override;
 

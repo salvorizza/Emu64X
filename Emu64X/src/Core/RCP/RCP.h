@@ -28,8 +28,8 @@ namespace esx {
 		U32 SysADLoad(U32 address, U8 accessSize);
 		void SysADStore(U32 address, U8 accessSize, U32 value);
 
-		void store(const StringView& busName, U32 address, U32 value) override;
-		void load(const StringView& busName, U32 address, U32& output) override;
+		void store(const StringView& busName, U32 address, U32 value, U8 lowerBits, U8 accessSize) override;
+		void load(const StringView& busName, U32 address, U32& output, U8 lowerBits, U8 accessSize) override;
 
 		void reset() override;
 

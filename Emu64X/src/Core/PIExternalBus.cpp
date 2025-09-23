@@ -20,7 +20,7 @@ namespace esx {
 	{
 	}
 
-	void PIExternalBus::load(const StringView& busName, U32 address, U32& output)
+	void PIExternalBus::load(const StringView& busName, U32 address, U32& output, U8 lowerBits, U8 accessSize)
 	{
 		if (address >= 0x05000000 && address <= 0x05FFFFFF) {
 			//TODO: N64DD Registers

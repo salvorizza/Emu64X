@@ -57,7 +57,7 @@ namespace esx {
 		if (cached) {
 			return accessCache(mICache, virtualAddress, physicalAddress);
 		} else {
-			return mRootBus->load(physicalAddress);
+			return mRootBus->load(physicalAddress, 0, sizeof(U32));
 		}
 	}
 
@@ -1856,43 +1856,6 @@ namespace esx {
 		auto& instruction = mICache.CacheLines[cacheLineNumber].Words[wordAddress];
 		instruction.Word = value;
 		mICache.CacheLines[cacheLineNumber].Valid = ESX_FALSE;
-	}
-
-	void VR4300::addWriteQueueOperation(const StoreOperation& writeOp)
-	{
-		mWriteQueue.push_back(writeOp);
-	}
-
-	void VR4300::doWriteQueueOperation(const StoreOperation& writeOp)
-	{
-		mRootBus->store(writeOp.Address, static_cast<U32>(writeOp.Data));
-	}
-
-	BIT VR4300::flushWriteQueue(U32 address)
-	{
-		auto foundIt = std::find_if(mWriteQueue.begin(), mWriteQueue.end(), [&](const StoreOperation& storeOp) { return storeOp.Address == address; });
-		if (foundIt != mWriteQueue.end()) {
-			doWriteQueueOperation(*foundIt);
-			mWriteQueue.erase(foundIt);
-			return ESX_TRUE;
-		}
-		return ESX_FALSE;
-	}
-
-	void VR4300::flushWriteQueueFirst()
-	{
-		if (mWriteQueue.size() == 0) return;
-		auto it = mWriteQueue.begin();
-		doWriteQueueOperation(*it);
-		mWriteQueue.erase(it);
-	}
-
-	void VR4300::flushWriteQueueAll()
-	{
-		for (auto it = mWriteQueue.begin(); it != mWriteQueue.end(); ++it) {
-			doWriteQueueOperation(*it);
-		}
-		mWriteQueue.clear();
 	}
 
 	void VR4300::raiseException(ExceptionType type, U32 virtualAddress) {

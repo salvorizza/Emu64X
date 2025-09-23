@@ -23,16 +23,23 @@ namespace esx {
 
 		RegisterIndex fs = mCPU->mCurrentInstruction.RegisterDestination();
 
-		if (fs.Value != 31) {
-			return;
+		U64 temp = 0;
+		switch (fs.Value) {
+			case 0: 
+				temp = FCR0.read();
+				break;
+
+			case 31:
+				temp = FCR31.read();
+				break;
+
+			default:
+				return;
 		}
 
-		U64 temp = FCR31.read();
-		
 		if (mCPU->is64BitMode()) {
 			temp = static_cast<I32>(static_cast<U32>(temp));
 		}
-
 
 		mCPU->setRegister(mCPU->mCurrentInstruction.RegisterTarget(), temp);
 	}
@@ -182,86 +189,107 @@ namespace esx {
 
 	void FloatingPointUnit::ADD()
 	{
+		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
 	}
 
 	void FloatingPointUnit::SUB()
 	{
+		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
 	}
 
 	void FloatingPointUnit::MUL()
 	{
+		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
 	}
 
 	void FloatingPointUnit::DIV()
 	{
+		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
 	}
 
 	void FloatingPointUnit::SQRT()
 	{
+		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
 	}
 
 	void FloatingPointUnit::ABS()
 	{
+		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
 	}
 
 	void FloatingPointUnit::MOV()
 	{
+		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
 	}
 
 	void FloatingPointUnit::NEG()
 	{
+		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
 	}
 
 	void FloatingPointUnit::ROUNDL()
 	{
+		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
 	}
 
 	void FloatingPointUnit::TRUNCL()
 	{
+		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
 	}
 
 	void FloatingPointUnit::CEILL()
 	{
+		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
 	}
 
 	void FloatingPointUnit::FLOORL()
 	{
+		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
 	}
 
 	void FloatingPointUnit::ROUNDW()
 	{
+		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
 	}
 
 	void FloatingPointUnit::TRUNCW()
 	{
+		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
 	}
 
 	void FloatingPointUnit::CEILW()
 	{
+		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
 	}
 
 	void FloatingPointUnit::FLOORW()
 	{
+		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
 	}
 
 	void FloatingPointUnit::CVTS()
 	{
+		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
 	}
 
 	void FloatingPointUnit::CVTD()
 	{
+		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
 	}
 
 	void FloatingPointUnit::CVTW()
 	{
+		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
 	}
 
 	void FloatingPointUnit::CVTL()
 	{
+		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
 	}
 
 	void FloatingPointUnit::C()
 	{
+		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
 	}
 
 	void FloatingPointUnit::unusable()

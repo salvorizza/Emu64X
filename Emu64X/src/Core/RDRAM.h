@@ -20,10 +20,13 @@ namespace esx {
 
 		virtual void init() override;
 
-		virtual void store(const StringView& busName, U32 address, U32 value) override;
-		virtual void load(const StringView& busName, U32 address, U32& output) override;
+		virtual void store(const StringView& busName, U32 address, U32 value, U8 lowerBits, U8 accessSize) override;
+		virtual void load(const StringView& busName, U32 address, U32& output, U8 lowerBits, U8 accessSize) override;
 
 		virtual void reset() override;
+
+	private:
+		inline U32 generateMask(U8 lowerBits, U8 accessSize) const;
 	private:
 		Vector<U8> mMemory;
 	};

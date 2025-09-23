@@ -288,7 +288,7 @@ namespace esx {
 			U32 baseAddr = physicalAddress & ~((1 << (std::popcount(cache.NumWords() - 1) + 2)) - 1);
 			for (U32 index = 0; index < cacheLine.Words.size(); index++) {
 				auto& word = cacheLine.Words[index];
-				word.Word = mRootBus->load(baseAddr + index * sizeof(U32));
+				word.Word = mRootBus->load(baseAddr + index * sizeof(U32), 0, sizeof(U32));
 			}
 
 			cacheLine.Tag = tag;

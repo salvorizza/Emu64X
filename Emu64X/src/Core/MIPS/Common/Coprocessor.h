@@ -43,9 +43,6 @@ namespace esx {
 		virtual ~Coprocessor() = default;
 
 		void clock(U64 clocks) override {
-			if (mMemoryLoad.first != -1) setRegister(mMemoryLoad.first, mMemoryLoad.second);
-			mMemoryLoad = mPendingLoad;
-			resetPendingLoad();
 		}
 
 		void NA() override {
@@ -78,7 +75,7 @@ namespace esx {
 				r = static_cast<I64>(static_cast<I32>(static_cast<U32>(r)));
 			}
 
-			mCPU->addPendingLoad(mCPU->mCurrentInstruction.RegisterTarget(), r);
+			mCPU->setRegister(mCPU->mCurrentInstruction.RegisterTarget(), r);
 		}
 
 		void DMF() override {
@@ -93,7 +90,7 @@ namespace esx {
 			}
 
 			U64 r = getRegister(mCPU->mCurrentInstruction.RegisterDestination());
-			mCPU->addPendingLoad(mCPU->mCurrentInstruction.RegisterTarget(), r);
+			mCPU->setRegister(mCPU->mCurrentInstruction.RegisterTarget(), r);
 		}
 
 		void CF() override {
@@ -120,11 +117,11 @@ namespace esx {
 					r = (data << 32) | (r & 0xFFFFFFFF);
 				}
 
-				addPendingLoad(RegisterIndex((rd >> 1) << 1), r);
+				setRegister(RegisterIndex((rd >> 1) << 1), r);
 			}
 			else {
 				U64 r = data;
-				addPendingLoad(mCPU->mCurrentInstruction.RegisterDestination(), r);
+				setRegister(mCPU->mCurrentInstruction.RegisterDestination(), r);
 			}
 		}
 
@@ -140,7 +137,7 @@ namespace esx {
 			}
 
 			U64 r = mCPU->getRegister(mCPU->mCurrentInstruction.RegisterTarget());
-			addPendingLoad(mCPU->mCurrentInstruction.RegisterDestination(), r);
+			setRegister(mCPU->mCurrentInstruction.RegisterDestination(), r);
 		}
 
 		void CT() override {

@@ -6,22 +6,12 @@ namespace esx {
 
 	enum class SchedulerEventType {
 		None,
-		CDROMCommand,
-		DMAChannelDone,
-		GPUScanlineStart,
 		GPUFrameStart,
-		GPUStartHBlank,
-		GPUEndHBlank,
+		GPUScanlineStart,
 		GPUStartVBlank,
 		GPUEndVBlank,
-		SPUSample,
-		SIO0Clock,
-		Timer0ReachTarget,
-		Timer1ReachTarget,
-		Timer2ReachTarget,
-		Timer0ReachMax,
-		Timer1ReachMax,
-		Timer2ReachMax
+		GPUStartHBlank,
+		GPUEndHBlank
 	};
 
 	struct SchedulerEvent {
@@ -65,6 +55,7 @@ namespace esx {
 		static void ExecuteEvent();
 		static void Progress();
 		static void AddSchedulerEventHandler(SchedulerEventType type, const SchedulerEventHandler& handler);
+		static BIT HasEvents();
 	private:
 		static U64 sProgressClock;
 		static SchedulerEventContainer sEvents;

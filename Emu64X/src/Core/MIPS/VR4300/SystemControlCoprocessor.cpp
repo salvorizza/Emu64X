@@ -11,10 +11,10 @@ namespace esx {
 
     void SystemControlCoprocessor::clock(U64 clocks)
     {
-        if (mCountRegister.read() == mCompareRegister.read()) {
+        if (mCountRegister.get(layouts::CountRegister::Field::Value).as<U32>() == mCompareRegister.get(layouts::CompareRegister::Field::Value).as<U32>()) {
             generateInterrupt(Interrupt::IP7);
         }
-        mCountRegister.write(clocks * 2);
+        mCountRegister.set(layouts::CountRegister::Field::Value, clocks * 2);
 
         U8 random = mRandomRegister.get(layouts::RandomRegister::Field::Random).as<U8>();
         U8 wired = mWiredRegister.get(layouts::WiredRegister::Field::Wired).as<U8>();
@@ -382,7 +382,15 @@ namespace esx {
             }
 
             case SystemControlRegisterType::Status:   mStatusRegister.write(value); break;
-            case SystemControlRegisterType::Cause:    mCauseRegister.write(value); break;
+
+            case SystemControlRegisterType::Cause: {
+                CauseRegister temp;
+                temp.write(value);
+
+                mCauseRegister.set(layouts::CauseRegister::Field::IP, (mCauseRegister.get(layouts::CauseRegister::Field::IP).as<U8>() & ~0x83) | (temp.get(layouts::CauseRegister::Field::IP).as<U8>() & 0x3));
+                break;
+            }
+
             case SystemControlRegisterType::EPC:      mEPCRegister.write(value); break;
             case SystemControlRegisterType::Config:   mConfigRegister.write(value); break;
             case SystemControlRegisterType::LLAddr:   mLLAddrRegister.write(value); break;

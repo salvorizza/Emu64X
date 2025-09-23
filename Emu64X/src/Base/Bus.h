@@ -51,8 +51,8 @@ namespace esx {
 
 		virtual void writeLine(const StringView& busName, const StringView& lineName, BIT value) {}
 
-		virtual void store(const StringView& busName, U32 address, U32 value) { ESX_CORE_LOG_ERROR("Device {} does not implement store32 at address {:08x}h", mName, address); }
-		virtual void load(const StringView& busName, U32 address, U32& output) { ESX_CORE_LOG_ERROR("Device {} does not implement load32 at address {:08x}h", mName, address); }
+		virtual void store(const StringView& busName, U32 address, U32 value, U8 lowerBits, U8 accessSize) { ESX_CORE_LOG_ERROR("Device {} does not implement store32 at address {:08x}h", mName, address); }
+		virtual void load(const StringView& busName, U32 address, U32& output, U8 lowerBits, U8 accessSize) { ESX_CORE_LOG_ERROR("Device {} does not implement load32 at address {:08x}h", mName, address); }
 
 		virtual void reset() { return; }
 
@@ -104,21 +104,21 @@ namespace esx {
 
 		void sortRanges();
 
-		void store(U32 physicalAddress, U32 value) {
-			storeIO(physicalAddress, value);
+		void store(U32 physicalAddress, U32 value, U8 lowerBits, U8 accessSize) {
+			storeIO(physicalAddress, value, lowerBits, accessSize);
 		}
 
-		U32 load(U32 physicalAddress) {
-			return loadIO(physicalAddress);
+		U32 load(U32 physicalAddress, U8 lowerBits, U8 accessSize) {
+			return loadIO(physicalAddress, lowerBits, accessSize);
 		}
 
-		void storeIO(U32 physicalAddress, U32 value) {
+		void storeIO(U32 physicalAddress, U32 value, U8 lowerBits, U8 accessSize) {
 			IntervalTreeNode* node = findRangeInIntervalTree(mIntervalTree, physicalAddress);
 
 			auto& [busRange, device] = node->interval;
 			if (node) {
 				if (device) {
-					device->store(mName, physicalAddress & busRange.Mask, value);
+					device->store(mName, physicalAddress & busRange.Mask, value, lowerBits, accessSize);
 				}
 				else {
 					ESX_CORE_LOG_ERROR("Writing Address 0x{:08x}: not found", physicalAddress);
@@ -129,14 +129,14 @@ namespace esx {
 			}
 		}
 
-		U32 loadIO(U32 physicalAddress) {
+		U32 loadIO(U32 physicalAddress, U8 lowerBits, U8 accessSize) {
 			U32 result = 0;
 
 			IntervalTreeNode* node = findRangeInIntervalTree(mIntervalTree, physicalAddress);
 			if (node) {
 				auto& [busRange, device] = node->interval;
 				if (device) {
-					device->load(mName, physicalAddress & busRange.Mask, result);
+					device->load(mName, physicalAddress & busRange.Mask, result, lowerBits, accessSize);
 				}
 				else {
 					ESX_CORE_LOG_ERROR("Reading Address 0x{:08x}: not found", physicalAddress);

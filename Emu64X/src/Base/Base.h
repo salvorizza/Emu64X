@@ -234,6 +234,7 @@ namespace esx {
 		Storage read() const {
 			return mValue & Layout::template Mask<Storage>();
 		}
+
 		void write(Storage v) {
 			mValue = v & Layout::template Mask<Storage>();
 		}

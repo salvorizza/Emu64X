@@ -74,4 +74,9 @@ namespace esx {
 		sEventHandlers[type].push_back(handler);
 	}
 
+	BIT Scheduler::HasEvents()
+	{
+		return sEvents.empty() ? ESX_FALSE : ESX_TRUE;
+	}
+
 }

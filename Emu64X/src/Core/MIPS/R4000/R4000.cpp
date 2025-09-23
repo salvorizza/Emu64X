@@ -820,11 +820,11 @@ namespace esx {
 
 	void R4000::doWriteQueueOperation(const StoreOperation& writeOp)
 	{
-		switch (writeOp.Size) {
+		/*switch (writeOp.Size) {
 			case sizeof(U8)  :  mRootBus->store(writeOp.Address, static_cast<U8> (writeOp.Data)); break;
 			case sizeof(U16) :	mRootBus->store(writeOp.Address, static_cast<U16>(writeOp.Data)); break;
 			case sizeof(U32) :	mRootBus->store(writeOp.Address, static_cast<U32>(writeOp.Data)); break;
-		}
+		}*/
 	}
 
 	BIT R4000::flushWriteQueue(U32 address)

@@ -1,12 +1,5 @@
 #include "RCP.h"
 
-//	addRange(ESX_TEXT("Root"), 0x04300000, 0x000FFFFF, 0xFFFFFFFF); MI
-//	addRange(ESX_TEXT("Root"), 0x04400000, 0x000FFFFF, 0xFFFFFFFF); VI
-//	addRange(ESX_TEXT("Root"), 0x04500000, 0x000FFFFF, 0xFFFFFFFF); AI
-//	addRange(ESX_TEXT("Root"), 0x04600000, 0x000FFFFF, 0xFFFFFFFF); PI
-//	addRange(ESX_TEXT("Root"), 0x04700000, 0x000FFFFF, 0xFFFFFFFF); RI
-//	addRange(ESX_TEXT("Root"), 0x04800000, 0x000FFFFF, 0xFFFFFFFF); SI
-
 namespace esx {
 	RCP::RCP()
 		:	BusDevice("RCP")
@@ -51,15 +44,15 @@ namespace esx {
 
 	U32 RCP::SysADLoad(U32 address, U8 accessSize)
 	{
-		return mRoot->load(address & 0xFFFFFFFC);
+		return mRoot->load(address & 0xFFFFFFFC, address & 0x3, accessSize);
 	}
 
 	void RCP::SysADStore(U32 address, U8 accessSize, U32 value)
 	{
-		return mRoot->store(address & 0xFFFFFFFC, value);
+		return mRoot->store(address & 0xFFFFFFFC, value, address & 0x3, accessSize);
 	}
 
-	void RCP::store(const StringView& busName, U32 address, U32 value)
+	void RCP::store(const StringView& busName, U32 address, U32 value, U8 lowerBits, U8 accessSize)
 	{
 		if (address >= 0x04000000 && address <= 0x04000FFF) {
 			*reinterpret_cast<U32*>(&mDMEM[address - 0x04000000]) = _byteswap_ulong(value);
@@ -75,9 +68,11 @@ namespace esx {
 		}
 		else if (address >= 0x04100000 && address <= 0x041FFFFF) {
 			//TODO: RDP Command
+			ESX_CORE_LOG_WARNING("Store RDP commands not implemented yet {:08x}h", value);
 		}
 		else if (address >= 0x04200000 && address <= 0x042FFFFF) {
 			//TODO: RDP Span
+			ESX_CORE_LOG_WARNING("RDP span not implemented yet");
 		}
 		else if (address >= 0x04300000 && address <= 0x043FFFFF) {
 			mMIPSInterface->store(address, value);
@@ -102,7 +97,7 @@ namespace esx {
 		}
 	}
 
-	void RCP::load(const StringView& busName, U32 address, U32& output)
+	void RCP::load(const StringView& busName, U32 address, U32& output, U8 lowerBits, U8 accessSize)
 	{
 		output = 0;
 
@@ -120,9 +115,11 @@ namespace esx {
 		}
 		else if (address >= 0x04100000 && address <= 0x041FFFFF) {
 			//TODO: RDP Command
+			ESX_CORE_LOG_WARNING("Load RDP commands not implemented yet");
 		}
 		else if (address >= 0x04200000 && address <= 0x042FFFFF) {
 			//TODO: RDP Span
+			ESX_CORE_LOG_WARNING("RDP span not implemented yet");
 		}
 		else if (address >= 0x04300000 && address <= 0x043FFFFF) {
 			output = mMIPSInterface->load(address);

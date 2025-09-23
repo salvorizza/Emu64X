@@ -48,7 +48,7 @@ namespace esx {
 		mPIF_RAM.resize(0x40);
 	}
 
-	void SIExternalBus::load(const StringView& busName, U32 address, U32& output)
+	void SIExternalBus::load(const StringView& busName, U32 address, U32& output, U8 lowerBits, U8 accessSize)
 	{
 		if (address >= 0x1FC00000 && address <= 0x1FC007BF) {
 			output = mLockPIF_ROM == ESX_TRUE ? 0x00000000 : _byteswap_ulong(*reinterpret_cast<U32*>(&mPIF_ROM[address - 0x1FC00000]));
@@ -61,7 +61,7 @@ namespace esx {
 		}
 	}
 
-	void SIExternalBus::store(const StringView& busName, U32 address, U32 value)
+	void SIExternalBus::store(const StringView& busName, U32 address, U32 value, U8 lowerBits, U8 accessSize)
 	{
 		if (address >= 0x1FC00000 && address <= 0x1FC007BF) {
 			ESX_CORE_LOG_ERROR("Store {} - Read only address 0x{:08x}", mName, address);

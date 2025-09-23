@@ -54,9 +54,7 @@ namespace esx {
 			case DebugState::StepOver:
 			case DebugState::Step:
 			case DebugState::Running: {
-				//U64 startClocks = mInstance->getClocks();
-				//while (mInstance->getClocks() < Scheduler::NextEvent().ClockTarget) {
-				for (I32 i = 0; i < 100000; i++) {
+				while (Scheduler::HasEvents() == ESX_FALSE) {
 					if (breakFunction(mInstance->mPC)) {
 						mScrollToCurrent = true;
 						mCurrent = Bus::toPhysicalAddress(mInstance->mPC);
@@ -67,12 +65,26 @@ namespace esx {
 
 					mInstance->clock();
 				}
-				//}
 
-				/*if (mInstance->getClocks() >= Scheduler::NextEvent().ClockTarget) {
-					Scheduler::ExecuteEvent();
-					Scheduler::Progress();
-				}*/
+				if (Scheduler::HasEvents()) {
+					while (mInstance->getClocks() < Scheduler::NextEvent().ClockTarget) {
+						if (breakFunction(mInstance->mPC)) {
+							mScrollToCurrent = true;
+							mCurrent = Bus::toPhysicalAddress(mInstance->mPC);
+							mNextPC = Bus::toPhysicalAddress(mInstance->mNextPC);
+							setDebugState(DebugState::Breakpoint);
+							break;
+						}
+
+						mInstance->clock();
+					}
+
+					if (mInstance->getClocks() >= Scheduler::NextEvent().ClockTarget) {
+						Scheduler::ExecuteEvent();
+						Scheduler::Progress();
+					}
+				}
+
 
 				if (mDebugState == DebugState::Breakpoint) {
 					break;
@@ -206,7 +218,7 @@ namespace esx {
 						U32 physAddress = baseAddress + row * 4;
 						U32 translatedAddress = physAddress;
 
-						U32 opcode = mInstance->getBus(ESX_TEXT("Root"))->load(physAddress);
+						U32 opcode = mInstance->getBus(ESX_TEXT("Root"))->load(physAddress, 0, sizeof(U32));
 						mInstance->decode(cpuInstruction, opcode, physAddress, ESX_TRUE);
 
 						Instruction instruction;
@@ -347,7 +359,7 @@ namespace esx {
 
 			if ((physAddress >= 0x00000000 && physAddress <= KIBI(2048)) || (physAddress >= 0x1FC00000 && physAddress < 0x1FC00000 + KIBI(512))) {
 
-				U32 opcode = mInstance->getBus(ESX_TEXT("Root"))->load(physAddress);
+				U32 opcode = mInstance->getBus(ESX_TEXT("Root"))->load(physAddress, 0, sizeof(U32));
 				mInstance->decode(cpuInstruction, opcode, physAddress, ESX_TRUE);
 
 				Instruction instruction;
