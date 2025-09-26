@@ -4,11 +4,19 @@
 #include "Core/RDRAM.h"
 #include "Core/PIExternalBus.h"
 
+#include "Core/MIPS/VR4300/VR4300.h"
+#include "Core/Scheduler.h"
+
 namespace esx {
 
 	PeripheralInterface::PeripheralInterface(RCP* rcp)
 		: mRCP(rcp)
 	{
+		Scheduler::AddSchedulerEventHandler(SchedulerEventType::PIDMADone, [&](const SchedulerEvent& ev) {
+			mRCP->setInterrupt(InterruptType::PI, PI_STATUS.get(layouts::PI_STATUS_Register::Field::DMA_COMPLETED).as<BIT>(), ESX_TRUE, 0);
+			PI_STATUS.set(layouts::PI_STATUS_Register::Field::DMA_BUSY, ESX_FALSE);
+			PI_STATUS.set(layouts::PI_STATUS_Register::Field::DMA_COMPLETED, ESX_TRUE);
+		});
 	}
 
 	PeripheralInterface::~PeripheralInterface()
@@ -55,6 +63,7 @@ namespace esx {
 				if (writeReg.get(layouts::PI_STATUS_Write_Register::Field::RESET_DMA).as<BIT>()) {
 					//Reset DMA Controller
 					//TODO: Stop transfers
+					Scheduler::UnScheduleAllEvents(SchedulerEventType::PIDMADone);
 					PI_STATUS.set(layouts::PI_STATUS_Register::Field::IO_BUSY, ESX_FALSE);
 					PI_STATUS.set(layouts::PI_STATUS_Register::Field::DMA_ERROR, ESX_FALSE);
 					PI_STATUS.set(layouts::PI_STATUS_Register::Field::DMA_BUSY, ESX_FALSE);
@@ -184,8 +193,18 @@ namespace esx {
 			fread_s(&mRDRAM->mMemory[DRAM_Address], Length, Length, 1, mPIExtBus->mCartridge);
 		}
 
-		mRCP->setInterrupt(InterruptType::PI, PI_STATUS.get(layouts::PI_STATUS_Register::Field::DMA_COMPLETED).as<BIT>(), ESX_TRUE, 0);
-		PI_STATUS.set(layouts::PI_STATUS_Register::Field::DMA_COMPLETED, ESX_TRUE);
+		U64 cpuClocks = mRCP->getBus("Root")->getDevice<VR4300>("VR4300")->getClocks();
+
+		SchedulerEvent dmaDoneEvent = {
+				.Type = SchedulerEventType::PIDMADone,
+				.ClockStart = cpuClocks,
+				.ClockTarget = cpuClocks + 1 //RCP::RCPClocksToCPUClocks((Length / 2) * (PI_BSD_DOM1_RLS.get(layouts::PI_BSD_DOM_RLS_Register::Field::RLS).as<U32>() + 1))
+		};
+
+		Scheduler::ScheduleEvent(dmaDoneEvent);
+
+		PI_STATUS.set(layouts::PI_STATUS_Register::Field::DMA_BUSY, ESX_TRUE);
+		PI_STATUS.set(layouts::PI_STATUS_Register::Field::DMA_COMPLETED, ESX_FALSE);
 	}
 
 }

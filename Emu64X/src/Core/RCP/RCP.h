@@ -36,6 +36,10 @@ namespace esx {
 		void setInterrupt(InterruptType type, BIT prevValue, BIT newValue, U64 delay);
 		void clearInterrupt(InterruptType type);
 		BIT interruptPending();
+
+		static U64 RCPClocksToCPUClocks(U64 RCPClocks);
+		static U64 CPUClocksToRCPClocks(U64 CPUClocks);
+
 	private:
 		SharedPtr<Bus> mRoot;
 		SharedPtr<R4000> mCore;

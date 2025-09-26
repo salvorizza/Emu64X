@@ -170,4 +170,14 @@ namespace esx {
 	{
 		return mMIPSInterface->interruptPending();
 	}
+
+	U64 RCP::RCPClocksToCPUClocks(U64 RCPClocks)
+	{
+		return (RCPClocks * 3) / 2;
+	}
+
+	U64 RCP::CPUClocksToRCPClocks(U64 CPUClocks)
+	{
+		return (CPUClocks * 2) / 3;
+	}
 }

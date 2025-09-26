@@ -11,7 +11,8 @@ namespace esx {
 		GPUStartVBlank,
 		GPUEndVBlank,
 		GPUStartHBlank,
-		GPUEndHBlank
+		GPUEndHBlank,
+		PIDMADone
 	};
 
 	struct SchedulerEvent {

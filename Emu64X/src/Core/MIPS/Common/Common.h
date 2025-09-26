@@ -184,7 +184,7 @@ namespace esx {
 						mWriteBack.first = RegisterIndex(0);
 						mRegisters[0] = 0;
 					}
-					mCyclesToWait = 2;
+					mCyclesToWait = 1;
 				}
 				mCyclesToWait--;
 

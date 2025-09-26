@@ -39,6 +39,8 @@ namespace esx {
 
 		if (mRCP->interruptPending()) {
 			mCP0->generateInterrupt(Interrupt::IP2);
+		} else {
+			mCP0->clearInterrupt(Interrupt::IP2);
 		}
 		mCP0->handleInterrupts();
 	}

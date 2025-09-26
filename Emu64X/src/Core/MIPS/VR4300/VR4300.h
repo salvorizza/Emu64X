@@ -62,10 +62,19 @@ namespace esx {
 				U32 hi = mRCP->SysADLoad((physicalAddress & ~0x7) + 0, sizeof(U32) * 8);
 
 				result = (static_cast<U64>(hi) << 32) | lo;
-			} else {
+			} else if constexpr (sizeof(T) == 4) {
+				U32 output = mRCP->SysADLoad(physicalAddress, sizeof(T) * 8);
+				result = output;
+			} 
+			else if constexpr (sizeof(T) == 2) {
 				U32 output = mRCP->SysADLoad(physicalAddress, sizeof(T) * 8);
 				constexpr T mask = std::numeric_limits<T>::max();
-				result = output >> ((physicalAddress & 0x3) * 8) & mask;
+				result = (output >> ((2 - (physicalAddress & 0x2)) * 8)) & mask;
+			}
+			else if constexpr (sizeof(T) == 1) {
+				U32 output = mRCP->SysADLoad(physicalAddress, sizeof(T) * 8);
+				constexpr T mask = std::numeric_limits<T>::max();
+				result = (output >> ((3 - (physicalAddress & 0x3)) * 8)) & mask;
 			}
 
 			PRINT_IO_LOAD(physicalAddress, result);

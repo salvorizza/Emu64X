@@ -11,7 +11,7 @@ namespace esx {
 
 	void Scheduler::ScheduleEvent(const SchedulerEvent& schedulerEvent)
 	{
-		auto it = std::find_if(sEvents.begin(), sEvents.end(), [&](const SchedulerEvent& ev) { return schedulerEvent.ClockTarget < ev.ClockTarget; });
+		auto it = std::find_if(sEvents.begin(), sEvents.end(), [&](const SchedulerEvent& ev) { return schedulerEvent.ClockTarget < ev.ClockTarget || (schedulerEvent.ClockTarget == ev.ClockTarget && static_cast<U8>(schedulerEvent.Type) > static_cast<U8>(ev.Type)); });
 		if (it != sEvents.end()) {
 			sEvents.insert(it, schedulerEvent);
 		} else {

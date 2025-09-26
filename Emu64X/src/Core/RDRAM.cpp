@@ -23,13 +23,14 @@ namespace esx {
 
 	void RDRAM::store(const StringView& busName, U32 address, U32 value, U8 lowerBits, U8 accessSize)
 	{
-		U32 mask = generateMask(lowerBits, accessSize);
+		U32 mask = generateMask(lowerBits, accessSize, value);
 
 		if (address >= 0x00000000 && address <= 0x03EFFFFF) {
 			if (address < mMemory.size()) {
 				U32* ptr = reinterpret_cast<U32*>(&mMemory[address]);
 				U32 temp = _byteswap_ulong(*ptr);
-				*ptr = _byteswap_ulong((value & mask) | (temp & ~mask));
+				U32 newValue = _byteswap_ulong((value & mask) | (temp & ~mask));
+				*ptr = newValue;
 			}
 		}
 		else if (address >= 0x03F00000 && address <= 0x03FFFFFF) {
@@ -39,12 +40,10 @@ namespace esx {
 
 	void RDRAM::load(const StringView& busName, U32 address, U32& output, U8 lowerBits, U8 accessSize)
 	{
-		U32 mask = generateMask(lowerBits, accessSize);
-
 		output = 0;
 		if (address >= 0x00000000 && address <= 0x03EFFFFF) {
 			if (address < mMemory.size()) {
-				output = _byteswap_ulong(*reinterpret_cast<U32*>(&mMemory[address])) & mask;
+				output = _byteswap_ulong(*reinterpret_cast<U32*>(&mMemory[address]));
 			}
 		}
 		else if (address >= 0x03F00000 && address <= 0x03F7FFFF) {
@@ -59,16 +58,18 @@ namespace esx {
 		std::fill(mMemory.begin(), mMemory.end(), 0x00);
 	}
 
-	inline U32 RDRAM::generateMask(U8 lowerBits, U8 accessSize) const
+	inline U32 RDRAM::generateMask(U8 lowerBits, U8 accessSize, U32& output) const
 	{
 		U32 mask = 0;
 
 		switch (accessSize) {
 			case 8:
-				mask = 0xFFu << (lowerBits * 8);
+				mask = 0xFFu << ((3 - lowerBits) * 8);
+				output <<= ((3 - lowerBits) * 8);
 				break;
 			case 16:
-				mask = 0xFFFFu << (lowerBits * 8);
+				mask = 0xFFFFu << ((2 - lowerBits) * 8);
+				output <<= ((2 - lowerBits) * 8);
 				break;
 			default:
 				mask = 0xFFFFFFFFu;
