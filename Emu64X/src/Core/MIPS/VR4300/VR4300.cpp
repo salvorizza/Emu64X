@@ -754,8 +754,8 @@ namespace esx {
 		U64 am = m & ~(0x3);
 		U64 aw = load<U32>(am, exception);
 
-		U64 u = m & 0x3;
-		U64 r = (c & (0x00FFFFFF >> (u * 8))) | (aw << (24 - (u * 8)));
+		U64 u = (m & 0x3) * 8;
+		U64 r = (c & (0x00FFFFFF >> (24 - u))) | (aw << u);
 
 		if (mCP0->is64BitMode()) {
 			r = static_cast<I32>(static_cast<U32>(r));
@@ -777,10 +777,10 @@ namespace esx {
 		U64 m = a + b;
 
 		U64 am = m & ~(0x3);
-		U64 aw = load<U32>(am, exception);
+		U32 aw = load<U32>(am, exception);
 
 		U64 u = (m & 0x3) * 8;
-		U64 mr = (aw & (0xFFFFFF00 << u)) | (c >> (24 - u));
+		U32 mr = (aw & (0xFFFFFF00u << (24 - u))) | (c >> u);
 
 		store<U32>(am, mr);
 	}
@@ -800,10 +800,10 @@ namespace esx {
 		U64 m = a + b;
 
 		U64 am = m & ~(0x3);
-		U64 aw = load<U32>(am, exception);
+		U32 aw = load<U32>(am, exception);
 
-		U64 u = m & 0x3;
-		U64 r = (c & (0xFFFFFF00 << ((0x3 - u) * 8))) | (aw >> (u * 8));
+		U64 u = (m & 0x3) * 8;
+		U32 r = (c & (0xFFFFFF00u << u)) | (aw >> (24 - u));
 
 		if (mCP0->is64BitMode()) {
 			r = static_cast<I32>(static_cast<U32>(r));
@@ -827,8 +827,8 @@ namespace esx {
 		U64 am = m & ~(0x3);
 		U64 aw = load<U32>(am, exception);
 
-		U64 u = m & 0x3;
-		U64 mr = (aw & (0x00FFFFFF >> ((0x3 - u) * 8))) | (c << (u * 8));
+		U64 u = (m & 0x3) * 8;
+		U64 mr = (aw & (0x00FFFFFF >> u)) | (c << (24 - u));
 
 		store<U32>(am, mr);
 	}
@@ -1425,6 +1425,10 @@ namespace esx {
 		I64 a = getRegister(mCurrentInstruction.RegisterSource());
 		I32 o = mCurrentInstruction.ImmediateSE() << 2;
 
+		if (!mCP0->is64BitMode()) {
+			a = static_cast<I32>(static_cast<U32>(a));
+		}
+
 		if (a < 0) {
 			mNextPC += o;
 			mNextPC -= 4;
@@ -1442,17 +1446,8 @@ namespace esx {
 
 	void VR4300::BLTZAL()
 	{
-		mBranch = ESX_TRUE;
-		I64 a = getRegister(mCurrentInstruction.RegisterSource());
-		I32 o = mCurrentInstruction.ImmediateSE() << 2;
-
 		setRegister(GPRRegister::ra, mNextPC);
-
-		if (a < 0) {
-			mNextPC += o;
-			mNextPC -= 4;
-			mTookBranch = ESX_TRUE;
-		}
+		BLTZ();
 	}
 
 	void VR4300::BLTZALL()
@@ -1468,6 +1463,10 @@ namespace esx {
 		mBranch = ESX_TRUE;
 		I64 a = getRegister(mCurrentInstruction.RegisterSource());
 		I32 o = mCurrentInstruction.ImmediateSE() << 2;
+
+		if (!mCP0->is64BitMode()) {
+			a = static_cast<I32>(static_cast<U32>(a));
+		}
 
 		if (a <= 0) {
 			mNextPC += o;
@@ -1490,6 +1489,10 @@ namespace esx {
 		I64 a = getRegister(mCurrentInstruction.RegisterSource());
 		I32 o = mCurrentInstruction.ImmediateSE() << 2;
 
+		if (!mCP0->is64BitMode()) {
+			a = static_cast<I32>(static_cast<U32>(a));
+		}
+
 		if (a > 0) {
 			mNextPC += o;
 			mNextPC -= 4;
@@ -1511,6 +1514,10 @@ namespace esx {
 		I64 a = getRegister(mCurrentInstruction.RegisterSource());
 		I32 o = mCurrentInstruction.ImmediateSE() << 2;
 
+		if (!mCP0->is64BitMode()) {
+			a = static_cast<I32>(static_cast<U32>(a));
+		}
+
 		if (a >= 0) {
 			mNextPC += o;
 			mNextPC -= 4;
@@ -1528,17 +1535,8 @@ namespace esx {
 
 	void VR4300::BGEZAL()
 	{
-		mBranch = ESX_TRUE;
-		I64 a = getRegister(mCurrentInstruction.RegisterSource());
-		I32 o = mCurrentInstruction.ImmediateSE() << 2;
-
 		setRegister(GPRRegister::ra, mNextPC);
-
-		if (a >= 0) {
-			mNextPC += o;
-			mNextPC -= 4;
-			mTookBranch = ESX_TRUE;
-		}
+		BGEZ();
 	}
 
 	void VR4300::BGEZALL()
@@ -1582,6 +1580,7 @@ namespace esx {
 	{
 		ESX_CORE_LOG_ERROR("0x{:08X} Break", mCurrentInstruction.Address);
 		raiseException(ExceptionType::Breakpoint);
+		__debugbreak();
 	}
 
 	void VR4300::SYSCALL()
@@ -1786,7 +1785,24 @@ namespace esx {
 
 	void VR4300::LDC1()
 	{
-		ESX_CORE_LOG_ERROR("LDC1 not implemented yet");
+		if (!mCP0->isCoprocessorUsable(1)) {
+			raiseException(ExceptionType::CoprocessorUnusable, 1);
+			return;
+		}
+
+		BIT exception = ESX_FALSE;
+
+		U64 a = getRegister(mCurrentInstruction.RegisterSource());
+		U64 b = mCurrentInstruction.ImmediateSE();
+
+		U64 m = a + b;
+
+		U64 r = load<U64>(m, exception);
+		if (exception) {
+			r = mCP1->getRegister(mCurrentInstruction.RegisterTarget());
+		}
+
+		mCP1->setRegister(mCurrentInstruction.RegisterTarget(), r);
 	}
 
 	void VR4300::LDC2()
@@ -1801,7 +1817,26 @@ namespace esx {
 
 	void VR4300::LWC1()
 	{
-		ESX_CORE_LOG_ERROR("LWC1 not implemented yet");
+		if (!mCP0->isCoprocessorUsable(1)) {
+			raiseException(ExceptionType::CoprocessorUnusable, 1);
+			return;
+		}
+
+		BIT exception = ESX_FALSE;
+
+		U64 a = getRegister(mCurrentInstruction.RegisterSource());
+		U64 b = mCurrentInstruction.ImmediateSE();
+
+		U64 m = a + b;
+
+		U64 r = load<U32>(m, exception);
+		if (exception) {
+			r = mCP1->getRegister(mCurrentInstruction.RegisterTarget());
+		}
+
+		r |= (mCP1->getRegister(mCurrentInstruction.RegisterTarget()) & 0xFFFFFFFF00000000);
+
+		mCP1->setRegister(mCurrentInstruction.RegisterTarget(), r);
 	}
 
 	void VR4300::LWC2()
@@ -1816,7 +1851,19 @@ namespace esx {
 
 	void VR4300::SDC1()
 	{
-		ESX_CORE_LOG_ERROR("SDC1 not implemented yet");
+		if (!mCP0->isCoprocessorUsable(1)) {
+			raiseException(ExceptionType::CoprocessorUnusable, 1);
+			return;
+		}
+
+		U64 a = getRegister(mCurrentInstruction.RegisterSource());
+		U64 b = mCurrentInstruction.ImmediateSE();
+
+		U64 m = a + b;
+
+		U64 v = mCP1->getRegister(mCurrentInstruction.RegisterTarget());
+
+		store<U64>(m, v);
 	}
 
 	void VR4300::SDC2()
@@ -1831,7 +1878,19 @@ namespace esx {
 
 	void VR4300::SWC1()
 	{
-		ESX_CORE_LOG_ERROR("SWC1 not implemented yet");
+		if (!mCP0->isCoprocessorUsable(1)) {
+			raiseException(ExceptionType::CoprocessorUnusable, 1);
+			return;
+		}
+
+		U64 a = getRegister(mCurrentInstruction.RegisterSource());
+		U64 b = mCurrentInstruction.ImmediateSE();
+
+		U64 m = a + b;
+
+		U32 v = mCP1->getRegister(mCurrentInstruction.RegisterTarget());
+
+		store<U32>(m, v);
 	}
 
 	void VR4300::SWC2()

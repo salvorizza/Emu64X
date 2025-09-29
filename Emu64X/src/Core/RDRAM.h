@@ -26,7 +26,7 @@ namespace esx {
 		virtual void reset() override;
 
 	private:
-		inline U32 generateMask(U8 lowerBits, U8 accessSize, U32& output) const;
+		inline U32 generateMask(U8 lowerBits, U8 accessSize) const;
 	private:
 		Vector<U8> mMemory;
 	};

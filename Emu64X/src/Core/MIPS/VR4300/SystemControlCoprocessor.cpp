@@ -64,7 +64,7 @@ namespace esx {
 
     void SystemControlCoprocessor::unusable()
     {
-        raiseException(ExceptionType::CoprocessorUnusable);
+        raiseException(ExceptionType::CoprocessorUnusable, mNumber);
     }
 
     void SystemControlCoprocessor::reserved()
@@ -184,11 +184,11 @@ namespace esx {
         }
     }
 
-    void SystemControlCoprocessor::raiseException(ExceptionType type, U32 virtualAddress)
+    void SystemControlCoprocessor::raiseException(ExceptionType type, U32 parameter)
     {
-        if (type == ExceptionType::AddressErrorLoad || type == ExceptionType::AddressErrorStore) mBadVAddrRegister.set(layouts::BadVAddrRegister::Field::Value, virtualAddress);
+        if (type == ExceptionType::AddressErrorLoad || type == ExceptionType::AddressErrorStore) mBadVAddrRegister.set(layouts::BadVAddrRegister::Field::Value, parameter);
         mCauseRegister.set(layouts::CauseRegister::Field::ExcCode, (U8)type);
-        if(type == ExceptionType::CoprocessorUnusable) mCauseRegister.set(layouts::CauseRegister::Field::CE, 0);
+        if(type == ExceptionType::CoprocessorUnusable) mCauseRegister.set(layouts::CauseRegister::Field::CE, parameter);
 
         U32 vecOffset = 0x180;
         if (mStatusRegister.get(layouts::StatusRegister::Field::EXL).as<BIT>() == ESX_FALSE) {
@@ -481,6 +481,11 @@ namespace esx {
     void SystemControlCoprocessor::setLLAddrToLastTranslation()
     {
         mLLAddrRegister.set(layouts::LLAddrRegister::Field::Value, mLastPhysicalAddress);
+    }
+
+    BIT SystemControlCoprocessor::useAdditionalFPR()
+    {
+        return mStatusRegister.get(layouts::StatusRegister::Field::FR).as<BIT>();
     }
 
 }

@@ -23,7 +23,7 @@ namespace esx {
 
 	void RDRAM::store(const StringView& busName, U32 address, U32 value, U8 lowerBits, U8 accessSize)
 	{
-		U32 mask = generateMask(lowerBits, accessSize, value);
+		U32 mask = generateMask(lowerBits, accessSize);
 
 		if (address >= 0x00000000 && address <= 0x03EFFFFF) {
 			if (address < mMemory.size()) {
@@ -58,18 +58,16 @@ namespace esx {
 		std::fill(mMemory.begin(), mMemory.end(), 0x00);
 	}
 
-	inline U32 RDRAM::generateMask(U8 lowerBits, U8 accessSize, U32& output) const
+	inline U32 RDRAM::generateMask(U8 lowerBits, U8 accessSize) const
 	{
 		U32 mask = 0;
 
 		switch (accessSize) {
 			case 8:
 				mask = 0xFFu << ((3 - lowerBits) * 8);
-				output <<= ((3 - lowerBits) * 8);
 				break;
 			case 16:
 				mask = 0xFFFFu << ((2 - lowerBits) * 8);
-				output <<= ((2 - lowerBits) * 8);
 				break;
 			default:
 				mask = 0xFFFFFFFFu;

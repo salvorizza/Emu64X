@@ -41,7 +41,7 @@ namespace esx {
 
 	void Scheduler::ExecuteEvent()
 	{
-		const SchedulerEvent& currentFront = sEvents.front();
+		SchedulerEvent& currentFront = sEvents.front();
 
 		for (const SchedulerEventHandler& evHandler : sEventHandlers[currentFront.Type]) {
 			evHandler(currentFront);

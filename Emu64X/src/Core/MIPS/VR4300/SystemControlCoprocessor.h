@@ -152,6 +152,7 @@ namespace esx {
 	using TLB = Array<TLBEntry, 32>;
 
 	class SystemControlCoprocessor : public Coprocessor<VR4300> {
+		friend class CPUStatusPanel;
 	public:
 		SystemControlCoprocessor(VR4300* cpu);
 		~SystemControlCoprocessor() = default;
@@ -170,7 +171,7 @@ namespace esx {
 		void ERET();
 
 		void handleInterrupts();
-		void raiseException(ExceptionType type, U32 virtualAddress = 0);
+		void raiseException(ExceptionType type, U32 parameter = 0);
 		void raiseTLBException(TLBExceptionType type, U32 virtualAddress);
 
 		void watchAddress(U32 physicalAddress, BIT store);
@@ -190,6 +191,7 @@ namespace esx {
 		BIT areInterruptsPending() const;
 		BIT areInterruptsEnabled() const;
 		void setLLAddrToLastTranslation();
+		BIT useAdditionalFPR();
 	private:
 		IndexRegister      mIndexRegister;
 		RandomRegister     mRandomRegister;

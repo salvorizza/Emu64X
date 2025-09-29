@@ -87,6 +87,10 @@ namespace esx {
 			return (binaryInstruction & 0x3F);
 		}
 
+		U8 Cond() const {
+			return (binaryInstruction & 0xF);
+		}
+
 		U16 Immediate() const {
 			return (binaryInstruction & 0xFFFF);
 		}
@@ -299,6 +303,15 @@ namespace esx {
 	public:
 		MIPSInstruction<Execute> mCurrentInstruction;
 		Array<SharedPtr<ICoprocessor>, 4> mCOPs;
+		BIT mStall = ESX_FALSE;
+		BIT mBranch = ESX_FALSE;
+		BIT mBranchSlot = ESX_FALSE;
+		BIT mNullifyBranchSlot = ESX_FALSE;
+		BIT mTookBranch = ESX_FALSE;
+		BIT mTookBranchSlot = ESX_FALSE;
+		BIT mHalt = ESX_FALSE;
+		Register mNextPC = 0;
+
 	protected:
 		SharedPtr<Bus> mRootBus;
 		Array<Register, 32> mRegisters;
@@ -308,20 +321,13 @@ namespace esx {
 		Pair<RegisterIndex, Register> mWriteBack;
 
 		Register mPC = 0;
-		Register mNextPC = 0;
 		Register mCurrentPC = 0;
 		Register mCallPC = 0;
 		Register mHI = 0;
 		Register mLO = 0;
 		BIT mLLBit = ESX_FALSE;
 
-		BIT mStall = ESX_FALSE;
-		BIT mBranch = ESX_FALSE;
-		BIT mBranchSlot = ESX_FALSE;
-		BIT mNullifyBranchSlot = ESX_FALSE;
-		BIT mTookBranch = ESX_FALSE;
-		BIT mTookBranchSlot = ESX_FALSE;
-		BIT mHalt = ESX_FALSE;
+		
 
 		U64 mCycles = 0;
 		U64 mCyclesToWait = 0;
@@ -346,434 +352,553 @@ namespace esx {
 			ESX_TEXT("$ra")
 		};
 
+		constexpr static std::array<StringView, 32> fpuFmts = {
+			ESX_TEXT("unk"),ESX_TEXT("unk"),ESX_TEXT("unk"),ESX_TEXT("unk"),ESX_TEXT("unk"),ESX_TEXT("unk"),ESX_TEXT("unk"),ESX_TEXT("unk"),
+			ESX_TEXT("unk"),ESX_TEXT("unk"),ESX_TEXT("unk"),ESX_TEXT("unk"),ESX_TEXT("unk"),ESX_TEXT("unk"),ESX_TEXT("unk"),ESX_TEXT("unk"),
+			ESX_TEXT("s"),ESX_TEXT("d"),ESX_TEXT("unk"),ESX_TEXT("unk"),ESX_TEXT("w"),ESX_TEXT("l"),ESX_TEXT("unk"),ESX_TEXT("unk"),
+			ESX_TEXT("unk"),ESX_TEXT("unk"),ESX_TEXT("unk"),ESX_TEXT("unk"),ESX_TEXT("unk"),ESX_TEXT("unk"),ESX_TEXT("unk"),ESX_TEXT("unk")
+		};
+
 		switch (Opcode()) {
 			//R Type
-		case 0x00: {
-			switch (Function()) {
 			case 0x00: {
-				return FormatString(ESX_TEXT("sll {},{},0x{:02x}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], ShiftAmount());
-			}
-			case 0x02: {
-				return FormatString(ESX_TEXT("srl {},{},0x{:02x}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], ShiftAmount());
-			}
-			case 0x03: {
-				return FormatString(ESX_TEXT("sra {},{},0x{:02x}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], ShiftAmount());
-			}
-			case 0x04: {
-				return FormatString(ESX_TEXT("sllv {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()]);
-			}
-			case 0x06: {
-				return FormatString(ESX_TEXT("srlv {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()]);
-			}
-			case 0x07: {
-				return FormatString(ESX_TEXT("srav {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()]);
-			}
-			case 0x08: {
-				return FormatString(ESX_TEXT("jr {}"), registersMnemonics[(U8)RegisterSource()]);
-			}
-			case 0x09: {
-				return FormatString(ESX_TEXT("jalr {},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()]);
-			}
-			case 0x0C: {
-				return FormatString(ESX_TEXT("syscall"));
-			}
-			case 0x0D: {
-				return FormatString(ESX_TEXT("break"));
-			}
-			case 0x0F: {
-				return FormatString(ESX_TEXT("sync"));
-			}
-			case 0x10: {
-				return FormatString(ESX_TEXT("mfhi {}"), registersMnemonics[(U8)RegisterDestination()]);
-			}
-			case 0x11: {
-				return FormatString(ESX_TEXT("mthi {}"), registersMnemonics[(U8)RegisterSource()]);
-			}
-			case 0x12: {
-				return FormatString(ESX_TEXT("mflo {}"), registersMnemonics[(U8)RegisterDestination()]);
-			}
-			case 0x13: {
-				return FormatString(ESX_TEXT("mtlo {}"), registersMnemonics[(U8)RegisterSource()]);
-			}
-			case 0x14: {
-				return FormatString(ESX_TEXT("dsllv {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()]);
-			}
-			case 0x16: {
-				return FormatString(ESX_TEXT("dsrlv {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()]);
-			}
-			case 0x17: {
-				return FormatString(ESX_TEXT("dsrav {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()]);
-			}
-			case 0x18: {
-				return FormatString(ESX_TEXT("mult {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-			}
-			case 0x19: {
-				return FormatString(ESX_TEXT("multu {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-			}
-			case 0x1A: {
-				return FormatString(ESX_TEXT("div {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-			}
-			case 0x1B: {
-				return FormatString(ESX_TEXT("divu {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-			}
-			case 0x1C: {
-				return FormatString(ESX_TEXT("dmult {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-			}
-			case 0x1D: {
-				return FormatString(ESX_TEXT("dmultu {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-			}
-			case 0x1E: {
-				return FormatString(ESX_TEXT("ddiv {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-			}
-			case 0x1F: {
-				return FormatString(ESX_TEXT("ddivu {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-			}
-			case 0x20: {
-				if (RegisterTarget().Value == 0) {
-					return FormatString(ESX_TEXT("move {},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()]);
-				}
-				else {
-					return FormatString(ESX_TEXT("add {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-				}
-			}
-			case 0x21: {
-				if (RegisterTarget().Value == 0) {
-					return FormatString(ESX_TEXT("move {},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()]);
-				}
-				else {
-					return FormatString(ESX_TEXT("addu {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-				}
-			}
-			case 0x22: {
-				return FormatString(ESX_TEXT("sub {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-			}
-			case 0x23: {
-				return FormatString(ESX_TEXT("subu {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-			}
-			case 0x24: {
-				return FormatString(ESX_TEXT("and {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-			}
-			case 0x25: {
-				return FormatString(ESX_TEXT("or {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-			}
-			case 0x26: {
-				return FormatString(ESX_TEXT("xor {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-			}
-			case 0x27: {
-				return FormatString(ESX_TEXT("nor {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-			}
-			case 0x2A: {
-				return FormatString(ESX_TEXT("slt {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-			}
-			case 0x2B: {
-				return FormatString(ESX_TEXT("sltu {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-			}
-			case 0x2C: {
-				if (RegisterTarget().Value == 0) {
-					return FormatString(ESX_TEXT("dmove {},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()]);
-				}
-				else {
-					return FormatString(ESX_TEXT("dadd {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-				}
-			}
-			case 0x2D: {
-				if (RegisterTarget().Value == 0) {
-					return FormatString(ESX_TEXT("dmove {},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()]);
-				}
-				else {
-					return FormatString(ESX_TEXT("daddu {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-				}
-			}
-			case 0x2E: {
-				return FormatString(ESX_TEXT("dsub {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-			}
-			case 0x2F: {
-				return FormatString(ESX_TEXT("dsubu {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-			}
-			case 0x30: {
-				return FormatString(ESX_TEXT("tge {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-			}
-			case 0x31: {
-				return FormatString(ESX_TEXT("tgeu {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-			}
-			case 0x32: {
-				return FormatString(ESX_TEXT("tlt {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-			}
-			case 0x33: {
-				return FormatString(ESX_TEXT("tltu {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-			}
-			case 0x34: {
-				return FormatString(ESX_TEXT("teq {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-			}
-			case 0x36: {
-				return FormatString(ESX_TEXT("tne {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
-			}
-			case 0x38: {
-				return FormatString(ESX_TEXT("dsll {},{},0x{:02x}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], ShiftAmount());
-			}
-			case 0x3A: {
-				return FormatString(ESX_TEXT("dsrl {},{},0x{:02x}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], ShiftAmount());
-			}
-			case 0x3B: {
-				return FormatString(ESX_TEXT("dsra {},{},0x{:02x}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], ShiftAmount());
-			}
-			case 0x3C: {
-				return FormatString(ESX_TEXT("dsll32 {},{},0x{:02x}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], ShiftAmount());
-			}
-			case 0x3E: {
-				return FormatString(ESX_TEXT("dsrl32 {},{},0x{:02x}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], ShiftAmount());
-			}
-			case 0x3F: {
-				return FormatString(ESX_TEXT("dsra32 {},{},0x{:02x}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], ShiftAmount());
-			}
-			}
-
-			break;
-		}
-
-				 //J Type
-		case 0x02: {
-			return FormatString(ESX_TEXT("j 0x{:08x}"), ((Address + 4) & 0xF0000000) | (PseudoAddress() << 2));
-		}
-		case 0x03: {
-			return FormatString(ESX_TEXT("jal 0x{:08x}"), ((Address + 4) & 0xF0000000) | (PseudoAddress() << 2));
-		}
-
-		default: {
-			switch (Opcode()) {
-			case 0x01: {
-				switch (RegisterTarget().Value) {
-				case 0x00: {
-					return FormatString(ESX_TEXT("bltz {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
-				}
-				case 0x01: {
-					return FormatString(ESX_TEXT("bgez {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
-				}
-				case 0x02: {
-					return FormatString(ESX_TEXT("bltzl {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
-				}
-				case 0x03: {
-					return FormatString(ESX_TEXT("bgezl {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
-				}
-				case 0x08: {
-					return FormatString(ESX_TEXT("tgei {},,0x{:04x}"), registersMnemonics[(U8)RegisterSource()], (I16)Immediate());
-				}
-				case 0x09: {
-					return FormatString(ESX_TEXT("tgeiu {},,0x{:04x}"), registersMnemonics[(U8)RegisterSource()], Immediate());
-				}
-				case 0x0A: {
-					return FormatString(ESX_TEXT("tlti {},,0x{:04x}"), registersMnemonics[(U8)RegisterSource()], (I16)Immediate());
-				}
-				case 0x0B: {
-					return FormatString(ESX_TEXT("tltiu {},,0x{:04x}"), registersMnemonics[(U8)RegisterSource()], Immediate());
-				}
-				case 0x0C: {
-					return FormatString(ESX_TEXT("teqi {},,0x{:04x}"), registersMnemonics[(U8)RegisterSource()], (I16)Immediate());
-				}
-				case 0x0E: {
-					return FormatString(ESX_TEXT("tnei {},,0x{:04x}"), registersMnemonics[(U8)RegisterSource()], (I16)Immediate());
-				}
-				case 0x10: {
-					return FormatString(ESX_TEXT("bltzal {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
-				}
-				case 0x11: {
-					return FormatString(ESX_TEXT("bgezal {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
-				}
-				case 0x12: {
-					return FormatString(ESX_TEXT("bltzall {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
-				}
-				case 0x13: {
-					return FormatString(ESX_TEXT("bgezall {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
-				}
+				switch (Function()) {
+					case 0x00: {
+						return FormatString(ESX_TEXT("sll {},{},0x{:02x}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], ShiftAmount());
+					}
+					case 0x02: {
+						return FormatString(ESX_TEXT("srl {},{},0x{:02x}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], ShiftAmount());
+					}
+					case 0x03: {
+						return FormatString(ESX_TEXT("sra {},{},0x{:02x}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], ShiftAmount());
+					}
+					case 0x04: {
+						return FormatString(ESX_TEXT("sllv {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()]);
+					}
+					case 0x06: {
+						return FormatString(ESX_TEXT("srlv {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()]);
+					}
+					case 0x07: {
+						return FormatString(ESX_TEXT("srav {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()]);
+					}
+					case 0x08: {
+						return FormatString(ESX_TEXT("jr {}"), registersMnemonics[(U8)RegisterSource()]);
+					}
+					case 0x09: {
+						return FormatString(ESX_TEXT("jalr {},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()]);
+					}
+					case 0x0C: {
+						return FormatString(ESX_TEXT("syscall"));
+					}
+					case 0x0D: {
+						return FormatString(ESX_TEXT("break"));
+					}
+					case 0x0F: {
+						return FormatString(ESX_TEXT("sync"));
+					}
+					case 0x10: {
+						return FormatString(ESX_TEXT("mfhi {}"), registersMnemonics[(U8)RegisterDestination()]);
+					}
+					case 0x11: {
+						return FormatString(ESX_TEXT("mthi {}"), registersMnemonics[(U8)RegisterSource()]);
+					}
+					case 0x12: {
+						return FormatString(ESX_TEXT("mflo {}"), registersMnemonics[(U8)RegisterDestination()]);
+					}
+					case 0x13: {
+						return FormatString(ESX_TEXT("mtlo {}"), registersMnemonics[(U8)RegisterSource()]);
+					}
+					case 0x14: {
+						return FormatString(ESX_TEXT("dsllv {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()]);
+					}
+					case 0x16: {
+						return FormatString(ESX_TEXT("dsrlv {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()]);
+					}
+					case 0x17: {
+						return FormatString(ESX_TEXT("dsrav {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()]);
+					}
+					case 0x18: {
+						return FormatString(ESX_TEXT("mult {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
+					}
+					case 0x19: {
+						return FormatString(ESX_TEXT("multu {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
+					}
+					case 0x1A: {
+						return FormatString(ESX_TEXT("div {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
+					}
+					case 0x1B: {
+						return FormatString(ESX_TEXT("divu {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
+					}
+					case 0x1C: {
+						return FormatString(ESX_TEXT("dmult {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
+					}
+					case 0x1D: {
+						return FormatString(ESX_TEXT("dmultu {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
+					}
+					case 0x1E: {
+						return FormatString(ESX_TEXT("ddiv {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
+					}
+					case 0x1F: {
+						return FormatString(ESX_TEXT("ddivu {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
+					}
+					case 0x20: {
+						if (RegisterTarget().Value == 0) {
+							return FormatString(ESX_TEXT("move {},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()]);
+						}
+						else {
+							return FormatString(ESX_TEXT("add {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
+						}
+					}
+					case 0x21: {
+						if (RegisterTarget().Value == 0) {
+							return FormatString(ESX_TEXT("move {},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()]);
+						}
+						else {
+							return FormatString(ESX_TEXT("addu {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
+						}
+					}
+					case 0x22: {
+						return FormatString(ESX_TEXT("sub {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
+					}
+					case 0x23: {
+						return FormatString(ESX_TEXT("subu {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
+					}
+					case 0x24: {
+						return FormatString(ESX_TEXT("and {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
+					}
+					case 0x25: {
+						return FormatString(ESX_TEXT("or {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
+					}
+					case 0x26: {
+						return FormatString(ESX_TEXT("xor {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
+					}
+					case 0x27: {
+						return FormatString(ESX_TEXT("nor {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
+					}
+					case 0x2A: {
+						return FormatString(ESX_TEXT("slt {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
+					}
+					case 0x2B: {
+						return FormatString(ESX_TEXT("sltu {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
+					}
+					case 0x2C: {
+						if (RegisterTarget().Value == 0) {
+							return FormatString(ESX_TEXT("dmove {},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()]);
+						}
+						else {
+							return FormatString(ESX_TEXT("dadd {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
+						}
+					}
+					case 0x2D: {
+						if (RegisterTarget().Value == 0) {
+							return FormatString(ESX_TEXT("dmove {},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()]);
+						}
+						else {
+							return FormatString(ESX_TEXT("daddu {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
+						}
+					}
+					case 0x2E: {
+						return FormatString(ESX_TEXT("dsub {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
+					}
+					case 0x2F: {
+						return FormatString(ESX_TEXT("dsubu {},{},{}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
+					}
+					case 0x30: {
+						return FormatString(ESX_TEXT("tge {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
+					}
+					case 0x31: {
+						return FormatString(ESX_TEXT("tgeu {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
+					}
+					case 0x32: {
+						return FormatString(ESX_TEXT("tlt {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
+					}
+					case 0x33: {
+						return FormatString(ESX_TEXT("tltu {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
+					}
+					case 0x34: {
+						return FormatString(ESX_TEXT("teq {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
+					}
+					case 0x36: {
+						return FormatString(ESX_TEXT("tne {},{}"), registersMnemonics[(U8)RegisterSource()], registersMnemonics[(U8)RegisterTarget()]);
+					}
+					case 0x38: {
+						return FormatString(ESX_TEXT("dsll {},{},0x{:02x}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], ShiftAmount());
+					}
+					case 0x3A: {
+						return FormatString(ESX_TEXT("dsrl {},{},0x{:02x}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], ShiftAmount());
+					}
+					case 0x3B: {
+						return FormatString(ESX_TEXT("dsra {},{},0x{:02x}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], ShiftAmount());
+					}
+					case 0x3C: {
+						return FormatString(ESX_TEXT("dsll32 {},{},0x{:02x}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], ShiftAmount());
+					}
+					case 0x3E: {
+						return FormatString(ESX_TEXT("dsrl32 {},{},0x{:02x}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], ShiftAmount());
+					}
+					case 0x3F: {
+						return FormatString(ESX_TEXT("dsra32 {},{},0x{:02x}"), registersMnemonics[(U8)RegisterDestination()], registersMnemonics[(U8)RegisterTarget()], ShiftAmount());
+					}
 				}
 
 				break;
 			}
-			case 0x04: {
-				return FormatString(ESX_TEXT("beq {},{},0x{:08x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
+
+					 //J Type
+			case 0x02: {
+				return FormatString(ESX_TEXT("j 0x{:08x}"), ((Address + 4) & 0xF0000000) | (PseudoAddress() << 2));
 			}
-			case 0x05: {
-				return FormatString(ESX_TEXT("bne {},{},0x{:08x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
+			case 0x03: {
+				return FormatString(ESX_TEXT("jal 0x{:08x}"), ((Address + 4) & 0xF0000000) | (PseudoAddress() << 2));
 			}
-			case 0x06: {
-				return FormatString(ESX_TEXT("blez {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
-			}
-			case 0x07: {
-				return FormatString(ESX_TEXT("bgtz {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
-			}
-			case 0x08: {
-				return FormatString(ESX_TEXT("addi {},{},0x{:04x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], (I16)Immediate());
-			}
-			case 0x09: {
-				return FormatString(ESX_TEXT("addiu {},{},0x{:04x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], (I16)Immediate());
-			}
-			case 0x0A: {
-				return FormatString(ESX_TEXT("slti {},{},0x{:04x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], (I16)Immediate());
-			}
-			case 0x0B: {
-				return FormatString(ESX_TEXT("sltiu {},{},0x{:04x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], (I16)Immediate());
-			}
-			case 0x0C: {
-				return FormatString(ESX_TEXT("andi {},{},0x{:04x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], Immediate());
-			}
-			case 0x0D: {
-				return FormatString(ESX_TEXT("ori {},{},0x{:04x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], Immediate());
-			}
-			case 0x0E: {
-				return FormatString(ESX_TEXT("xori {},{},0x{:04x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], Immediate());
-			}
-			case 0x0F: {
-				return FormatString(ESX_TEXT("lui {},0x{:04x}"), registersMnemonics[(U8)RegisterTarget()], Immediate());
-			}
-			case 0x10:
-			case 0x11:
-			case 0x12:
-			case 0x13: {
-				U8 cpn = COP_N(binaryInstruction);
-				if (COP(binaryInstruction) == 0) {
-					switch (RegisterSource().Value) {
-					case 0x00: {
-						return FormatString(ESX_TEXT("mfc{} {},${}"), cpn, registersMnemonics[(U8)RegisterTarget()], (U8)RegisterDestination());
-					}
-					case 0x02: {
-						return FormatString(ESX_TEXT("cfc{} {},${}"), cpn, registersMnemonics[(U8)RegisterTarget()], (U8)RegisterDestination());
+
+			default: {
+				switch (Opcode()) {
+					case 0x01: {
+						switch (RegisterTarget().Value) {
+							case 0x00: {
+								return FormatString(ESX_TEXT("bltz {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
+							}
+							case 0x01: {
+								return FormatString(ESX_TEXT("bgez {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
+							}
+							case 0x02: {
+								return FormatString(ESX_TEXT("bltzl {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
+							}
+							case 0x03: {
+								return FormatString(ESX_TEXT("bgezl {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
+							}
+							case 0x08: {
+								return FormatString(ESX_TEXT("tgei {},,0x{:04x}"), registersMnemonics[(U8)RegisterSource()], (I16)Immediate());
+							}
+							case 0x09: {
+								return FormatString(ESX_TEXT("tgeiu {},,0x{:04x}"), registersMnemonics[(U8)RegisterSource()], Immediate());
+							}
+							case 0x0A: {
+								return FormatString(ESX_TEXT("tlti {},,0x{:04x}"), registersMnemonics[(U8)RegisterSource()], (I16)Immediate());
+							}
+							case 0x0B: {
+								return FormatString(ESX_TEXT("tltiu {},,0x{:04x}"), registersMnemonics[(U8)RegisterSource()], Immediate());
+							}
+							case 0x0C: {
+								return FormatString(ESX_TEXT("teqi {},,0x{:04x}"), registersMnemonics[(U8)RegisterSource()], (I16)Immediate());
+							}
+							case 0x0E: {
+								return FormatString(ESX_TEXT("tnei {},,0x{:04x}"), registersMnemonics[(U8)RegisterSource()], (I16)Immediate());
+							}
+							case 0x10: {
+								return FormatString(ESX_TEXT("bltzal {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
+							}
+							case 0x11: {
+								return FormatString(ESX_TEXT("bgezal {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
+							}
+							case 0x12: {
+								return FormatString(ESX_TEXT("bltzall {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
+							}
+							case 0x13: {
+								return FormatString(ESX_TEXT("bgezall {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
+							}
+						}
+
+						break;
 					}
 					case 0x04: {
-						return FormatString(ESX_TEXT("mtc{} {},${}"), cpn, registersMnemonics[(U8)RegisterTarget()], (U8)RegisterDestination());
+						return FormatString(ESX_TEXT("beq {},{},0x{:08x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
+					}
+					case 0x05: {
+						return FormatString(ESX_TEXT("bne {},{},0x{:08x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
 					}
 					case 0x06: {
-						return FormatString(ESX_TEXT("ctc{} {},${}"), cpn, registersMnemonics[(U8)RegisterTarget()], (U8)RegisterDestination());
+						return FormatString(ESX_TEXT("blez {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
+					}
+					case 0x07: {
+						return FormatString(ESX_TEXT("bgtz {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
 					}
 					case 0x08: {
-						switch (RegisterTarget()) {
-						case 0: return FormatString(ESX_TEXT("bc{}f 0x{:04x}"), cpn, Immediate());
-						case 1: return FormatString(ESX_TEXT("bc{}t 0x{:04x}"), cpn, Immediate());
-						}
+						return FormatString(ESX_TEXT("addi {},{},0x{:04x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], (I16)Immediate());
 					}
+					case 0x09: {
+						return FormatString(ESX_TEXT("addiu {},{},0x{:04x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], (I16)Immediate());
 					}
-				}
-				else {
-					switch (cpn) {
-					case 0: {
-						switch (COP_FUNC(binaryInstruction)) {
-						case 0x10: {
-							return FormatString(ESX_TEXT("rfe"));
+					case 0x0A: {
+						return FormatString(ESX_TEXT("slti {},{},0x{:04x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], (I16)Immediate());
+					}
+					case 0x0B: {
+						return FormatString(ESX_TEXT("sltiu {},{},0x{:04x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], (I16)Immediate());
+					}
+					case 0x0C: {
+						return FormatString(ESX_TEXT("andi {},{},0x{:04x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], Immediate());
+					}
+					case 0x0D: {
+						return FormatString(ESX_TEXT("ori {},{},0x{:04x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], Immediate());
+					}
+					case 0x0E: {
+						return FormatString(ESX_TEXT("xori {},{},0x{:04x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], Immediate());
+					}
+					case 0x0F: {
+						return FormatString(ESX_TEXT("lui {},0x{:04x}"), registersMnemonics[(U8)RegisterTarget()], Immediate());
+					}
+					case 0x10:
+					case 0x11:
+					case 0x12:
+					case 0x13: {
+						U8 cpn = COP_N(binaryInstruction);
+						if (COP(binaryInstruction) == 0) {
+							switch (RegisterSource().Value) {
+								case 0x00: {
+									return FormatString(ESX_TEXT("mfc{} {},${}"), cpn, registersMnemonics[(U8)RegisterTarget()], (U8)RegisterDestination());
+								}
+								case 0x01: {
+									return FormatString(ESX_TEXT("dmfc{} {},${}"), cpn, registersMnemonics[(U8)RegisterTarget()], (U8)RegisterDestination());
+								}
+								case 0x02: {
+									return FormatString(ESX_TEXT("cfc{} {},${}"), cpn, registersMnemonics[(U8)RegisterTarget()], (U8)RegisterDestination());
+								}
+								case 0x04: {
+									return FormatString(ESX_TEXT("mtc{} {},${}"), cpn, registersMnemonics[(U8)RegisterTarget()], (U8)RegisterDestination());
+								}
+								case 0x05: {
+									return FormatString(ESX_TEXT("dmtc{} {},${}"), cpn, registersMnemonics[(U8)RegisterTarget()], (U8)RegisterDestination());
+								}
+								case 0x06: {
+									return FormatString(ESX_TEXT("ctc{} {},${}"), cpn, registersMnemonics[(U8)RegisterTarget()], (U8)RegisterDestination());
+								}
+								case 0x08: {
+									switch (RegisterTarget()) {
+										case 0: return FormatString(ESX_TEXT("bc{}f 0x{:04x}"), cpn, Immediate());
+										case 1: return FormatString(ESX_TEXT("bc{}t 0x{:04x}"), cpn, Immediate());
+										case 2: return FormatString(ESX_TEXT("bc{}fl 0x{:04x}"), cpn, Immediate());
+										case 3: return FormatString(ESX_TEXT("bc{}tl 0x{:04x}"), cpn, Immediate());
+									}
+								}
+							}
 						}
+						else {
+							switch (cpn) {
+								case 0: {
+									switch (CoprocessorFunction()) {
+										case 1: {
+											return FormatString(ESX_TEXT("tlbr"));
+										}
+
+										case 2: {
+											return FormatString(ESX_TEXT("tlbwi"));
+										}
+
+										case 6: {
+											return FormatString(ESX_TEXT("tlbwr"));
+										}
+
+										case 8: {
+											return FormatString(ESX_TEXT("tlbp"));
+										}
+
+										case 16: {
+											break;
+										}
+
+										case 24: {
+											return FormatString(ESX_TEXT("eret"));
+										}
+									}
+									break;
+								}
+
+								case 1: {
+									switch (Function()) {
+										case 0: {
+											return FormatString(ESX_TEXT("add.{} ${},${},${}"), fpuFmts[RegisterSource().Value], ShiftAmount(), RegisterDestination().Value, RegisterTarget().Value);
+										}
+										case 1: {
+											return FormatString(ESX_TEXT("sub.{} ${},${},${}"), fpuFmts[RegisterSource().Value], ShiftAmount(), RegisterDestination().Value, RegisterTarget().Value);
+										}
+										case 2: {
+											return FormatString(ESX_TEXT("mul.{} ${},${},${}"), fpuFmts[RegisterSource().Value], ShiftAmount(), RegisterDestination().Value, RegisterTarget().Value);
+										}
+										case 3: {
+											return FormatString(ESX_TEXT("div.{} ${},${},${}"), fpuFmts[RegisterSource().Value], ShiftAmount(), RegisterDestination().Value, RegisterTarget().Value);
+										}
+										case 4: {
+											return FormatString(ESX_TEXT("sqrt.{} ${},${},${}"), fpuFmts[RegisterSource().Value], ShiftAmount(), RegisterDestination().Value, RegisterTarget().Value);
+										}
+										case 5: {
+											return FormatString(ESX_TEXT("abs.{} ${},${},${}"), fpuFmts[RegisterSource().Value], ShiftAmount(), RegisterDestination().Value, RegisterTarget().Value);
+										}
+										case 6: {
+											return FormatString(ESX_TEXT("mov.{} ${},${}"), fpuFmts[RegisterSource().Value], ShiftAmount(), RegisterDestination().Value);
+										}
+										case 7: {
+											return FormatString(ESX_TEXT("neg.{} ${},${}"), fpuFmts[RegisterSource().Value], ShiftAmount(), RegisterDestination().Value);
+										}
+										case 8: {
+											return FormatString(ESX_TEXT("round.l.{} ${},${}"), fpuFmts[RegisterSource().Value], ShiftAmount(), RegisterDestination().Value);
+										}
+										case 9: {
+											return FormatString(ESX_TEXT("trunc.l.{} ${},${}"), fpuFmts[RegisterSource().Value], ShiftAmount(), RegisterDestination().Value);
+										}
+										case 10: {
+											return FormatString(ESX_TEXT("ceil.l.{} ${},${}"), fpuFmts[RegisterSource().Value], ShiftAmount(), RegisterDestination().Value);
+										}
+										case 11: {
+											return FormatString(ESX_TEXT("floor.l.{} ${},${}"), fpuFmts[RegisterSource().Value], ShiftAmount(), RegisterDestination().Value);
+										}
+										case 12: {
+											return FormatString(ESX_TEXT("round.w.{} ${},${}"), fpuFmts[RegisterSource().Value], ShiftAmount(), RegisterDestination().Value);
+										}
+										case 13: {
+											return FormatString(ESX_TEXT("trunc.w.{} ${},${}"), fpuFmts[RegisterSource().Value], ShiftAmount(), RegisterDestination().Value);
+										}
+										case 14: {
+											return FormatString(ESX_TEXT("ceil.w.{} ${},${}"), fpuFmts[RegisterSource().Value], ShiftAmount(), RegisterDestination().Value);
+										}
+										case 15: {
+											return FormatString(ESX_TEXT("floor.w.{} ${},${}"), fpuFmts[RegisterSource().Value], ShiftAmount(), RegisterDestination().Value);
+										}
+										case 32: {
+											return FormatString(ESX_TEXT("cvt.s.{} ${},${}"), fpuFmts[RegisterSource().Value], ShiftAmount(), RegisterDestination().Value);
+										}
+										case 33: {
+											return FormatString(ESX_TEXT("cvt.d.{} ${},${}"), fpuFmts[RegisterSource().Value], ShiftAmount(), RegisterDestination().Value);
+										}
+										case 36: {
+											return FormatString(ESX_TEXT("cvt.w.{} ${},${}"), fpuFmts[RegisterSource().Value], ShiftAmount(), RegisterDestination().Value);
+										}
+										case 37: {
+											return FormatString(ESX_TEXT("cvt.l.{} ${},${}"), fpuFmts[RegisterSource().Value], ShiftAmount(), RegisterDestination().Value);
+										}
+										case 48:
+										case 49:
+										case 50:
+										case 51:
+										case 52:
+										case 53:
+										case 54:
+										case 55:
+										case 56:
+										case 57:
+										case 58:
+										case 59:
+										case 60:
+										case 61:
+										case 62:
+										case 63: {
+											return FormatString(ESX_TEXT("c.cond.{} ${},${}"), fpuFmts[RegisterSource().Value], RegisterDestination().Value, RegisterTarget().Value);
+										}
+									}
+									break;
+								}
+
+								case 2: {
+									return FormatString(ESX_TEXT("cop2 0x{:08x}"), Immediate25());
+								}
+							}
 						}
 						break;
 					}
 
-					case 2: {
-						return FormatString(ESX_TEXT("cop2 0x{:08x}"), Immediate25());
+					case 0x14: {
+						return FormatString(ESX_TEXT("beql {},{},0x{:08x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
 					}
+					case 0x15: {
+						return FormatString(ESX_TEXT("bnel {},{},0x{:08x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
+					}
+					case 0x16: {
+						return FormatString(ESX_TEXT("blezl {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
+					}
+					case 0x17: {
+						return FormatString(ESX_TEXT("bgtzl {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
+					}
+					case 0x20: {
+						return FormatString(ESX_TEXT("lb {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
+					}
+					case 0x21: {
+						return FormatString(ESX_TEXT("lh {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
+					}
+					case 0x22: {
+						return FormatString(ESX_TEXT("lwl {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
+					}
+					case 0x23: {
+						return FormatString(ESX_TEXT("lw {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
+					}
+					case 0x24: {
+						return FormatString(ESX_TEXT("lbu {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
+					}
+					case 0x25: {
+						return FormatString(ESX_TEXT("lhu {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
+					}
+					case 0x26: {
+						return FormatString(ESX_TEXT("lwr {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
+					}
+					case 0x27: {
+						return FormatString(ESX_TEXT("lwu {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
+					}
+					case 0x28: {
+						return FormatString(ESX_TEXT("sb {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
+					}
+					case 0x29: {
+						return FormatString(ESX_TEXT("sh {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
+					}
+					case 0x2A: {
+						return FormatString(ESX_TEXT("swl {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
+					}
+					case 0x2B: {
+						return FormatString(ESX_TEXT("sw {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
+					}
+					case 0x2C: {
+						return FormatString(ESX_TEXT("sdl {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
+					}
+					case 0x2D: {
+						return FormatString(ESX_TEXT("sdr {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
+					}
+					case 0x2E: {
+						return FormatString(ESX_TEXT("swr {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
+					}
+					case 0x2F: {
+						return FormatString(ESX_TEXT("cache"));
+					}
+
+
+					case 0x30:
+					case 0x31:
+					case 0x32: {
+						U8 cpn = COP_N(binaryInstruction);
+						return FormatString(ESX_TEXT("lwc{} ${},0x{:08x}"), cpn, (U8)RegisterTarget(), cpuState->getRegister(RegisterSource()) + ImmediateSE());
+						break;
+					}
+
+					case 0x34:
+					case 0x35:
+					case 0x36: {
+						U8 cpn = COP_N(binaryInstruction);
+						return FormatString(ESX_TEXT("ldc{} ${},0x{:08x}"), cpn, (U8)RegisterTarget(), cpuState->getRegister(RegisterSource()) + ImmediateSE());
+						break;
+					}
+
+					case 0x37: {
+						return FormatString(ESX_TEXT("ld {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
+					}
+
+					case 0x38:
+					case 0x39:
+					case 0x3A: {
+						U8 cpn = COP_N(binaryInstruction);
+						return FormatString(ESX_TEXT("swc{} ${},0x{:08x}"), cpn, (U8)RegisterTarget(), cpuState->getRegister(RegisterSource()) + ImmediateSE());
+						break;
+					}
+
+					case 0x3C:
+					case 0x3D:
+					case 0x3E: {
+						U8 cpn = COP_N(binaryInstruction);
+						return FormatString(ESX_TEXT("sdc{} ${},0x{:08x}"), cpn, (U8)RegisterTarget(), cpuState->getRegister(RegisterSource()) + ImmediateSE());
+						break;
+					}
+
+					case 0x3F: {
+						return FormatString(ESX_TEXT("sd {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
 					}
 				}
-				break;
 			}
-
-			case 0x14: {
-				return FormatString(ESX_TEXT("beql {},{},0x{:08x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
-			}
-			case 0x15: {
-				return FormatString(ESX_TEXT("bnel {},{},0x{:08x}"), registersMnemonics[(U8)RegisterTarget()], registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
-			}
-			case 0x16: {
-				return FormatString(ESX_TEXT("blezl {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
-			}
-			case 0x17: {
-				return FormatString(ESX_TEXT("bgtzl {},0x{:08x}"), registersMnemonics[(U8)RegisterSource()], (Address + 4) + (ImmediateSE() << 2));
-			}
-			case 0x20: {
-				return FormatString(ESX_TEXT("lb {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-			}
-			case 0x21: {
-				return FormatString(ESX_TEXT("lh {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-			}
-			case 0x22: {
-				return FormatString(ESX_TEXT("lwl {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-			}
-			case 0x23: {
-				return FormatString(ESX_TEXT("lw {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-			}
-			case 0x24: {
-				return FormatString(ESX_TEXT("lbu {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-			}
-			case 0x25: {
-				return FormatString(ESX_TEXT("lhu {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-			}
-			case 0x26: {
-				return FormatString(ESX_TEXT("lwr {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-			}
-			case 0x27: {
-				return FormatString(ESX_TEXT("lwu {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-			}
-			case 0x28: {
-				return FormatString(ESX_TEXT("sb {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-			}
-			case 0x29: {
-				return FormatString(ESX_TEXT("sh {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-			}
-			case 0x2A: {
-				return FormatString(ESX_TEXT("swl {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-			}
-			case 0x2B: {
-				return FormatString(ESX_TEXT("sw {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-			}
-			case 0x2C: {
-				return FormatString(ESX_TEXT("sdl {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-			}
-			case 0x2D: {
-				return FormatString(ESX_TEXT("sdr {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-			}
-			case 0x2E: {
-				return FormatString(ESX_TEXT("swr {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-			}
-			case 0x2F: {
-				return FormatString(ESX_TEXT("cache"));
-			}
-
-
-			case 0x30:
-			case 0x31:
-			case 0x32: {
-				U8 cpn = COP_N(binaryInstruction);
-				return FormatString(ESX_TEXT("lwc{} ${},0x{:08x}"), cpn, registersMnemonics[(U8)RegisterTarget()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-				break;
-			}
-
-			case 0x34:
-			case 0x35:
-			case 0x36: {
-				U8 cpn = COP_N(binaryInstruction);
-				return FormatString(ESX_TEXT("ldc{} ${},0x{:08x}"), cpn, registersMnemonics[(U8)RegisterTarget()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-				break;
-			}
-
-			case 0x37: {
-				return FormatString(ESX_TEXT("ld {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-			}
-
-			case 0x38:
-			case 0x39:
-			case 0x3A: {
-				U8 cpn = COP_N(binaryInstruction);
-				return FormatString(ESX_TEXT("swc{} ${},0x{:08x}"), cpn, registersMnemonics[(U8)RegisterTarget()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-				break;
-			}
-
-			case 0x3C:
-			case 0x3D:
-			case 0x3E: {
-				U8 cpn = COP_N(binaryInstruction);
-				return FormatString(ESX_TEXT("sdc{} ${},0x{:08x}"), cpn, registersMnemonics[(U8)RegisterTarget()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-				break;
-			}
-
-			case 0x3F: {
-				return FormatString(ESX_TEXT("sd {},{}({}) [0x{:08x}]"), registersMnemonics[(U8)RegisterTarget()], (I32)ImmediateSE(), registersMnemonics[(U8)RegisterSource()], cpuState->getRegister(RegisterSource()) + ImmediateSE());
-			}
-			}
-		}
 		}
 
 		return FormatString(ESX_TEXT("0x{:08x}"), binaryInstruction);

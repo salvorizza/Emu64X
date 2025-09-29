@@ -68,7 +68,7 @@ namespace esx {
 		};
 
 		enum class TabItem {
-			CPU,CP0
+			CPU,CP0,CP1
 		};
 
 		static TabItem tabItem = TabItem::CPU;
@@ -82,6 +82,11 @@ namespace esx {
 
 			if (ImGui::BeginTabItem("CP0")) {
 				tabItem = TabItem::CP0;
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("CP1")) {
+				tabItem = TabItem::CP1;
 				ImGui::EndTabItem();
 			}
 		}
@@ -141,6 +146,62 @@ namespace esx {
 						ImGui::Text("0x%016llX", mInstance->mCP0->getRegister(RegisterIndex(i)));
 					}
 					
+				}
+				ImGui::EndTable();
+				break;
+			}
+
+			case TabItem::CP1: {
+				static int selected_fmt = U8(FormatSpec::Reserved);
+
+				ImGui::RadioButton("raw hex", &selected_fmt, U8(FormatSpec::Reserved));
+				ImGui::RadioButton("single", &selected_fmt, U8(FormatSpec::S));
+				ImGui::SameLine();
+				ImGui::RadioButton("double", &selected_fmt, U8(FormatSpec::D));
+				ImGui::RadioButton("word", &selected_fmt, U8(FormatSpec::W));
+				ImGui::SameLine();
+				ImGui::RadioButton("long", &selected_fmt, U8(FormatSpec::L));
+
+				if (ImGui::BeginTable("CP1StatusTable", 3, ImGuiTableFlags_SizingStretchSame | ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Hideable)) {
+					ImGui::TableSetupColumn("Register", ImGuiTableColumnFlags_WidthFixed, availWidth * 0.30f);
+					ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, availWidth * 0.50f);
+					ImGui::TableHeadersRow();
+
+					for (int i = 0; i < 32; i++) {
+						ImGui::TableNextRow();
+						ImGui::TableNextColumn();
+						ImGui::Text("FGR%d",i);
+						ImGui::TableNextColumn();
+
+						switch (FormatSpec(selected_fmt)) {
+							case FormatSpec::S: {
+								ImGui::Text("%f", *reinterpret_cast<float*>(&mInstance->mCP1->FGR[i]));
+								break;
+							}
+
+							case FormatSpec::D: {
+								ImGui::Text("%f", *reinterpret_cast<double*>(&mInstance->mCP1->FGR[i]));
+								break;
+							}
+
+							case FormatSpec::W: {
+								ImGui::Text("%d", static_cast<U32>(mInstance->mCP1->FGR[i]));
+								break;
+							}
+
+							case FormatSpec::L: {
+								ImGui::Text("%lld", mInstance->mCP1->FGR[i]);
+								break;
+							}
+
+							case FormatSpec::Reserved: {
+								ImGui::Text("0x%016llX", mInstance->mCP1->FGR[i]);
+							}
+							
+
+						}
+					}
+
 				}
 				ImGui::EndTable();
 				break;

@@ -97,7 +97,11 @@ namespace esx {
 			PRINT_STORE(physicalAddress, value);
 			PRINT_IO_STORE(physicalAddress,value);
 
-			value <<= (physicalAddress & 0x3) * 8;
+			if constexpr (sizeof(T) == 2) {
+				value <<= ((2 - (physicalAddress & 0x2)) * 8);
+			} else if constexpr (sizeof(T) == 1) {
+				value <<= ((3 - (physicalAddress & 0x3)) * 8);
+			}
 
 			if constexpr (sizeof(T) == 8) {
 				mRCP->SysADStore((physicalAddress & ~0x7) + 4, sizeof(T) * 8, value);

@@ -71,13 +71,32 @@ namespace esx {
                 SP_STATUS_Write_Register writeReg;
                 writeReg.write(value);
 
-                if (writeReg.get(layouts::SP_STATUS_Write_Register::Field::CLR_HALT).as<BIT>() == ESX_TRUE) mCPU->setHalt(ESX_FALSE);
-                if (writeReg.get(layouts::SP_STATUS_Write_Register::Field::SET_HALT).as<BIT>() == ESX_TRUE) mCPU->setHalt(ESX_TRUE);
-                if (writeReg.get(layouts::SP_STATUS_Write_Register::Field::CLR_BROKE).as<BIT>() == ESX_TRUE) SP_STATUS.set(layouts::SP_STATUS_Register::Field::BROKE, ESX_FALSE);
-                if (writeReg.get(layouts::SP_STATUS_Write_Register::Field::CLR_SSTEP).as<BIT>() == ESX_TRUE) SP_STATUS.set(layouts::SP_STATUS_Register::Field::SSTEP, ESX_FALSE);
-                if (writeReg.get(layouts::SP_STATUS_Write_Register::Field::SET_SSTEP).as<BIT>() == ESX_TRUE) SP_STATUS.set(layouts::SP_STATUS_Register::Field::SSTEP, ESX_TRUE);
-                if (writeReg.get(layouts::SP_STATUS_Write_Register::Field::CLR_INTBREAK).as<BIT>() == ESX_TRUE) SP_STATUS.set(layouts::SP_STATUS_Register::Field::INTBREAK, ESX_FALSE);
-                if (writeReg.get(layouts::SP_STATUS_Write_Register::Field::SET_INTBREAK).as<BIT>() == ESX_TRUE) SP_STATUS.set(layouts::SP_STATUS_Register::Field::INTBREAK, ESX_TRUE);
+                if (writeReg.get(layouts::SP_STATUS_Write_Register::Field::CLR_HALT).as<BIT>() == ESX_TRUE) 
+                    mCPU->setHalt(ESX_FALSE);
+
+                if (writeReg.get(layouts::SP_STATUS_Write_Register::Field::SET_HALT).as<BIT>() == ESX_TRUE) 
+                    mCPU->setHalt(ESX_TRUE);
+
+                if (writeReg.get(layouts::SP_STATUS_Write_Register::Field::CLR_BROKE).as<BIT>() == ESX_TRUE) 
+                    SP_STATUS.set(layouts::SP_STATUS_Register::Field::BROKE, ESX_FALSE);
+
+                if (writeReg.get(layouts::SP_STATUS_Write_Register::Field::CLR_SSTEP).as<BIT>() == ESX_TRUE) 
+                    SP_STATUS.set(layouts::SP_STATUS_Register::Field::SSTEP, ESX_FALSE);
+
+                if (writeReg.get(layouts::SP_STATUS_Write_Register::Field::SET_INTR).as<BIT>() == ESX_TRUE)
+                    mRCP->setInterrupt(InterruptType::SP, ESX_FALSE, ESX_TRUE, 0);
+
+                if (writeReg.get(layouts::SP_STATUS_Write_Register::Field::CLR_INTR).as<BIT>() == ESX_TRUE) 
+                    mRCP->clearInterrupt(InterruptType::SP);
+
+                if (writeReg.get(layouts::SP_STATUS_Write_Register::Field::SET_SSTEP).as<BIT>() == ESX_TRUE) 
+                    SP_STATUS.set(layouts::SP_STATUS_Register::Field::SSTEP, ESX_TRUE);
+
+                if (writeReg.get(layouts::SP_STATUS_Write_Register::Field::CLR_INTBREAK).as<BIT>() == ESX_TRUE)
+                    SP_STATUS.set(layouts::SP_STATUS_Register::Field::INTBREAK, ESX_FALSE);
+
+                if (writeReg.get(layouts::SP_STATUS_Write_Register::Field::SET_INTBREAK).as<BIT>() == ESX_TRUE)
+                    SP_STATUS.set(layouts::SP_STATUS_Register::Field::INTBREAK, ESX_TRUE);
 
                 U16 clrSetSig = writeReg.get(layouts::SP_STATUS_Write_Register::Field::CLR_SET_SIG).as<U16>();
                 U8 sig = SP_STATUS.get(layouts::SP_STATUS_Register::Field::SIG).as<U8>();
@@ -97,6 +116,8 @@ namespace esx {
             }
 
             case ScalarUnitRegisterType::c7:    SP_SEMAPHORE.write(value); break;
+            default: ESX_CORE_LOG_WARNING("SU {} not implemented", reg.Value);
+              
         }
     }
 

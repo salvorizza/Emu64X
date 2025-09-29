@@ -46,6 +46,9 @@ namespace esx {
 		input.close();
 
 		mPIF_RAM.resize(0x40);
+
+		mJoybusAddr.resize(5);
+		mJoybusStatus.resize(5);
 	}
 
 	void SIExternalBus::load(const StringView& busName, U32 address, U32& output, U8 lowerBits, U8 accessSize)
@@ -79,29 +82,46 @@ namespace esx {
 			};
 
 			if (commandByte != 0) {
-				manageCommand(PIF_CommandBits::TerminateBootProcess, 
+				commandByte &= ~(static_cast<U8>(PIF_CommandBits::Complete));
+
+				manageCommand(PIF_CommandBits::TerminateBootProcess,
 					[&]() {
+						ESX_CORE_LOG_INFO("PIF TerminateBootProcess received");
 					}
 				);
 
-				manageCommand(PIF_CommandBits::ROMLockout, 
+				manageCommand(PIF_CommandBits::ROMLockout,
 					[&]() {
 						mLockPIF_ROM = ESX_TRUE; 
 					}
 				);
 
-				manageCommand(PIF_CommandBits::AcquireChecksum, 
+				manageCommand(PIF_CommandBits::AcquireChecksum,
 					[&]() { 
 						mAcquiredChecksum = _byteswap_uint64(*reinterpret_cast<U64*>(&mPIF_RAM[0x30]));  
-						commandByte |= static_cast<U8>(PIF_CommandBits::Complete); 
+						*reinterpret_cast<U64*>(&mPIF_RAM[0x30]) = 0;
+
+						commandByte |= static_cast<U8>(PIF_CommandBits::Complete);
 					}
 				);
 
-				manageCommand(PIF_CommandBits::RunChecksum, 
+				manageCommand(PIF_CommandBits::RunChecksum,
 					[&]() {
 						if (mAcquiredChecksum != sCICData.at(mCIC).IPL2Checksum) {
-							//TODO: Halt CPU using NMI
+							ESX_CORE_LOG_ERROR("PIF different checksum Acquired => {:016x}h, IPL2Checksum => {:016x}h halt not implemented yet.", mAcquiredChecksum, sCICData.at(mCIC).IPL2Checksum);
 						}
+					}
+				);
+
+				manageCommand(PIF_CommandBits::ConfigureJoybusFrame,
+					[&]() {
+						ParseJoybusFrame();
+					}
+				);
+
+				manageCommand(PIF_CommandBits::Challenge,
+					[&]() {
+						ESX_CORE_LOG_WARNING("PIF Challenge not implemented yet");
 					}
 				);
 
@@ -129,6 +149,115 @@ namespace esx {
 	void SIExternalBus::setCIC(CIC cic)
 	{
 		mCIC = cic;
+	}
+
+	void SIExternalBus::ParseJoybusFrame()
+	{
+		std::fill(mJoybusStatus.begin(), mJoybusStatus.end(), (U8)JoybusStatus::Skip);
+
+		U8 nibble = 0;
+		U8 nChannels = 0;
+
+		do {
+			U8 tx = mPIF_RAM[nibble / 2];
+
+			if (tx == 0xFE) {
+				break;
+			}
+
+			if (tx == 0xFD) {
+				mJoybusStatus[nChannels] |= ((U8)JoybusStatus::Reset);
+			}
+
+			if (tx == 0xFF || tx == 0xFD || tx == 0x00) {
+				nibble += 2;
+				if (!nibble) {
+					break;
+				}
+
+				if (tx != 0xFF)
+					++nChannels;
+			}
+			else {
+				mJoybusAddr[nChannels] = nibble / 2;
+				mJoybusStatus[nChannels] &= ~((U8)JoybusStatus::Skip);
+				++nChannels;
+
+				BIT returnValue = ESX_FALSE;
+				U8 address = nibble;
+
+				U8 send = mPIF_RAM[address / 2] & 0x3F;
+				address += 2;
+				if (!address) {
+					returnValue = ESX_TRUE;
+				}
+
+				if (returnValue == ESX_FALSE) {
+					U8 recv = mPIF_RAM[address / 2] & 0x3F;
+					U8 count = send;
+					count += recv;
+					count += count;
+
+					U16 next = address + count + 2;
+					if (next >= (mPIF_RAM.size() * 2)) {
+						returnValue = ESX_TRUE;
+					}
+
+					if (returnValue == ESX_FALSE) {
+						nibble = next;
+					}
+				}
+
+				if (returnValue == ESX_TRUE) {
+					nChannels--;
+					mJoybusStatus[nChannels] &= ~((U8)JoybusStatus::Reset);
+					mJoybusStatus[nChannels] |= ((U8)JoybusStatus::Skip);
+					break;
+				}
+			}
+		} while (nChannels != 5);
+	}
+
+	void SIExternalBus::ExecuteJoybusFrame()
+	{
+		for (I32 nChannel = 0; nChannel < 5; nChannel++) {
+			if ((mJoybusStatus[nChannel] & static_cast<U8>(JoybusStatus::Reset)) != 0) {
+				ESX_CORE_LOG_WARNING("JoybusFrame Reset not implemented yet");
+			}
+
+			if ((mJoybusStatus[nChannel] & static_cast<U8>(JoybusStatus::Skip)) != 0) {
+				continue;
+			}
+
+			U8 addr = mJoybusAddr[nChannel];
+
+			U8 tx = mPIF_RAM[addr++];
+			U8 rx = mPIF_RAM[addr++];
+			if (tx > 0) {
+				U8 command = mPIF_RAM[addr++];
+				Span<U8> parameters;
+				if (tx > 1) {
+					parameters = Span<U8>(mPIF_RAM.begin() + addr, mPIF_RAM.begin() + addr + (tx - 1));
+					addr += (tx - 1);
+				}
+
+				switch (command) {
+					case 0xFF:
+					case 0x00: {
+						for (I32 i = 0; i < rx; i++) {
+							mPIF_RAM[addr++] = 0x00;
+						}
+						break;
+					}
+
+					default: {
+						ESX_CORE_LOG_WARNING("JoybusFrame tx => {:02x}h not implemented yet", tx);
+						break;
+					}
+				}
+			}
+
+		}
 	}
 
 }

@@ -12,7 +12,8 @@ namespace esx {
 		GPUEndVBlank,
 		GPUStartHBlank,
 		GPUEndHBlank,
-		PIDMADone
+		PIDMADone,
+		SIDMADone
 	};
 
 	struct SchedulerEvent {
@@ -22,16 +23,20 @@ namespace esx {
 		BIT Reschedule = ESX_FALSE;
 		U64 RescheduleClocks = 0;
 		Vector<U8> UserData = {};
+		U8 ReadPointer = 0;
 
 		template<typename T>
 		void Write(const T& Data) {
-			UserData.resize(sizeof(T));
-			std::memcpy(UserData.data(), reinterpret_cast<const U8*>(&Data), sizeof(T));
+			size_t writeP = UserData.size();
+			UserData.resize(UserData.size() + sizeof(T));
+			std::memcpy(UserData.data() + writeP, reinterpret_cast<const U8*>(&Data), sizeof(T));
 		}
 
 		template<typename T>
-		const T& Read() const {
-			return *reinterpret_cast<const T*>(UserData.data());
+		T Read() {
+			T value = *reinterpret_cast<const T*>(UserData.data() + ReadPointer);
+			ReadPointer += sizeof(T);
+			return value;
 		}
 	};
 
@@ -39,7 +44,7 @@ namespace esx {
 		bool operator()(const SchedulerEvent& l, const SchedulerEvent& r) const { return l.ClockTarget > r.ClockTarget || (l.ClockTarget == r.ClockTarget && static_cast<U8>(l.Type) > static_cast<U8>(r.Type)); }
 	};
 
-	using SchedulerEventHandler = Function<void(const SchedulerEvent&)>;
+	using SchedulerEventHandler = Function<void(SchedulerEvent&)>;
 	using SchedulerEventContainer = Deque<SchedulerEvent>;
 	using SchedulerEventHandlerContainer = UnorderedMap<SchedulerEventType, Vector<SchedulerEventHandler>>;
 

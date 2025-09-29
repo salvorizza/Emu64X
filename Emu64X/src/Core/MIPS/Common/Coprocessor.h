@@ -24,6 +24,7 @@ namespace esx {
 
 		virtual U64 getRegister(RegisterIndex reg) = 0;
 		virtual void setRegister(RegisterIndex reg, U64 value) = 0;
+		virtual BIT COC() = 0;
 		virtual void unusable() = 0;
 		virtual void reserved() = 0;
 		virtual void signalBreak() = 0;
@@ -145,19 +146,39 @@ namespace esx {
 		}
 
 		void BCF() override {
-			unusable();
+			mCPU->mBranch = ESX_TRUE;
+			I32 o = mCPU->mCurrentInstruction.ImmediateSE() << 2;
+
+			if (COC() == ESX_FALSE) {
+				mCPU->mNextPC += o;
+				mCPU->mNextPC -= 4;
+				mCPU->mTookBranch = ESX_TRUE;
+			}
 		}
 
 		void BCT() override {
-			unusable();
+			mCPU->mBranch = ESX_TRUE;
+			I32 o = mCPU->mCurrentInstruction.ImmediateSE() << 2;
+
+			if (COC() == ESX_TRUE) {
+				mCPU->mNextPC += o;
+				mCPU->mNextPC -= 4;
+				mCPU->mTookBranch = ESX_TRUE;
+			}
 		}
 
 		void BCFL() override {
-			unusable();
+			BCF();
+			if (mCPU->mTookBranch == ESX_FALSE) {
+				mCPU->mNullifyBranchSlot = ESX_TRUE;
+			}
 		}
 
 		void BCTL() override {
-			unusable();
+			BCT();
+			if (mCPU->mTookBranch == ESX_FALSE) {
+				mCPU->mNullifyBranchSlot = ESX_TRUE;
+			}
 		}
 
 		void CO() override {
@@ -166,6 +187,7 @@ namespace esx {
 
 		U64 getRegister(RegisterIndex reg) override { return 0; }
 		void setRegister(RegisterIndex reg, U64 value) override {}
+		BIT COC() override { return ESX_FALSE; }
 
 		void unusable() override {}
 		void reserved() override {}
@@ -188,8 +210,8 @@ namespace esx {
 		}
 	protected:
 		Processor* mCPU;
-	private:
 		U8 mNumber;
+	private:
 		Pair<RegisterIndex, U64> mPendingLoad;
 		Pair<RegisterIndex, U64> mMemoryLoad;
 	};
