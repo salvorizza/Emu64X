@@ -14,30 +14,31 @@ namespace esx {
 
 	DisassemblerPanel::DisassemblerPanel()
 		:	Panel("Disassembler", false),
-			mInstance(nullptr),
-			mDebugState(DebugState::Idle),
-			mPrevDebugState(DebugState::None),
-			mScrollToCurrent(false)
+			mInstance(nullptr)
 	{
+		mDisassemblerStates[DisassemblerProc::VR4300] = {};
+		mDisassemblerStates[DisassemblerProc::RSP] = {};
 	}
 
 	DisassemblerPanel::~DisassemblerPanel()
 	{
 	}
 
-	bool DisassemblerPanel::breakFunction(U32 address)
+	bool DisassemblerPanel::breakFunction()
 	{
 		switch (mDebugState) {
 			case DebugState::Running:
-				if (mBreakpoints.size() > 0) {
-					auto it = std::find_if(mBreakpoints.begin(), mBreakpoints.end(), [&](Breakpoint& b) { return Bus::toPhysicalAddress(b.PhysAddress) == Bus::toPhysicalAddress(address) && b.Enabled; });
-					return it != mBreakpoints.end();
+				for (auto& [k,state] : mDisassemblerStates) {
+					if (state.mBreakpoints.size() > 0) {
+						auto it = std::find_if(state.mBreakpoints.begin(), state.mBreakpoints.end(), [&](Breakpoint& b) { return Bus::toPhysicalAddress(b.PhysAddress) == getCurrentInstancePC() && b.Enabled; });
+						return it != state.mBreakpoints.end();
+					}
 				}
 				return false;
 
 			case DebugState::Step:
 			case DebugState::StepOver:
-				return Bus::toPhysicalAddress(mInstance->mPC) == mNextPC;
+				return getCurrentInstancePC() == getDisassemblerState().mNextPC;
 		}
 
 		return false;
@@ -46,6 +47,8 @@ namespace esx {
 
 	void DisassemblerPanel::onUpdate()
 	{
+		auto& state = getDisassemblerState();
+
 		switch (mDebugState) {
 			case DebugState::Start:
 				setDebugState(DebugState::Running);
@@ -54,44 +57,40 @@ namespace esx {
 			case DebugState::StepOver:
 			case DebugState::Step:
 			case DebugState::Running: {
-				while (Scheduler::HasEvents() == ESX_FALSE) {
-					if (breakFunction(mInstance->mPC)) {
-						mScrollToCurrent = true;
-						mCurrent = Bus::toPhysicalAddress(mInstance->mPC);
-						mNextPC = Bus::toPhysicalAddress(mInstance->mNextPC);
-						setDebugState(DebugState::Breakpoint);
-						break;
-					}
+				//U64 clockStart = mInstance->getClocks();
 
-					mInstance->clock();
-				}
-
-				if (Scheduler::HasEvents()) {
-					while (mInstance->getClocks() < Scheduler::NextEvent().ClockTarget) {
-						if (breakFunction(mInstance->mPC)) {
-							mScrollToCurrent = true;
-							mCurrent = Bus::toPhysicalAddress(mInstance->mPC);
-							mNextPC = Bus::toPhysicalAddress(mInstance->mNextPC);
+				BIT newFrameAvailable = ESX_FALSE;
+				while (newFrameAvailable == ESX_FALSE) {
+					while (Scheduler::HasEvents() == ESX_FALSE || mInstance->getClocks() < Scheduler::NextEvent().ClockTarget) {
+						if (breakFunction()) {
+							state.mScrollToCurrent = true;
+							state.mCurrent = getTrueCurrentInstancePC();
+							state.mNextPC = getCurrentInstanceNextPC();
 							setDebugState(DebugState::Breakpoint);
 							break;
 						}
 
 						mInstance->clock();
+
+						if (mDebugState == DebugState::Breakpoint) {
+							break;
+						}
 					}
 
-					if (mInstance->getClocks() >= Scheduler::NextEvent().ClockTarget) {
-						Scheduler::ExecuteEvent();
-						Scheduler::Progress();
+
+					if (mDebugState == DebugState::Breakpoint) {
+						break;
 					}
+
+					if (Scheduler::NextEvent().Type == SchedulerEventType::GPUFrameStart) {
+						newFrameAvailable = ESX_TRUE;
+					}
+
+					Scheduler::ExecuteEvent();
+					Scheduler::Progress();
 				}
-
-
-				if (mDebugState == DebugState::Breakpoint) {
-					break;
-				}
-				/*U64 endClocks = mInstance->getClocks();
-				ESX_CORE_LOG_TRACE("{}", endClocks - startClocks);*/
-
+				/*U64 clockEnd = mInstance->getClocks();
+				ESX_CORE_LOG_TRACE("Emu FPS: {}", 93750000.0f / (clockEnd - clockStart));*/
 				break;
 			}
 
@@ -107,6 +106,22 @@ namespace esx {
 
 	void DisassemblerPanel::onImGuiRender()
 	{
+
+		if (ImGui::BeginTabBar("SelectProcessor"))
+		{
+			if (ImGui::BeginTabItem("VR4300")) {
+				mCurrentDisassemblerProc = DisassemblerProc::VR4300;
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("RSP")) {
+				mCurrentDisassemblerProc = DisassemblerProc::RSP;
+				ImGui::EndTabItem();
+			}
+		}
+		ImGui::EndTabBar();
+
+		auto& state = getDisassemblerState();
 
 		float availWidth = ImGui::GetContentRegionAvail().x;
 		float oneCharSize = ImGui::CalcTextSize("A").x;
@@ -130,8 +145,8 @@ namespace esx {
 			if (ImGui::Button(ICON_FA_ARROWS_TURN_DOWN)) onStepOver();
 			ImGui::SameLine();
 			if (ImGui::Button(ICON_FA_GOLF_BALL)) {
-				mScrollToCurrent = true;
-				mCurrent = Bus::toPhysicalAddress(mInstance->mPC);
+				state.mScrollToCurrent = true;
+				state.mCurrent = getTrueCurrentInstancePC();
 			}
 		}
 		
@@ -159,34 +174,7 @@ namespace esx {
 				break;
 		}
 
-
-		U32 baseAddress = 0x00000000;
-		U32 adressingSize = 0x03F80000;
-		if (ImGui::BeginTabBar("SelectDisassembleRom"))
-		{
-			if (ImGui::BeginTabItem("Instructions")) {
-				baseAddress = 0x00000000;
-				adressingSize = 0x03F80000;
-				ImGui::EndTabItem();
-			}
-			if (ImGui::BeginTabItem("Bios")) {
-				baseAddress = 0x1FC00000;
-				adressingSize = 0x000007C0;
-				ImGui::EndTabItem();
-			}
-			if (ImGui::BeginTabItem("IMEM")) {
-				baseAddress = 0x04001000;
-				adressingSize = 0x00001000;
-				ImGui::EndTabItem();
-			}
-			if (ImGui::BeginTabItem("DMEM")) {
-				baseAddress = 0x04000000;
-				adressingSize = 0x00001000;
-				ImGui::EndTabItem();
-			}
-
-			ImGui::EndTabBar();
-		}
+		auto [baseAddress, adressingSize] = getDisassemblerState().mAdressingFunc();
 
 		static bool p_open = true;
 		float sizeY = ImGui::GetContentRegionAvail().y;
@@ -203,41 +191,32 @@ namespace esx {
 
 				ImGuiListClipper clipper;
 				clipper.Begin(numInstructions);
-				if (mScrollToCurrent) {
+				if (state.mScrollToCurrent) {
 					U32 index = 0;
 					
-					index = (mCurrent - Bus::toPhysicalAddress(baseAddress)) / 4;
+					index = (state.mCurrent - Bus::toPhysicalAddress(baseAddress)) / 4;
 
 					clipper.ForceDisplayRangeByIndices(index, index + 1);
 				}
 				while (clipper.Step())
 				{
 					for (int row = clipper.DisplayStart; row < clipper.DisplayEnd; row++) {
-						esx::VR4300Instruction cpuInstruction;
-						
 						U32 physAddress = baseAddress + row * 4;
 						U32 translatedAddress = physAddress;
 
-						U32 opcode = mInstance->getBus(ESX_TEXT("Root"))->load(physAddress, 0, sizeof(U32));
-						mInstance->decode(cpuInstruction, opcode, physAddress, ESX_TRUE);
-
-						Instruction instruction;
-						instruction.Address = translatedAddress;
-						instruction.Mnemonic = cpuInstruction.Mnemonic(mInstance);
-
-						//Instruction instruction = mInstructions[row];
-
+						Instruction instruction = state.mDecodeFunc(&physAddress);
+						
 						U32 address = Bus::toPhysicalAddress(instruction.Address);
-						auto breakpointIt = std::find_if(mBreakpoints.begin(), mBreakpoints.end(), [&](Breakpoint& b) { return b.PhysAddress == address && b.Enabled; });
-						BIT breakpointFound = breakpointIt != mBreakpoints.end();
+						auto breakpointIt = std::find_if(state.mBreakpoints.begin(), state.mBreakpoints.end(), [&](Breakpoint& b) { return b.PhysAddress == physAddress && b.Enabled; });
+						BIT breakpointFound = breakpointIt != state.mBreakpoints.end();
 
 						ImGui::TableNextRow();
-						if (mScrollToCurrent && address == mCurrent) {
+						if (state.mScrollToCurrent && address == state.mCurrent) {
 							ImGui::SetScrollHereY(0.75);
-							mScrollToCurrent = false;
+							state.mScrollToCurrent = false;
 						}
 
-						if (mDebugState != DebugState::Idle && address == Bus::toPhysicalAddress(mInstance->mPC)) {
+						if (mDebugState != DebugState::Idle && physAddress == getCurrentInstancePC()) {
 							ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, IM_COL32(230, 100, 120, 125));
 							ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, IM_COL32(180, 50, 70, 125));
 						}
@@ -250,13 +229,13 @@ namespace esx {
 						ImGui::PushID(address);
 						if (ImGui::Button(ICON_FA_CIRCLE)) {
 							if (breakpointFound) {
-								mBreakpoints.erase(breakpointIt);
+								state.mBreakpoints.erase(breakpointIt);
 							} else {
 								Breakpoint breakpoint = {};
 								breakpoint.Enabled = ESX_TRUE;
 								breakpoint.Address = address;
-								breakpoint.PhysAddress = address;
-								mBreakpoints.push_back(breakpoint);
+								breakpoint.PhysAddress = physAddress;
+								state.mBreakpoints.push_back(breakpoint);
 							}
 						}
 						ImGui::PopID();
@@ -288,7 +267,7 @@ namespace esx {
 		}
 
 		if (ImGui::Button(ICON_FA_PLUS)) {
-			mBreakpoints.emplace(mBreakpoints.begin());
+			getDisassemblerState().mBreakpoints.emplace(state.mBreakpoints.begin());
 		}
 
 		sizeY = ImGui::GetContentRegionAvail().y;
@@ -303,7 +282,7 @@ namespace esx {
 				I64 indexToDelete = -1;
 				int i = 0;
 				static char addressBuffer[32];
-				for (auto& breakpoint : mBreakpoints) {
+				for (auto& breakpoint : state.mBreakpoints) {
 					ImGui::TableNextRow();
 
 					ImGui::TableNextColumn();
@@ -323,7 +302,7 @@ namespace esx {
 						U32 addr;
 						if (sscanf_s(addressBuffer, "0x%08X", &addr) == 1 || sscanf_s(addressBuffer, "%08X", &addr) == 1) {
 							breakpoint.Address = addr;
-							breakpoint.PhysAddress = Bus::toPhysicalAddress(breakpoint.Address);
+							breakpoint.PhysAddress = mCurrentDisassemblerProc == DisassemblerProc::VR4300 ? Bus::toPhysicalAddress(breakpoint.Address) : (0x04001000 + breakpoint.Address);
 						}
 					}
 					ImGui::PopID();
@@ -341,34 +320,13 @@ namespace esx {
 
 
 				if (indexToDelete != -1) {
-					mBreakpoints.erase(mBreakpoints.begin() + indexToDelete);
+					getDisassemblerState().mBreakpoints.erase(state.mBreakpoints.begin() + indexToDelete);
 				}
 
 				ImGui::EndTable();
 			}
 		}
 		ImGui::EndChild();
-	}
-
-	void DisassemblerPanel::disassemble(uint32_t startAddress, size_t size){
-		esx::VR4300Instruction cpuInstruction;
-
-		mInstructions.clear();
-		for (U32 address = startAddress; address < startAddress + size; address +=4) {
-			U32 physAddress = address & SEGS_MASKS[address >> 29];
-
-			if ((physAddress >= 0x00000000 && physAddress <= KIBI(2048)) || (physAddress >= 0x1FC00000 && physAddress < 0x1FC00000 + KIBI(512))) {
-
-				U32 opcode = mInstance->getBus(ESX_TEXT("Root"))->load(physAddress, 0, sizeof(U32));
-				mInstance->decode(cpuInstruction, opcode, physAddress, ESX_TRUE);
-
-				Instruction instruction;
-				instruction.Address = address;
-				instruction.Mnemonic = cpuInstruction.Mnemonic(mInstance);
-				mInstructions.push_back(instruction);
-			}
-
-		}
 	}
 
 	void DisassemblerPanel::onPlay() {
@@ -386,27 +344,34 @@ namespace esx {
 	}
 
 	void DisassemblerPanel::onPause() {
+		auto& state = getDisassemblerState();
+
 		setDebugState(DebugState::Breakpoint);
 		//disassemble(mInstance->mPC - 4 * disassembleRange, 4 * disassembleRange * 2);
-		mScrollToCurrent = true;
-		mCurrent = Bus::toPhysicalAddress(mInstance->mPC);
+		state.mScrollToCurrent = true;
+		state.mCurrent = getTrueCurrentInstancePC();
 	}
 
 	void DisassemblerPanel::onStepForward() {
+		auto& state = getDisassemblerState();
+
 		if (mDebugState == DebugState::Breakpoint) {
 			setDebugState(DebugState::Step);
-			mScrollToCurrent = true;
-			mCurrent = Bus::toPhysicalAddress(mInstance->mPC);
+			state.mScrollToCurrent = true;
+			state.mCurrent = getTrueCurrentInstancePC();
+			state.mNextPC = getCurrentInstanceNextPC();
 		}
 	}
 
 	void DisassemblerPanel::onStepOver()
 	{
+		auto& state = getDisassemblerState();
+
 		if (mDebugState == DebugState::Breakpoint) {
-			mNextPC = Bus::toPhysicalAddress(mInstance->mPC + 4);
+			state.mNextPC = getCurrentInstancePC() + 4;
 			setDebugState(DebugState::StepOver);
-			mScrollToCurrent = true;
-			mCurrent = Bus::toPhysicalAddress(mInstance->mPC);
+			state.mScrollToCurrent = true;
+			state.mCurrent = getTrueCurrentInstancePC();
 		}
 	}
 

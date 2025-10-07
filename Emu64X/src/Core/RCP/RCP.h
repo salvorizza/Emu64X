@@ -17,6 +17,7 @@ namespace esx {
 
 	class RCP : public BusDevice {
 		friend class MemoryEditorPanel;
+		friend class R4000;
 	public:
 		RCP();
 		~RCP();
@@ -40,6 +41,7 @@ namespace esx {
 		static U64 RCPClocksToCPUClocks(U64 RCPClocks);
 		static U64 CPUClocksToRCPClocks(U64 CPUClocks);
 
+		SharedPtr<R4000>& getCore() { return mRSP->getCore(); }
 	private:
 		SharedPtr<Bus> mRoot;
 		SharedPtr<R4000> mCore;

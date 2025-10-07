@@ -67,34 +67,76 @@ namespace esx {
 			"*Garbage*",
 		};
 
-		enum class TabItem {
-			CPU,CP0,CP1
+		constexpr static const char* R4000_cop0RegistersMnemonics[] = {
+			"SP_DMA_SPADDR",
+			"SP_DMA_RAMADDR",
+			"SP_DMA_RDLEN",
+			"SP_DMA_WRLEN",
+			"SP_STATUS",
+			"SP_DMA_FULL",
+			"SP_DMA_BUSY",
+			"SP_SEMAPHORE"
 		};
 
+		enum class TabItemProc {
+			VR4300, RSP
+		};
+
+		enum class TabItem {
+			CPU, CP0, CP1
+		};
+
+		static TabItemProc tabItemProc = TabItemProc::VR4300;
 		static TabItem tabItem = TabItem::CPU;
+		static TabItem R4000tabItem = TabItem::CPU;
+
+		if (ImGui::BeginTabBar("SelectProcessor"))
+		{
+			if (ImGui::BeginTabItem("VR4300")) {
+				tabItemProc = TabItemProc::VR4300;
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("RSP")) {
+				tabItemProc = TabItemProc::RSP;
+				ImGui::EndTabItem();
+			}
+		}
+		ImGui::EndTabBar();
 
 		if (ImGui::BeginTabBar("SelectCoprocessor"))
 		{
 			if (ImGui::BeginTabItem("CPU")) {
-				tabItem = TabItem::CPU;
+				if (tabItemProc == TabItemProc::VR4300) {
+					tabItem = TabItem::CPU;
+				} else {
+					R4000tabItem = TabItem::CPU;
+				}
 				ImGui::EndTabItem();
 			}
 
 			if (ImGui::BeginTabItem("CP0")) {
-				tabItem = TabItem::CP0;
+				if (tabItemProc == TabItemProc::VR4300) {
+					tabItem = TabItem::CP0;
+				} else {
+					R4000tabItem = TabItem::CP0;
+				}
 				ImGui::EndTabItem();
 			}
 
-			if (ImGui::BeginTabItem("CP1")) {
-				tabItem = TabItem::CP1;
-				ImGui::EndTabItem();
+			if (tabItemProc == TabItemProc::VR4300) {
+				if (ImGui::BeginTabItem("CP1")) {
+					tabItem = TabItem::CP1;
+					ImGui::EndTabItem();
+				}
 			}
 		}
 		ImGui::EndTabBar();
 
 		float availWidth = ImGui::GetContentRegionAvail().x;
 
-		switch (tabItem) {
+		TabItem currentItem = tabItemProc == TabItemProc::VR4300 ? tabItem : R4000tabItem;
+		switch (currentItem) {
 			case TabItem::CPU: {
 				if (ImGui::BeginTable("CPUStatusTable", 3, ImGuiTableFlags_SizingStretchSame | ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Hideable)) {
 					ImGui::TableSetupColumn("GPR", ImGuiTableColumnFlags_WidthFixed, availWidth * 0.15f);
@@ -106,26 +148,38 @@ namespace esx {
 						ImGui::TableNextColumn();
 						ImGui::TextUnformatted(registersMnemonics[i]);
 						ImGui::TableNextColumn();
-						ImGui::Text("0x%016llX", mInstance->mRegisters[i]);
+						if (tabItemProc == TabItemProc::VR4300) {
+							ImGui::Text("0x%016llX", mInstance->mRegisters[i]);
+						} else {
+							ImGui::Text("0x%08X", mInstanceR4000->mRegisters[i]);
+						}
 					}
 
-					ImGui::TableNextRow();
-					ImGui::TableNextColumn();
-					ImGui::TextUnformatted("HI");
-					ImGui::TableNextColumn();
-					ImGui::Text("0x%016llX", mInstance->mHI);
+					if (tabItemProc == TabItemProc::VR4300) {
+						ImGui::TableNextRow();
+						ImGui::TableNextColumn();
+						ImGui::TextUnformatted("HI");
+						ImGui::TableNextColumn();
+						ImGui::Text("0x%016llX", mInstance->mHI);
 
-					ImGui::TableNextRow();
-					ImGui::TableNextColumn();
-					ImGui::TextUnformatted("LO");
-					ImGui::TableNextColumn();
-					ImGui::Text("0x%016llX", mInstance->mLO);
+						ImGui::TableNextRow();
+						ImGui::TableNextColumn();
+						ImGui::TextUnformatted("LO");
+						ImGui::TableNextColumn();
+						ImGui::Text("0x%016llX", mInstance->mLO);
 
-					ImGui::TableNextRow();
-					ImGui::TableNextColumn();
-					ImGui::TextUnformatted("PC");
-					ImGui::TableNextColumn();
-					ImGui::Text("0x%016llX", mInstance->mPC);
+						ImGui::TableNextRow();
+						ImGui::TableNextColumn();
+						ImGui::TextUnformatted("PC");
+						ImGui::TableNextColumn();
+						ImGui::Text("0x%016llX", mInstance->mPC);
+					} else {
+						ImGui::TableNextRow();
+						ImGui::TableNextColumn();
+						ImGui::TextUnformatted("PC");
+						ImGui::TableNextColumn();
+						ImGui::Text("0x%08X", mInstanceR4000->mPC);
+					}
 
 				}
 				ImGui::EndTable();
@@ -134,16 +188,20 @@ namespace esx {
 
 			case TabItem::CP0: {
 				if (ImGui::BeginTable("CP0StatusTable", 3, ImGuiTableFlags_SizingStretchSame | ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Hideable)) {
-					ImGui::TableSetupColumn("Register", ImGuiTableColumnFlags_WidthFixed, availWidth * 0.30f);
+					ImGui::TableSetupColumn("Register", ImGuiTableColumnFlags_WidthFixed, availWidth * 0.35f);
 					ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, availWidth * 0.50f);
 					ImGui::TableHeadersRow();
 
-					for (int i = 0; i < 32; i++) {
+					for (int i = 0; i < (tabItemProc == TabItemProc::VR4300 ? 32 : 8); i++) {
 						ImGui::TableNextRow();
 						ImGui::TableNextColumn();
-						ImGui::TextUnformatted(cop0RegistersMnemonics[i]);
+						ImGui::TextUnformatted(tabItemProc == TabItemProc::VR4300 ? cop0RegistersMnemonics[i] : R4000_cop0RegistersMnemonics[i]);
 						ImGui::TableNextColumn();
-						ImGui::Text("0x%016llX", mInstance->mCP0->getRegister(RegisterIndex(i)));
+						if (tabItemProc == TabItemProc::VR4300) {
+							ImGui::Text("0x%016llX", mInstance->mCP0->getRegister(RegisterIndex(i)));
+						} else {
+							ImGui::Text("0x%08X", mInstanceR4000->mCOPs[0]->getRegister(RegisterIndex(i)));
+						}
 					}
 					
 				}

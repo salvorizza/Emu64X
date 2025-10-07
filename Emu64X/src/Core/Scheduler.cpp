@@ -24,12 +24,12 @@ namespace esx {
 		std::erase_if(sEvents, [&](const SchedulerEvent& ev) { return ev.Type == type; });
 	}
 
-	Optional<SchedulerEvent> Scheduler::NextEventOfType(SchedulerEventType type)
+	Optional<SchedulerEvent*> Scheduler::NextEventOfType(SchedulerEventType type)
 	{
-		Optional<SchedulerEvent> result = {};
+		Optional<SchedulerEvent*> result = {};
 		auto it = std::find_if(sEvents.begin(), sEvents.end(), [&](const SchedulerEvent& ev) { return ev.Type == type; });
 		if (it != sEvents.end()) {
-			result.emplace(*it);
+			result.emplace(&*it);
 		}
 		return result;
 	}

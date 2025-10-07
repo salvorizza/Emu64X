@@ -173,11 +173,11 @@ namespace esx {
 
 	U64 RCP::RCPClocksToCPUClocks(U64 RCPClocks)
 	{
-		return (RCPClocks * 3) / 2;
+		return (RCPClocks * 93750000llu) / 62500000llu;
 	}
 
 	U64 RCP::CPUClocksToRCPClocks(U64 CPUClocks)
 	{
-		return (CPUClocks * 2) / 3;
+		return (CPUClocks * 62500000llu) / 93750000llu;
 	}
 }

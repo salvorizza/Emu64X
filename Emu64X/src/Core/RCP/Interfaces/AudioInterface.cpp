@@ -1,12 +1,25 @@
 #include "AudioInterface.h"
 
 #include "../RCP.h"
+#include "Core/MIPS/VR4300/VR4300.h"
+#include "Core/Scheduler.h"
 
 namespace esx {
 
 	AudioInterface::AudioInterface(RCP* rcp)
 		: mRCP(rcp)
 	{
+		Scheduler::AddSchedulerEventHandler(SchedulerEventType::AIDMAStart, [&](SchedulerEvent& ev) {
+			mRCP->setInterrupt(InterruptType::AI, ESX_FALSE, ESX_TRUE, 0);
+		});
+
+		Scheduler::AddSchedulerEventHandler(SchedulerEventType::AIDMADone, [&](SchedulerEvent& ev) {
+			if (AI_STATUS.get(layouts::AI_STATUS_Register::Field::FULL).as<BIT>() == ESX_TRUE) {
+				AI_STATUS.set(layouts::AI_STATUS_Register::Field::FULL, ESX_FALSE);
+			} else {
+				AI_STATUS.set(layouts::AI_STATUS_Register::Field::BUSY, ESX_FALSE);
+			}
+		});
 	}
 
 	AudioInterface::~AudioInterface()
@@ -30,15 +43,44 @@ namespace esx {
 			}
 			case 0x04500004: {
 				AI_LENGTH.write(value);
+
+
+				if (AI_CONTROL.get(layouts::AI_CONTROL_Register::Field::DMA_ENABLE).as<BIT>() == ESX_TRUE && AI_STATUS.get(layouts::AI_STATUS_Register::Field::FULL).as<BIT>() == ESX_FALSE) {
+					BIT DMAAlreadyUp = AI_STATUS.get(layouts::AI_STATUS_Register::Field::BUSY).as<BIT>();
+					AI_STATUS.set(layouts::AI_STATUS_Register::Field::FULL, DMAAlreadyUp);
+					AI_STATUS.set(layouts::AI_STATUS_Register::Field::BUSY, ESX_TRUE);
+
+					U64 cpuClocks = mRCP->getBus("Root")->getDevice<VR4300>("VR4300")->getClocks();
+
+					U64 TargetClock = DMAAlreadyUp ? Scheduler::NextEventOfType(SchedulerEventType::AIDMADone).value()->ClockTarget : cpuClocks;
+					U64 Length = AI_LENGTH.get(layouts::AI_LENGTH_Register::Field::LENGTH).as<U64>();
+					U64 DACRate = AI_DACRATE.get(layouts::AI_DACRATE_Register::Field::DACRATE).as<U64>();
+					U64 SampleClock = (((Length / 4llu) * (DACRate + 1)) * 93750000llu) / 48681812llu;
+
+					SchedulerEvent dmaStartEvent = {
+							.Type = SchedulerEventType::AIDMAStart,
+							.ClockStart = cpuClocks,
+							.ClockTarget = TargetClock + 1
+					};
+
+					SchedulerEvent dmaDoneEvent = {
+							.Type = SchedulerEventType::AIDMADone,
+							.ClockStart = cpuClocks,
+							.ClockTarget = TargetClock + SampleClock
+					};
+					dmaDoneEvent.Write(AI_DRAM_ADDR.read());
+					dmaDoneEvent.Write(AI_LENGTH.read());
+
+					Scheduler::ScheduleEvent(dmaStartEvent);
+					Scheduler::ScheduleEvent(dmaDoneEvent);
+				}
+
 				break;
 			}
 			case 0x04500008: {
 				AI_CONTROL.write(value);
 
-				if (AI_CONTROL.get(layouts::AI_CONTROL_Register::Field::DMA_ENABLE).as<BIT>() == ESX_TRUE) {
-					//Start DMA
-					ESX_CORE_LOG_WARNING("{} - DMA not implemented yet", mName);
-				}
+				AI_STATUS.set(layouts::AI_STATUS_Register::Field::ENABLED, AI_CONTROL.get(layouts::AI_CONTROL_Register::Field::DMA_ENABLE).as<BIT>());
 				break;
 			}
 			case 0x0450000C: {

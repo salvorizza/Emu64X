@@ -24,10 +24,13 @@ namespace esx {
 		U32 load(U32 address);
 
 		void reset() ;
+
+		SharedPtr<R4000>& getCore() { return mCore; }
 	private:
 		StringView mName = "RSP";
 
 		RCP* mRCP;
+		U64 mRCPClocks = 0;
 
 		SharedPtr<R4000> mCore;
 		SharedPtr<ScalarUnit> mSU;

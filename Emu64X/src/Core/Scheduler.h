@@ -13,7 +13,10 @@ namespace esx {
 		GPUStartHBlank,
 		GPUEndHBlank,
 		PIDMADone,
-		SIDMADone
+		SIDMADone,
+		AIDMADone,
+		AIDMAStart,
+		SPDMADone
 	};
 
 	struct SchedulerEvent {
@@ -55,7 +58,7 @@ namespace esx {
 
 		static void ScheduleEvent(const SchedulerEvent& schedulerEvent);
 		static void UnScheduleAllEvents(SchedulerEventType type);
-		static Optional<SchedulerEvent> NextEventOfType(SchedulerEventType type);
+		static Optional<SchedulerEvent*> NextEventOfType(SchedulerEventType type);
 		static const SchedulerEvent& NextEvent();
 		static BIT CurrentEventHasBeenStopped();
 		static void ExecuteEvent();

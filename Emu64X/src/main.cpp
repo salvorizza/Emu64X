@@ -181,9 +181,86 @@ public:
 		root->sortRanges();
 
 		mCPUStatusPanel->setInstance(mVR4300);
+		mCPUStatusPanel->setInstance(mRCP->getCore());
 		mDisassemblerPanel->setInstance(mVR4300);
+		mDisassemblerPanel->setInstance(mRCP->getCore());
 		mDisassemblerPanel->setBus(root);
 		mMemoryEditorPanel->setInstance(root);
+
+		mDisassemblerPanel->setAddressingFunc(DisassemblerProc::VR4300, [&]() {
+			U32 baseAddress = 0x00000000;
+			U32 adressingSize = 0x03F80000;
+			if (ImGui::BeginTabBar("SelectDisassembleRom"))
+			{
+				if (ImGui::BeginTabItem("Instructions")) {
+					baseAddress = 0x00000000;
+					adressingSize = 0x03F80000;
+					ImGui::EndTabItem();
+				}
+				if (ImGui::BeginTabItem("Bios")) {
+					baseAddress = 0x1FC00000;
+					adressingSize = 0x000007C0;
+					ImGui::EndTabItem();
+				}
+				if (ImGui::BeginTabItem("IMEM")) {
+					baseAddress = 0x04001000;
+					adressingSize = 0x00001000;
+					ImGui::EndTabItem();
+				}
+				if (ImGui::BeginTabItem("DMEM")) {
+					baseAddress = 0x04000000;
+					adressingSize = 0x00001000;
+					ImGui::EndTabItem();
+				}
+
+				ImGui::EndTabBar();
+			}
+			return std::make_pair(baseAddress, adressingSize);
+		});
+
+		mDisassemblerPanel->setAddressingFunc(DisassemblerProc::RSP, [&]() {
+			U32 baseAddress = 0x00000000;
+			U32 adressingSize = 0x1000;
+			if (ImGui::BeginTabBar("SelectDisassembleRom"))
+			{
+				if (ImGui::BeginTabItem("Instructions")) {
+					baseAddress = 0x00000000;
+					adressingSize = 0x1000;
+					ImGui::EndTabItem();
+				}
+
+				ImGui::EndTabBar();
+			}
+			return std::make_pair(baseAddress, adressingSize);
+		});
+
+		mDisassemblerPanel->setDecodeFunc(DisassemblerProc::VR4300, [&](U32* physAddress) {
+			esx::VR4300Instruction cpuInstruction;
+
+			U32 opcode = mVR4300->getBus(ESX_TEXT("Root"))->load(*physAddress, 0, sizeof(U32));
+			mVR4300->decode(cpuInstruction, opcode, *physAddress, ESX_TRUE);
+
+			DisassemblerPanel::Instruction instruction;
+			instruction.Address = *physAddress;
+			instruction.Mnemonic = cpuInstruction.Mnemonic(mVR4300);
+
+			return instruction;
+		});
+
+		mDisassemblerPanel->setDecodeFunc(DisassemblerProc::RSP, [&](U32* physAddress) {
+			esx::R4000Instruction cpuInstruction;
+			U32 addr = *physAddress;
+			*physAddress += 0x04001000;
+
+			U32 opcode = mRCP->SysADLoad(*physAddress, sizeof(U32));
+			mRCP->getCore()->decode(cpuInstruction, opcode, addr, ESX_TRUE);
+
+			DisassemblerPanel::Instruction instruction;
+			instruction.Address = addr;
+			instruction.Mnemonic = cpuInstruction.Mnemonic(mRCP->getCore());
+
+			return instruction;
+		});
 
 		mBatchRenderer->Begin();
 		mSoftwareRenderer->Begin();

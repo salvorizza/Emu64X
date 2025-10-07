@@ -79,6 +79,10 @@ namespace esx {
 			return RegisterIndex(((binaryInstruction >> 11) & 0x1F));
 		}
 
+		U8 Element() const {
+			return ((binaryInstruction >> 7) & 0xF);
+		}
+
 		U8 ShiftAmount() const {
 			return ((binaryInstruction >> 6) & 0x1F);
 		}
@@ -86,6 +90,11 @@ namespace esx {
 		U8 Function() const {
 			return (binaryInstruction & 0x3F);
 		}
+
+		I8 Offset() const {
+			return static_cast<I8>((binaryInstruction & 0x7F) << 1) >> 1;
+		}
+
 
 		U8 Cond() const {
 			return (binaryInstruction & 0xF);
@@ -239,7 +248,7 @@ namespace esx {
 		virtual BIT isCoprocessorUsable(U8 copNumber) const { return ESX_TRUE; }
 		virtual BIT isReserved64BitInstruction() const { return ESX_FALSE; }
 
-		inline void addPendingLoad(RegisterIndex index, U64 value)
+		inline void addPendingLoad(RegisterIndex index, Register value)
 		{
 			mPendingLoad.first = index;
 			mPendingLoad.second = value;
@@ -255,7 +264,7 @@ namespace esx {
 			mPendingLoad.second = 0;
 		}
 
-		inline void setRegister(RegisterIndex index, U64 value)
+		inline void setRegister(RegisterIndex index, Register value)
 		{
 			mWriteBack.first = index;
 			mWriteBack.second = value;
@@ -311,7 +320,8 @@ namespace esx {
 		BIT mTookBranchSlot = ESX_FALSE;
 		BIT mHalt = ESX_FALSE;
 		Register mNextPC = 0;
-
+		Register mPC = 0;
+		Register mCurrentPC = 0;
 	protected:
 		SharedPtr<Bus> mRootBus;
 		Array<Register, 32> mRegisters;
@@ -320,8 +330,6 @@ namespace esx {
 		Pair<RegisterIndex, Register> mMemoryLoad;
 		Pair<RegisterIndex, Register> mWriteBack;
 
-		Register mPC = 0;
-		Register mCurrentPC = 0;
 		Register mCallPC = 0;
 		Register mHI = 0;
 		Register mLO = 0;

@@ -1,5 +1,7 @@
 #include "RSP.h"
 
+#include "../RCP.h"
+
 namespace esx {
 
 
@@ -15,7 +17,12 @@ namespace esx {
 
 	void RSP::clock(U64 clocks)
 	{
-		mCore->clock();
+		U64 newRCPClocks = RCP::CPUClocksToRCPClocks(clocks);
+		while (mRCPClocks < newRCPClocks) {
+			mCore->clock();
+			mRCPClocks++;
+		}
+
 		mSU->clock(clocks);
 		mVU->clock(clocks);
 	}
@@ -63,7 +70,11 @@ namespace esx {
 			}
 
 			case 0x04080000: {
-				//mCore->setRegister(RegisterIndex(7), value);
+				value &= 0xFFC;
+				
+				mCore->mPC = value;
+				mCore->mCurrentPC = mCore->mPC - 4;
+				mCore->mNextPC = mCore->mPC + 4;
 				break;
 			}
 		}
@@ -74,53 +85,45 @@ namespace esx {
 		switch (address) {
 			case 0x04040000: {
 				return mSU->getRegister(RegisterIndex(0));
-				break;
 			}
 
 			case 0x04040004: {
 				return mSU->getRegister(RegisterIndex(1));
-				break;
 			}
 
 			case 0x04040008: {
 				return mSU->getRegister(RegisterIndex(2));
-				break;
 			}
 
 			case 0x0404000C: {
 				return mSU->getRegister(RegisterIndex(3));
-				break;
 			}
 
 			case 0x04040010: {
 				return mSU->getRegister(RegisterIndex(4));
-				break;
 			}
 
 			case 0x04040014: {
 				return mSU->getRegister(RegisterIndex(5));
-				break;
 			}
 
 			case 0x04040018: {
 				return mSU->getRegister(RegisterIndex(6));
-				break;
 			}
 
 			case 0x0404001C: {
 				return mSU->getRegister(RegisterIndex(7));
-				break;
 			}
 
 			case 0x04080000: {
-				//mCore->setRegister(RegisterIndex(7), value);
-				break;
+				return mCore->mPC & 0xFFF;
 			}
 		}
 	}
 
 	void RSP::reset() {
 		mCore->reset();
+		mRCPClocks = 0;
 	}
 
 }

@@ -367,7 +367,21 @@ namespace esx {
 
 	void FloatingPointUnit::TRUNCW()
 	{
-		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
+		FormatSpec fmt = static_cast<FormatSpec>(mCPU->mCurrentInstruction.RegisterSource().Value);
+		RegisterIndex fs = mCPU->mCurrentInstruction.RegisterDestination();
+		RegisterIndex fd = RegisterIndex(mCPU->mCurrentInstruction.ShiftAmount());
+
+		switch (fmt) {
+			case FormatSpec::S: {
+				StoreFPR(fd, FormatSpec::W, ConvertFmt<U32>(std::trunc(ValueFPR<float>(fs, fmt)), fmt, FormatSpec::W));
+				break;
+			}
+
+			default: {
+				ESX_CORE_LOG_WARNING("{} Not implemented yet with fmt {}", __FUNCTION__, static_cast<U8>(fmt));
+				break;
+			}
+		}
 	}
 
 	void FloatingPointUnit::CEILW()

@@ -110,32 +110,21 @@ namespace esx {
 		(this->*instruction.Execute)();
 	}
 
-	U32 R4000::load(U32 virtualAddress, BIT& exception, size_t accessSize) {
+	U64 R4000::load(U32 virtualAddress, BIT& exception, size_t accessSize) {
 		BIT cached = ESX_FALSE;
 		U32 physicalAddress = 0x04000000 + (virtualAddress & 0xFFF);
 
-		if (isWriteQueueActive(physicalAddress)) {
-			if (flushWriteQueue(physicalAddress) == ESX_FALSE) {
-				flushWriteQueueFirst();
-			}
-		}
-		else {
-			flushWriteQueueAll(); //TODO: Write queue stall
-		}
-
 		PRINT_LOAD(physicalAddress);
 
-		U32 result = 0;
+		U64 result = 0;
 		if (accessSize == 8) {
-			U32 lo = mRCP->SysADLoad(physicalAddress & ~0x7, sizeof(U32) * 8);
-			U32 hi = mRCP->SysADLoad((physicalAddress & ~0x7) + 4, sizeof(U32) * 8);
-
-			result = (static_cast<U64>(hi) << 32) | lo;
-		}
-		else {
-			U32 output = mRCP->SysADLoad(physicalAddress, sizeof(U32) * 8);
-			constexpr U32 mask = std::numeric_limits<U32>::max();
-			result = output >> ((physicalAddress & 0x3) * 8) & mask;
+			result = _byteswap_uint64(*reinterpret_cast<U64*>(&mRCP->mDMEM[physicalAddress - 0x04000000]));
+		} else if  (accessSize == 4) {
+			result = _byteswap_ulong(*reinterpret_cast<U32*>(&mRCP->mDMEM[physicalAddress - 0x04000000]));
+		} else if (accessSize == 2) {
+			result = _byteswap_ushort(*reinterpret_cast<U16*>(&mRCP->mDMEM[physicalAddress - 0x04000000]));
+		} else if (accessSize == 1) {
+			result = mRCP->mDMEM[physicalAddress - 0x04000000];
 		}
 
 		PRINT_IO_LOAD(physicalAddress, result);
@@ -144,15 +133,22 @@ namespace esx {
 	}
 
 	void R4000::store(U32 virtualAddress, U64 value, size_t accessSize) {
+
 		BIT cached = ESX_FALSE;
 		U32 physicalAddress = 0x04000000 + (virtualAddress & 0xFFF);
-
 
 		PRINT_STORE(physicalAddress, value);
 		PRINT_IO_STORE(physicalAddress, value);
 
-		value <<= (physicalAddress & 0x3) * 8;
-		mRCP->SysADStore(physicalAddress, accessSize, value);
+		if (accessSize == 8) {
+			*reinterpret_cast<U64*>(&mRCP->mDMEM[physicalAddress - 0x04000000]) = _byteswap_uint64(value);
+		} else if (accessSize == 4) {
+			*reinterpret_cast<U32*>(&mRCP->mDMEM[physicalAddress - 0x04000000]) = _byteswap_ulong(value);
+		} else if (accessSize == 2) {
+			*reinterpret_cast<U16*>(&mRCP->mDMEM[physicalAddress - 0x04000000]) = _byteswap_ushort(value);
+		} else if (accessSize == 1) {
+			mRCP->mDMEM[physicalAddress - 0x04000000] = value;
+		}
 	}
 
 	void R4000::reset()
@@ -236,7 +232,7 @@ namespace esx {
 			r = getRegister(mCurrentInstruction.RegisterTarget());
 		}
 
-		addPendingLoad(mCurrentInstruction.RegisterTarget(), r);
+		setRegister(mCurrentInstruction.RegisterTarget(), r);
 	}
 
 	void R4000::LH()
@@ -255,7 +251,7 @@ namespace esx {
 			r = static_cast<U32>(static_cast<I32>(static_cast<I16>(static_cast<U16>(r))));
 		}
 
-		addPendingLoad(mCurrentInstruction.RegisterTarget(), r);
+		setRegister(mCurrentInstruction.RegisterTarget(), r);
 	}
 
 	void R4000::LHU()
@@ -272,7 +268,7 @@ namespace esx {
 			r = getRegister(mCurrentInstruction.RegisterTarget());
 		}
 
-		addPendingLoad(mCurrentInstruction.RegisterTarget(), r);
+		setRegister(mCurrentInstruction.RegisterTarget(), r);
 	}
 
 	void R4000::LB()
@@ -291,7 +287,7 @@ namespace esx {
 			r = static_cast<U32>(static_cast<I32>(static_cast<I8>(static_cast<U8>(r))));
 		}
 
-		addPendingLoad(mCurrentInstruction.RegisterTarget(), r);
+		setRegister(mCurrentInstruction.RegisterTarget(), r);
 	}
 
 	void R4000::LBU()
@@ -305,7 +301,7 @@ namespace esx {
 
 		U32 r = load(m, exception, sizeof(U16));
 
-		addPendingLoad(mCurrentInstruction.RegisterTarget(), r);
+		setRegister(mCurrentInstruction.RegisterTarget(), r);
 	}
 
 	void R4000::SB()
@@ -379,7 +375,7 @@ namespace esx {
 			r = getRegister(mCurrentInstruction.RegisterTarget());
 		}
 
-		addPendingLoad(mCurrentInstruction.RegisterTarget(), r);
+		setRegister(mCurrentInstruction.RegisterTarget(), r);
 		mLLBit = ESX_TRUE;
 	}
 
@@ -556,8 +552,8 @@ namespace esx {
 	void R4000::BEQ()
 	{
 		mBranch = ESX_TRUE;
-		U64 a = getRegister(mCurrentInstruction.RegisterSource());
-		U64 b = getRegister(mCurrentInstruction.RegisterTarget());
+		U32 a = getRegister(mCurrentInstruction.RegisterSource());
+		U32 b = getRegister(mCurrentInstruction.RegisterTarget());
 		I32 o = mCurrentInstruction.ImmediateSE() << 2;
 
 		if (a == b) {
@@ -570,8 +566,8 @@ namespace esx {
 	void R4000::BNE()
 	{
 		mBranch = ESX_TRUE;
-		U64 a = getRegister(mCurrentInstruction.RegisterSource());
-		U64 b = getRegister(mCurrentInstruction.RegisterTarget());
+		U32 a = getRegister(mCurrentInstruction.RegisterSource());
+		U32 b = getRegister(mCurrentInstruction.RegisterTarget());
 		I32 o = mCurrentInstruction.ImmediateSE() << 2;
 
 		if (a != b) {
@@ -584,7 +580,7 @@ namespace esx {
 	void R4000::BLTZ()
 	{
 		mBranch = ESX_TRUE;
-		I64 a = getRegister(mCurrentInstruction.RegisterSource());
+		I32 a = static_cast<I32>(getRegister(mCurrentInstruction.RegisterSource()));
 		I32 o = mCurrentInstruction.ImmediateSE() << 2;
 
 		if (a < 0) {
@@ -612,7 +608,7 @@ namespace esx {
 	void R4000::BLEZ()
 	{
 		mBranch = ESX_TRUE;
-		I64 a = getRegister(mCurrentInstruction.RegisterSource());
+		I32 a = static_cast<I32>(getRegister(mCurrentInstruction.RegisterSource()));
 		I32 o = mCurrentInstruction.ImmediateSE() << 2;
 
 		if (a <= 0) {
@@ -625,7 +621,7 @@ namespace esx {
 	void R4000::BGTZ()
 	{
 		mBranch = ESX_TRUE;
-		I64 a = getRegister(mCurrentInstruction.RegisterSource());
+		I32 a = static_cast<I32>(getRegister(mCurrentInstruction.RegisterSource()));
 		I32 o = mCurrentInstruction.ImmediateSE() << 2;
 
 		if (a > 0) {
@@ -638,7 +634,7 @@ namespace esx {
 	void R4000::BGEZ()
 	{
 		mBranch = ESX_TRUE;
-		I64 a = getRegister(mCurrentInstruction.RegisterSource());
+		I32 a = static_cast<I32>(getRegister(mCurrentInstruction.RegisterSource()));
 		I32 o = mCurrentInstruction.ImmediateSE() << 2;
 
 		if (a >= 0) {
@@ -651,7 +647,7 @@ namespace esx {
 	void R4000::BGEZAL()
 	{
 		mBranch = ESX_TRUE;
-		I64 a = getRegister(mCurrentInstruction.RegisterSource());
+		I32 a = static_cast<I32>(getRegister(mCurrentInstruction.RegisterSource()));
 		I32 o = mCurrentInstruction.ImmediateSE() << 2;
 
 		setRegister(GPRRegister::ra, mNextPC);
@@ -723,6 +719,9 @@ namespace esx {
 			}
 			((mCOPs[0].get())->*coprocessorFunction)();
 		}
+		else {
+			ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
+		}
 	}
 
 	void R4000::COP1()
@@ -736,6 +735,8 @@ namespace esx {
 				coprocessorFunction = copDecodeBC[mCurrentInstruction.RegisterTarget().Value];
 			}
 			((mCOPs[1].get())->*coprocessorFunction)();
+		} else {
+				ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
 		}
 	}
 
@@ -751,6 +752,9 @@ namespace esx {
 			}
 			((mCOPs[2].get())->*coprocessorFunction)();
 		}
+		else {
+			ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
+		}
 	}
 
 	void R4000::COP3()
@@ -765,42 +769,82 @@ namespace esx {
 			}
 			((mCOPs[3].get())->*coprocessorFunction)();
 		}
+		else {
+			ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
+		}
 	}
 
 	void R4000::LWC0()
 	{
+		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
 	}
 
 	void R4000::LWC1()
 	{
+		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
 	}
 
 	void R4000::LWC2()
 	{
+		SharedPtr<VectorUnit> vu = std::dynamic_pointer_cast<VectorUnit>(mCOPs[2]);
+
+		BIT exception = ESX_FALSE;
+
+		RegisterIndex base = mCurrentInstruction.RegisterSource();
+		U8 vt = mCurrentInstruction.RegisterTarget().Value;
+		U8 opcode = mCurrentInstruction.RegisterDestination().Value;
+		U8 element = mCurrentInstruction.Element();
+		I8 offset = mCurrentInstruction.Offset();
+		size_t access_size = 1llu << opcode;
+
+		U32 addr = getRegister(base) + offset * access_size;
+		U64 data = load(addr, exception, access_size);
+
+		vu->setVPRRegisterBytes(vt, data, element, access_size);
 	}
 
 	void R4000::LWC3()
 	{
+		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
 	}
 
 	void R4000::SWC0()
 	{
+		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
 	}
 
 	void R4000::SWC1()
 	{
+		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
 	}
 
 	void R4000::SWC2()
 	{
+		SharedPtr<VectorUnit> vu = std::dynamic_pointer_cast<VectorUnit>(mCOPs[2]);
+
+		BIT exception = ESX_FALSE;
+
+		RegisterIndex base = mCurrentInstruction.RegisterSource();
+		U8 vt = mCurrentInstruction.RegisterTarget().Value;
+		U8 opcode = mCurrentInstruction.RegisterDestination().Value;
+		U8 element = mCurrentInstruction.Element();
+		I8 offset = mCurrentInstruction.Offset();
+		size_t access_size = 1llu << opcode;
+
+		U32 addr = getRegister(base) + offset * access_size;
+		U64 data = vu->getVPRRegisterBytes(vt, element, access_size);
+
+		store(addr, data, access_size);
 	}
 
 	void R4000::SWC3()
 	{
+		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
 	}
 
 	void R4000::NA()
 	{
+		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
 	}
 
 	void R4000::iCacheStore(U32 address, U32 value)

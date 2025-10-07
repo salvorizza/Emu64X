@@ -186,9 +186,11 @@ namespace esx {
 
     void SystemControlCoprocessor::raiseException(ExceptionType type, U32 parameter)
     {
-        if (type == ExceptionType::AddressErrorLoad || type == ExceptionType::AddressErrorStore) mBadVAddrRegister.set(layouts::BadVAddrRegister::Field::Value, parameter);
+        if (type == ExceptionType::AddressErrorLoad || type == ExceptionType::AddressErrorStore) 
+            mBadVAddrRegister.set(layouts::BadVAddrRegister::Field::Value, parameter);
         mCauseRegister.set(layouts::CauseRegister::Field::ExcCode, (U8)type);
-        if(type == ExceptionType::CoprocessorUnusable) mCauseRegister.set(layouts::CauseRegister::Field::CE, parameter);
+        if(type == ExceptionType::CoprocessorUnusable) 
+            mCauseRegister.set(layouts::CauseRegister::Field::CE, parameter);
 
         U32 vecOffset = 0x180;
         if (mStatusRegister.get(layouts::StatusRegister::Field::EXL).as<BIT>() == ESX_FALSE) {

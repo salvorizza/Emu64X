@@ -13,7 +13,7 @@ namespace esx {
 		: mRCP(rcp)
 	{
 		Scheduler::AddSchedulerEventHandler(SchedulerEventType::PIDMADone, [&](const SchedulerEvent& ev) {
-			mRCP->setInterrupt(InterruptType::PI, PI_STATUS.get(layouts::PI_STATUS_Register::Field::DMA_COMPLETED).as<BIT>(), ESX_TRUE, 0);
+			mRCP->setInterrupt(InterruptType::PI, ESX_FALSE, ESX_TRUE, 0);
 			PI_STATUS.set(layouts::PI_STATUS_Register::Field::DMA_BUSY, ESX_FALSE);
 			PI_STATUS.set(layouts::PI_STATUS_Register::Field::DMA_COMPLETED, ESX_TRUE);
 		});

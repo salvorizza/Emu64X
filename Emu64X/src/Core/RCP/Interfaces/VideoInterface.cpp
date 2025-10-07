@@ -86,8 +86,13 @@ namespace esx {
 	{
 		switch (address) {
 			case 0x04400000: {
+				U8 lastCtrl = VI_CTRL.get(layouts::VI_CTRL_Register::Field::TYPE).as<U8>() ;
 				VI_CTRL.write(value);
-				scheduleVIEvents();
+				U8 newCtrl = VI_CTRL.get(layouts::VI_CTRL_Register::Field::TYPE).as<U8>();
+
+				if (lastCtrl != newCtrl) {
+					scheduleVIEvents();
+				}
 				break;
 			}
 			case 0x04400004: {
@@ -112,28 +117,38 @@ namespace esx {
 				break;
 			}
 			case 0x04400018: {
+				U32 lastValue = VI_V_TOTAL.read();
 				VI_V_TOTAL.write(value);
-				scheduleVIEvents();
+
+				if(lastValue != VI_V_TOTAL.read()) scheduleVIEvents();
 				break;
 			}
 			case 0x0440001C: {
+				U32 lastValue = VI_H_TOTAL.read();
 				VI_H_TOTAL.write(value);
-				scheduleVIEvents();
+
+				if (lastValue != VI_H_TOTAL.read()) scheduleVIEvents();
 				break;
 			}
 			case 0x04400020: {
+				U32 lastValue = VI_H_TOTAL_LEAP.read();
 				VI_H_TOTAL_LEAP.write(value);
-				scheduleVIEvents();
+
+				if (lastValue != VI_H_TOTAL_LEAP.read()) scheduleVIEvents();
 				break;
 			}
 			case 0x04400024: {
+				U32 lastValue = VI_H_VIDEO.read();
 				VI_H_VIDEO.write(value);
-				scheduleVIEvents();
+
+				if (lastValue != VI_H_VIDEO.read()) scheduleVIEvents();
 				break;
 			}
 			case 0x04400028: {
+				U32 lastValue = VI_V_VIDEO.read();
 				VI_V_VIDEO.write(value);
-				scheduleVIEvents();
+
+				if (lastValue != VI_V_VIDEO.read()) scheduleVIEvents();
 				break;
 			}
 			case 0x0440002C: {
@@ -226,11 +241,11 @@ namespace esx {
 	}
 
 	inline U64 VideoInterface::VIClocksToCPUClocks(U64 VIClocks) {
-		return (VIClocks * 150) / 128;
+		return (VIClocks * 93750000llu) / 48681812llu;
 	}
 
 	inline U64 VideoInterface::CPUClocksToVIClocks(U64 CPUClocks) {
-		return (CPUClocks * 128) / 150;
+		return (CPUClocks * 48681812llu) / 93750000llu;
 	}
 
 	void VideoInterface::scheduleVIEvents()
@@ -255,7 +270,7 @@ namespace esx {
 			SchedulerEvent frameStartEvent = {
 				.Type = SchedulerEventType::GPUFrameStart,
 				.ClockStart = cpuClocks,
-				.ClockTarget = cpuClocks + VIClocksToCPUClocks(scanlineLength * numScanlines),
+				.ClockTarget = cpuClocks + 1,
 				.Reschedule = ESX_TRUE,
 				.RescheduleClocks = VIClocksToCPUClocks(scanlineLength * numScanlines)
 			};
