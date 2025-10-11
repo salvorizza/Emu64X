@@ -16,7 +16,8 @@ namespace esx {
 		SIDMADone,
 		AIDMADone,
 		AIDMAStart,
-		SPDMADone
+		SPDMADone,
+		DPDMADone
 	};
 
 	struct SchedulerEvent {

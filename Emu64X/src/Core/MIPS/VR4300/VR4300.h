@@ -92,6 +92,10 @@ namespace esx {
 			BIT cached = ESX_FALSE;
 			U32 physicalAddress = mCP0->AddressTranslation(virtualAddress, ESX_TRUE, cached);
 
+			if (physicalAddress == 0x27f4e0) {
+				ESX_CORE_LOG_TRACE("{:08x}h - $a1 => {:08x}h", mCurrentInstruction.Address, getRegister(RegisterIndex(GPRRegister::a1)));
+			}
+
 			mCP0->watchAddress(physicalAddress, ESX_TRUE);
 
 			PRINT_STORE(physicalAddress, value);

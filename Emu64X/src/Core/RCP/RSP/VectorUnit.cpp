@@ -241,7 +241,7 @@ namespace esx {
 
     void VectorUnit::reserved()
     {
-        ESX_CORE_LOG_WARNING("{} not implemented yet", __FUNCTION__);
+        ESX_CORE_LOG_WARNING("{} not implemented yet {:02x}h", __FUNCTION__, mCPU->mCurrentInstruction.CoprocessorFunction());
     }
 
     U64 VectorUnit::getRegister(RegisterIndex reg)

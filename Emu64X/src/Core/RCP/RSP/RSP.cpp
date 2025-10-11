@@ -20,7 +20,8 @@ namespace esx {
 		U64 newRCPClocks = RCP::CPUClocksToRCPClocks(clocks);
 		while (mRCPClocks < newRCPClocks) {
 			mCore->clock();
-			mRCPClocks++;
+
+			mRCPClocks = (mRCPClocks + 1) & 0xFFFFFF;
 		}
 
 		mSU->clock(clocks);

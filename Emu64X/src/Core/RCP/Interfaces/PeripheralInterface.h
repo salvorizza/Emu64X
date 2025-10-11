@@ -73,6 +73,8 @@ namespace esx {
 		PI_BSD_DOM_PWD_Register PI_BSD_DOM1_PWD, PI_BSD_DOM2_PWD;
 		PI_BSD_DOM_PGS_Register PI_BSD_DOM1_PGS, PI_BSD_DOM2_PGS;
 		PI_BSD_DOM_RLS_Register PI_BSD_DOM1_RLS, PI_BSD_DOM2_RLS;
+
+		U32 mLastMisalignment = 0;
 	};
 
 }

@@ -17,6 +17,7 @@ namespace esx {
 			if (AI_STATUS.get(layouts::AI_STATUS_Register::Field::FULL).as<BIT>() == ESX_TRUE) {
 				AI_STATUS.set(layouts::AI_STATUS_Register::Field::FULL, ESX_FALSE);
 			} else {
+				AI_LENGTH.set(layouts::AI_LENGTH_Register::Field::LENGTH, 0);
 				AI_STATUS.set(layouts::AI_STATUS_Register::Field::BUSY, ESX_FALSE);
 			}
 		});
@@ -53,9 +54,9 @@ namespace esx {
 					U64 cpuClocks = mRCP->getBus("Root")->getDevice<VR4300>("VR4300")->getClocks();
 
 					U64 TargetClock = DMAAlreadyUp ? Scheduler::NextEventOfType(SchedulerEventType::AIDMADone).value()->ClockTarget : cpuClocks;
-					U64 Length = AI_LENGTH.get(layouts::AI_LENGTH_Register::Field::LENGTH).as<U64>();
+					U64 Length = AI_LENGTH.get(layouts::AI_LENGTH_Register::Field::LENGTH).as<U64>() << 3;
 					U64 DACRate = AI_DACRATE.get(layouts::AI_DACRATE_Register::Field::DACRATE).as<U64>();
-					U64 SampleClock = (((Length / 4llu) * (DACRate + 1)) * 93750000llu) / 48681812llu;
+					U64 SampleClock = (((Length / 2llu) * (DACRate + 1)) * 93750000llu) / 48681812llu;
 
 					SchedulerEvent dmaStartEvent = {
 							.Type = SchedulerEventType::AIDMAStart,

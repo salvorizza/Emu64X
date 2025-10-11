@@ -82,12 +82,14 @@ namespace esx {
 						break;
 					}
 
-					if (Scheduler::NextEvent().Type == SchedulerEventType::GPUFrameStart) {
-						newFrameAvailable = ESX_TRUE;
-					}
+					if (mInstance->getClocks() >= Scheduler::NextEvent().ClockTarget) {
+						if (Scheduler::NextEvent().Type == SchedulerEventType::GPUFrameStart) {
+							newFrameAvailable = ESX_TRUE;
+						}
 
-					Scheduler::ExecuteEvent();
-					Scheduler::Progress();
+						Scheduler::ExecuteEvent();
+						Scheduler::Progress();
+					}
 				}
 				/*U64 clockEnd = mInstance->getClocks();
 				ESX_CORE_LOG_TRACE("Emu FPS: {}", 93750000.0f / (clockEnd - clockStart));*/
@@ -285,6 +287,8 @@ namespace esx {
 				for (auto& breakpoint : state.mBreakpoints) {
 					ImGui::TableNextRow();
 
+					ImGui::PushID(i);
+
 					ImGui::TableNextColumn();
 					if (breakpoint.Enabled) {
 						if (ImGui::Button(ICON_FA_EYE)) breakpoint.Enabled = false;
@@ -296,7 +300,6 @@ namespace esx {
 					ImGui::TableNextColumn();
 					sprintf_s(addressBuffer, 32, "0x%08X", breakpoint.Address);
 					ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(1, 1, 1, 0));
-					ImGui::PushID(i);
 					if (ImGui::InputText("##goto", addressBuffer, IM_ARRAYSIZE(addressBuffer), ImGuiInputTextFlags_CharsHexadecimal))
 					{
 						U32 addr;
@@ -305,14 +308,13 @@ namespace esx {
 							breakpoint.PhysAddress = mCurrentDisassemblerProc == DisassemblerProc::VR4300 ? Bus::toPhysicalAddress(breakpoint.Address) : (0x04001000 + breakpoint.Address);
 						}
 					}
-					ImGui::PopID();
 					ImGui::PopStyleColor(1);
 
 					ImGui::TableNextColumn();
-					ImGui::PushID(i);
 					if (ImGui::Button(ICON_FA_TRASH)) {
 						indexToDelete = i;
 					}
+
 					ImGui::PopID();
 
 					i++;

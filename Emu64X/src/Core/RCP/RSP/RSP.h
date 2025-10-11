@@ -30,7 +30,8 @@ namespace esx {
 		StringView mName = "RSP";
 
 		RCP* mRCP;
-		U64 mRCPClocks = 0;
+
+		U32 mRCPClocks = 0;
 
 		SharedPtr<R4000> mCore;
 		SharedPtr<ScalarUnit> mSU;

@@ -19,7 +19,8 @@ namespace esx {
             SP_DMA_RAMADDR_Register SP_DMA_RAMADDR = ev.Read<SP_DMA_RAMADDR_Register>();
 
             U32 RDRAMAddr = SP_DMA_RAMADDR.get(layouts::SP_DMA_RAMADDR_Register::Field::DRAM_ADDR).as<U32>() << 3;
-            U32 MEMAddr = 0x04000000 + (SP_DMA_SPADDR.get(layouts::SP_DMA_SPADDR_Register::Field::MEM_BANK).as<U8>() << 12) + (SP_DMA_SPADDR.get(layouts::SP_DMA_SPADDR_Register::Field::MEM_ADDR).as<U32>() << 3);
+            U32 MEMBase = 0x04000000 + (SP_DMA_SPADDR.get(layouts::SP_DMA_SPADDR_Register::Field::MEM_BANK).as<U8>() << 12);
+            U32 MEMAddr = MEMBase + (SP_DMA_SPADDR.get(layouts::SP_DMA_SPADDR_Register::Field::MEM_ADDR).as<U32>() << 3);
             if (Write == ESX_FALSE) {
                 SP_DMA_RDLEN_Register SP_DMA_RDLEN = ev.Read<SP_DMA_RDLEN_Register>();
                 Length = ((SP_DMA_RDLEN.get(layouts::SP_DMA_RDLEN_Register::Field::RDLEN).as<U32>() + 1) << 3);
@@ -50,6 +51,8 @@ namespace esx {
 
                     RDRAMAddr += 8;
                     MEMAddr += 8;
+
+                    MEMAddr &= (MEMBase | 0xFFF);
                 }
                 RDRAMAddr += (SP_DMA_RDLEN.get(layouts::SP_DMA_RDLEN_Register::Field::SKIP).as<U32>() << 3);
             }
@@ -73,6 +76,16 @@ namespace esx {
         
     }
 
+    void ScalarUnit::CF()
+    {
+        ESX_CORE_LOG_WARNING("{} - Not implemented yet", __FUNCTION__);
+    }
+
+    void ScalarUnit::CT()
+    {
+        ESX_CORE_LOG_WARNING("{} - Not implemented yet", __FUNCTION__);
+    }
+
     void ScalarUnit::CO()
     {
         
@@ -80,10 +93,12 @@ namespace esx {
 
     void ScalarUnit::unusable()
     {
+        ESX_CORE_LOG_WARNING("{}", __FUNCTION__);
     }
 
     void ScalarUnit::reserved()
     {
+        ESX_CORE_LOG_WARNING("{}", __FUNCTION__);
     }
 
     void ScalarUnit::signalBreak()
@@ -112,6 +127,12 @@ namespace esx {
             case ScalarUnitRegisterType::c5:    return SP_STATUS.get(layouts::SP_STATUS_Register::Field::DMA_FULL).as<BIT>();
             case ScalarUnitRegisterType::c6:    return SP_STATUS.get(layouts::SP_STATUS_Register::Field::DMA_BUSY).as<BIT>();
             case ScalarUnitRegisterType::c7:    return SP_SEMAPHORE.read();
+            case ScalarUnitRegisterType::c8:    return DPC_START.read();
+            case ScalarUnitRegisterType::c9:    return DPC_END.read();
+            case ScalarUnitRegisterType::c10:   return DPC_CURRENT.read();
+            case ScalarUnitRegisterType::c11:   return DPC_STATUS.read();
+
+            default: ESX_CORE_LOG_WARNING("{} - SU {} not implemented", __FUNCTION__, reg.Value);
         }
         return 0;
     }
@@ -131,8 +152,12 @@ namespace esx {
 
                     U64 cpuClocks = mRCP->getBus("Root")->getDevice<VR4300>("VR4300")->getClocks();
 
+                    U32 Length = ((SP_DMA_RDLEN.get(layouts::SP_DMA_RDLEN_Register::Field::RDLEN).as<U32>() + 1) << 3);
+                    U16 NumRows = SP_DMA_RDLEN.get(layouts::SP_DMA_RDLEN_Register::Field::COUNT).as<U16>() + 1;
+                    U32 NumDWords = (Length / 8) + ((Length % 8) > 0 ? 1 : 0);
+                    U32 NumBytes = NumRows * NumDWords * 8;
                     U64 TargetClock = DMAAlreadyUp ? Scheduler::NextEventOfType(SchedulerEventType::SPDMADone).value()->ClockTarget : cpuClocks;
-                    U64 ClockToAdd = (((SP_DMA_RDLEN.get(layouts::SP_DMA_RDLEN_Register::Field::COUNT).as<U8>() + 1) * ((SP_DMA_RDLEN.get(layouts::SP_DMA_RDLEN_Register::Field::RDLEN).as<U32>() + 1) << 3)) * 37) / 10;
+                    U64 ClockToAdd = (NumBytes * 37) / 10;
 
                     SchedulerEvent dmaDoneEvent = {
                             .Type = SchedulerEventType::SPDMADone,
@@ -160,8 +185,12 @@ namespace esx {
 
                     U64 cpuClocks = mRCP->getBus("Root")->getDevice<VR4300>("VR4300")->getClocks();
 
+                    U32 Length = ((SP_DMA_RDLEN.get(layouts::SP_DMA_RDLEN_Register::Field::RDLEN).as<U32>() + 1) << 3);
+                    U16 NumRows = SP_DMA_RDLEN.get(layouts::SP_DMA_RDLEN_Register::Field::COUNT).as<U16>() + 1;
+                    U32 NumDWords = (Length / 8) + ((Length % 8) > 0 ? 1 : 0);
+                    U32 NumBytes = NumRows * NumDWords * 8;
                     U64 TargetClock = DMAAlreadyUp ? Scheduler::NextEventOfType(SchedulerEventType::SPDMADone).value()->ClockTarget : cpuClocks;
-                    U64 ClockToAdd = (((SP_DMA_WRLEN.get(layouts::SP_DMA_WRLEN_Register::Field::COUNT).as<U8>() + 1) * ((SP_DMA_WRLEN.get(layouts::SP_DMA_WRLEN_Register::Field::WRLEN).as<U32>() + 1) << 3)) * 37) / 10;
+                    U64 ClockToAdd = (NumBytes * 10) / 37;
 
                     SchedulerEvent dmaDoneEvent = {
                             .Type = SchedulerEventType::SPDMADone,
@@ -227,8 +256,74 @@ namespace esx {
             }
 
             case ScalarUnitRegisterType::c7:    SP_SEMAPHORE.write(value); break;
-            default: ESX_CORE_LOG_WARNING("SU {} not implemented", reg.Value);
-              
+
+            case ScalarUnitRegisterType::c8: {
+                DPC_START.write(value);
+                DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::START_PENDING, ESX_TRUE);
+                break;
+            }
+
+            case ScalarUnitRegisterType::c9: {
+                DPC_END.write(value);
+
+                auto TransferEvent = Scheduler::NextEventOfType(SchedulerEventType::DPDMADone);
+                if (DPC_STATUS.get(layouts::DPC_STATUS_Register::Field::START_PENDING).as<BIT>() == ESX_FALSE) {
+                    //Incremental
+                } else {
+                    if (TransferEvent) {
+                        DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::END_PENDING, ESX_TRUE);
+                        //Prepare/Update pending event
+                    } else {
+                        DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::START_PENDING, ESX_FALSE);
+                        //Start new event
+                    }
+                }
+
+                DPC_CURRENT.set(layouts::DPC_CURRENT_Register::Field::CURRENT, DPC_END.get(layouts::DPC_END_Register::Field::END).as<U32>());
+                break;
+            }
+
+            case ScalarUnitRegisterType::c11: {
+                DPC_STATUS_Write_Register writeReg;
+                writeReg.write(value);
+
+                if(writeReg.get(layouts::DPC_STATUS_Write_Register::Field::CLR_XBUS).as<BIT>() == ESX_TRUE)
+                    DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::XBUS, ESX_FALSE);
+
+                if (writeReg.get(layouts::DPC_STATUS_Write_Register::Field::SET_XBUS).as<BIT>() == ESX_TRUE)
+                    DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::XBUS, ESX_TRUE);
+
+                if (writeReg.get(layouts::DPC_STATUS_Write_Register::Field::CLR_FREEZE).as<BIT>() == ESX_TRUE)
+                    DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::FREEZE, ESX_FALSE);
+
+                if (writeReg.get(layouts::DPC_STATUS_Write_Register::Field::SET_FREEZE).as<BIT>() == ESX_TRUE)
+                    DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::FREEZE, ESX_TRUE);
+
+                if (writeReg.get(layouts::DPC_STATUS_Write_Register::Field::CLR_FLUSH).as<BIT>() == ESX_TRUE)
+                    DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::FLUSH, ESX_FALSE);
+
+                if (writeReg.get(layouts::DPC_STATUS_Write_Register::Field::SET_FLUSH).as<BIT>() == ESX_TRUE)
+                    DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::FLUSH, ESX_TRUE);
+
+                if (writeReg.get(layouts::DPC_STATUS_Write_Register::Field::CLR_TMEM_BUSY).as<BIT>() == ESX_TRUE) {
+                    ESX_CORE_LOG_WARNING("Cear DPC_TMEM_BUSY to 0 not implemented yet");
+                }
+
+                if (writeReg.get(layouts::DPC_STATUS_Write_Register::Field::CLR_PIPE_BUSY).as<BIT>() == ESX_TRUE) {
+                    ESX_CORE_LOG_WARNING("Cear DPC_PIPE_BUSY to 0 not implemented yet");
+                }
+
+                if (writeReg.get(layouts::DPC_STATUS_Write_Register::Field::CLR_BUFFER_BUSY).as<BIT>() == ESX_TRUE) {
+                    ESX_CORE_LOG_WARNING("Cear DPC_BUSY to 0 not implemented yet");
+                }
+
+                if (writeReg.get(layouts::DPC_STATUS_Write_Register::Field::CLR_CLOCK).as<BIT>() == ESX_TRUE) {
+                    ESX_CORE_LOG_WARNING("Cear DPC_CLOCK to 0 not implemented yet");
+                }
+                break;
+            }
+
+            default: ESX_CORE_LOG_WARNING("{} - SU {} not implemented {:08x}h", __FUNCTION__, reg.Value, value);
         }
     }
 

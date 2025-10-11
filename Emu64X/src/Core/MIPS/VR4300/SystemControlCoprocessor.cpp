@@ -192,14 +192,25 @@ namespace esx {
         if(type == ExceptionType::CoprocessorUnusable) 
             mCauseRegister.set(layouts::CauseRegister::Field::CE, parameter);
 
+        U64 EPC = 0;
+        if (type == ExceptionType::Interrupt) {
+            EPC = mCPU->mPC;
+            mCPU->mBranchSlot = mCPU->mBranch;
+            mCPU->mTookBranchSlot = mCPU->mTookBranch;
+        }
+        else {
+            EPC = mCPU->mCurrentPC;
+        }
+
+
         U32 vecOffset = 0x180;
         if (mStatusRegister.get(layouts::StatusRegister::Field::EXL).as<BIT>() == ESX_FALSE) {
             if (mCPU->mBranchSlot == ESX_FALSE) {
                 mCauseRegister.set(layouts::CauseRegister::Field::BD, ESX_FALSE);
-                mEPCRegister.set(layouts::EPCRegister::Field::Value, mCPU->mCurrentPC);
+                mEPCRegister.set(layouts::EPCRegister::Field::Value, EPC);
             } else {
                 mCauseRegister.set(layouts::CauseRegister::Field::BD, ESX_TRUE);
-                mEPCRegister.set(layouts::EPCRegister::Field::Value, mCPU->mCurrentPC - 4);
+                mEPCRegister.set(layouts::EPCRegister::Field::Value, EPC - 4);
             }
         }
 

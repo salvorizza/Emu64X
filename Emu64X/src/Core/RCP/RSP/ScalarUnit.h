@@ -11,6 +11,13 @@
     M(CLR_HALT,0,0) M(SET_HALT,1,1) M(CLR_BROKE,2,2) M(CLR_INTR,3,3) M(SET_INTR,4,4) \
     M(CLR_SSTEP,5,5) M(SET_SSTEP,6,6) M(CLR_INTBREAK,7,7) M(SET_INTBREAK,8,8) M(CLR_SET_SIG,9,24)
 
+#define DPC_START_FIELDS(M) M(START,0,23)
+#define DPC_END_FIELDS(M) M(END,0,23)
+#define DPC_CURRENT_FIELDS(M) M(CURRENT,0,23)
+#define DPC_STATUS_FIELDS(M) M(XBUS,0,0)  M(FREEZE,1,1)  M(FLUSH,2,2) M(GCLK,3,3)  M(TMEM_BUSY,4,4)  M(PIPE_BUSY,5,5)  M(CMD_BUSY,6,6)  M(CBUF_READY,7,7)  M(DMA_BUSY,8,8)  M(END_PENDING,9,9)  M(START_PENDING,10,10)  
+#define DPC_STATUS_WRITE_FIELDS(M) M(CLR_XBUS,0,0)  M(SET_XBUS,1,1)  M(CLR_FREEZE,2,2)  M(SET_FREEZE,3,3)  M(CLR_FLUSH,4,4)  M(SET_FLUSH,5,5)  M(CLR_TMEM_BUSY,6,6)  M(CLR_PIPE_BUSY,7,7)  M(CLR_BUFFER_BUSY,8,8)  M(CLR_CLOCK,9,9)
+
+
 #include "Base/Base.h"
 
 #include "Core/MIPS/Common/Coprocessor.h"
@@ -27,16 +34,29 @@ namespace esx {
 	DEFINE_REGISTER_LAYOUT(SP_STATUS_Register, U32, SP_STATUS_FIELDS)
 	DEFINE_REGISTER_LAYOUT(SP_SEMAPHORE_Register, U32, SP_SEMAPHORE_FIELDS)
 	DEFINE_REGISTER_LAYOUT(SP_STATUS_Write_Register, U32, SP_STATUS_WRITE_FIELDS)
+	DEFINE_REGISTER_LAYOUT(DPC_START_Register, U32, DPC_START_FIELDS)
+	DEFINE_REGISTER_LAYOUT(DPC_END_Register, U32, DPC_END_FIELDS)
+	DEFINE_REGISTER_LAYOUT(DPC_CURRENT_Register, U32, DPC_CURRENT_FIELDS)
+	DEFINE_REGISTER_LAYOUT(DPC_STATUS_Register, U32, DPC_STATUS_FIELDS)
+	DEFINE_REGISTER_LAYOUT(DPC_STATUS_Write_Register, U32, DPC_STATUS_WRITE_FIELDS)
 
 	enum class ScalarUnitRegisterType : U8 {
-		c0 = 0,
-		c1 = 1,
-		c2 = 2,
-		c3 = 3,
-		c4 = 4,
-		c5 = 5,
-		c6 = 6,
-		c7 = 7
+		c0,
+		c1,
+		c2,
+		c3,
+		c4,
+		c5,
+		c6,
+		c7,
+		c8,
+		c9,
+		c10,
+		c11,
+		c12,
+		c13,
+		c14,
+		c15
 	};
 
 	class ScalarUnit : public Coprocessor<R4000> {
@@ -48,6 +68,8 @@ namespace esx {
 
 		void clock(U64 clocks) override;
 
+		void CF() override;
+		void CT() override;
 		void CO() override;
 
 		void unusable() override;
@@ -65,5 +87,10 @@ namespace esx {
 		SP_DMA_WRLEN_Register SP_DMA_WRLEN;
 		SP_STATUS_Register SP_STATUS;
 		SP_SEMAPHORE_Register SP_SEMAPHORE;
+
+		DPC_START_Register DPC_START;
+		DPC_END_Register DPC_END;
+		DPC_CURRENT_Register DPC_CURRENT;
+		DPC_STATUS_Register DPC_STATUS;
 	};
 }

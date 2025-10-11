@@ -68,7 +68,7 @@ namespace esx {
 		}
 		else if (address >= 0x04100000 && address <= 0x041FFFFF) {
 			//TODO: RDP Command
-			ESX_CORE_LOG_WARNING("Store RDP commands not implemented yet {:08x}h", value);
+			ESX_CORE_LOG_WARNING("Store RDP commands not implemented yet at address {:08x}h with value {:08x}h", address, value);
 		}
 		else if (address >= 0x04200000 && address <= 0x042FFFFF) {
 			//TODO: RDP Span
@@ -115,7 +115,7 @@ namespace esx {
 		}
 		else if (address >= 0x04100000 && address <= 0x041FFFFF) {
 			//TODO: RDP Command
-			ESX_CORE_LOG_WARNING("Load RDP commands not implemented yet");
+			ESX_CORE_LOG_WARNING("Load RDP commands not implemented yet at address {:08x}h", address);
 		}
 		else if (address >= 0x04200000 && address <= 0x042FFFFF) {
 			//TODO: RDP Span
