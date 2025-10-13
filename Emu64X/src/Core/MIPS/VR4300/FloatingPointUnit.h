@@ -70,8 +70,8 @@ namespace esx {
 			U64 data = getRegister(reg);
 
 			switch (fmt) {
-				case FormatSpec::S: return *reinterpret_cast<float*>(&data);
-				case FormatSpec::D: return *reinterpret_cast<double*>(&data);
+				case FormatSpec::S: return *reinterpret_cast<F32*>(&data);
+				case FormatSpec::D: return *reinterpret_cast<F64*>(&data);
 				case FormatSpec::W: return *reinterpret_cast<U32*>(&data);
 				case FormatSpec::L: return *reinterpret_cast<U64*>(&data);
 			}
@@ -80,8 +80,8 @@ namespace esx {
 		template<typename T, typename T2>
 		T ConvertFmt(T2 value, FormatSpec from, FormatSpec to) {
 			switch (to) {
-				case FormatSpec::S: return static_cast<float>(value);
-				case FormatSpec::D: return static_cast<double>(value);
+				case FormatSpec::S: return static_cast<F32>(value);
+				case FormatSpec::D: return static_cast<F64>(value);
 				case FormatSpec::W: return static_cast<U32>(value);
 				case FormatSpec::L: return static_cast<U64>(value);
 			}

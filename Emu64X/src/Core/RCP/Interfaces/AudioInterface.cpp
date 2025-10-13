@@ -53,7 +53,8 @@ namespace esx {
 
 					U64 cpuClocks = mRCP->getBus("Root")->getDevice<VR4300>("VR4300")->getClocks();
 
-					U64 TargetClock = DMAAlreadyUp ? Scheduler::NextEventOfType(SchedulerEventType::AIDMADone).value()->ClockTarget : cpuClocks;
+					auto TransferEvent = Scheduler::NextEventOfType(SchedulerEventType::AIDMADone);
+					U64 TargetClock = DMAAlreadyUp ? TransferEvent.value()->ClockTarget : (cpuClocks + 1);
 					U64 Length = AI_LENGTH.get(layouts::AI_LENGTH_Register::Field::LENGTH).as<U64>() << 3;
 					U64 DACRate = AI_DACRATE.get(layouts::AI_DACRATE_Register::Field::DACRATE).as<U64>();
 					U64 SampleClock = (((Length / 2llu) * (DACRate + 1)) * 93750000llu) / 48681812llu;
@@ -61,13 +62,15 @@ namespace esx {
 					SchedulerEvent dmaStartEvent = {
 							.Type = SchedulerEventType::AIDMAStart,
 							.ClockStart = cpuClocks,
-							.ClockTarget = TargetClock + 1
+							.ClockTarget = TargetClock,
+							.Priority = TransferEvent ? 1 : 0
 					};
 
 					SchedulerEvent dmaDoneEvent = {
 							.Type = SchedulerEventType::AIDMADone,
 							.ClockStart = cpuClocks,
-							.ClockTarget = TargetClock + SampleClock
+							.ClockTarget = TargetClock + SampleClock,
+							.Priority = TransferEvent ? 1 : 0
 					};
 					dmaDoneEvent.Write(AI_DRAM_ADDR.read());
 					dmaDoneEvent.Write(AI_LENGTH.read());

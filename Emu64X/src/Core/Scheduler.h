@@ -21,6 +21,7 @@ namespace esx {
 	};
 
 	struct SchedulerEvent {
+		U64 Id = 0;
 		SchedulerEventType Type = SchedulerEventType::None;
 		U64 ClockStart = 0;
 		U64 ClockTarget = 0;
@@ -28,6 +29,7 @@ namespace esx {
 		U64 RescheduleClocks = 0;
 		Vector<U8> UserData = {};
 		U8 ReadPointer = 0;
+		I32 Priority = 0;
 
 		template<typename T>
 		void Write(const T& Data) {
@@ -41,6 +43,10 @@ namespace esx {
 			T value = *reinterpret_cast<const T*>(UserData.data() + ReadPointer);
 			ReadPointer += sizeof(T);
 			return value;
+		}
+
+		void Clear() {
+			UserData.resize(0);
 		}
 	};
 
@@ -57,9 +63,9 @@ namespace esx {
 		Scheduler() = delete;
 		~Scheduler() = default;
 
-		static void ScheduleEvent(const SchedulerEvent& schedulerEvent);
+		static void ScheduleEvent(SchedulerEvent& schedulerEvent);
 		static void UnScheduleAllEvents(SchedulerEventType type);
-		static Optional<SchedulerEvent*> NextEventOfType(SchedulerEventType type);
+		static Optional<SchedulerEvent*> NextEventOfType(SchedulerEventType type, U64 idToExclude = 0);
 		static const SchedulerEvent& NextEvent();
 		static BIT CurrentEventHasBeenStopped();
 		static void ExecuteEvent();
@@ -71,6 +77,7 @@ namespace esx {
 		static SchedulerEventContainer sEvents;
 		static SchedulerEventHandlerContainer sEventHandlers;
 		static BIT sStopCurrentEvent;
+		static U64 sEventSerial;
 
 	};
 

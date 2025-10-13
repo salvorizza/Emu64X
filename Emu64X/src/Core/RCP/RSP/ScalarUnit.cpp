@@ -69,11 +69,50 @@ namespace esx {
                 SP_STATUS.set(layouts::SP_STATUS_Register::Field::DMA_BUSY, ESX_FALSE);
             }
         });
+    
+        Scheduler::AddSchedulerEventHandler(SchedulerEventType::DPDMADone, [&](SchedulerEvent& ev) {
+            DPC_START_Register DPC_START = ev.Read<DPC_START_Register>();
+            DPC_END_Register DPC_END = ev.Read<DPC_END_Register>();
+            
+            U32 RDRAMAddr = DPC_START.get(layouts::DPC_START_Register::Field::START).as<U32>() & ~0x7;
+            U64 TransferLength = (DPC_END.get(layouts::DPC_END_Register::Field::END).as<U32>() & ~0x7) - (DPC_START.get(layouts::DPC_START_Register::Field::START).as<U32>() & ~0x7);
+            U64 NumDWords = TransferLength / 8;
+
+            for (I32 numDWord = 0; numDWord < NumDWords; numDWord++) {
+                U32 lo = mRCP->SysADLoad(RDRAMAddr + 4, sizeof(U32) * 8);
+                U32 hi = mRCP->SysADLoad(RDRAMAddr + 0, sizeof(U32) * 8);
+                U64 command = (static_cast<U64>(hi) << 32) | lo;
+
+                RDRAMAddr += 8;
+            }
+
+            DPC_CURRENT.set(layouts::DPC_CURRENT_Register::Field::CURRENT, DPC_END.get(layouts::DPC_END_Register::Field::END).as<U32>());
+            if (Scheduler::NextEventOfType(SchedulerEventType::DPDMADone, ev.Id).has_value() == ESX_FALSE) {
+                DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::PIPE_BUSY, ESX_FALSE);
+                DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::DMA_BUSY, ESX_FALSE);
+            }
+        });
     }
 
     void ScalarUnit::clock(U64 clocks)
     {
-        
+        if (mPendingTransfer && Scheduler::NextEventOfType(SchedulerEventType::DPDMADone).has_value() == ESX_FALSE) {
+            U64 cpuClocks = mRCP->getBus("Root")->getDevice<VR4300>("VR4300")->getClocks();
+
+            SchedulerEvent dmaDoneEvent = {
+                .Type = SchedulerEventType::DPDMADone,
+                .ClockStart = cpuClocks,
+                .ClockTarget = cpuClocks + mPendingTransfer->Clocks()
+            };
+            dmaDoneEvent.Write(mPendingTransfer->Start);
+            dmaDoneEvent.Write(mPendingTransfer->End);
+
+            Scheduler::ScheduleEvent(dmaDoneEvent);
+            DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::PIPE_BUSY, ESX_TRUE);
+            DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::DMA_BUSY, ESX_TRUE);
+
+            mPendingTransfer = {};
+        }
     }
 
     void ScalarUnit::CF()
@@ -162,7 +201,8 @@ namespace esx {
                     SchedulerEvent dmaDoneEvent = {
                             .Type = SchedulerEventType::SPDMADone,
                             .ClockStart = cpuClocks,
-                            .ClockTarget = TargetClock + ClockToAdd
+                            .ClockTarget = TargetClock + ClockToAdd,
+                            .Priority = DMAAlreadyUp ? 1 : 0
                     };
                     dmaDoneEvent.Write(ESX_FALSE);
                     dmaDoneEvent.Write(SP_DMA_SPADDR);
@@ -195,7 +235,8 @@ namespace esx {
                     SchedulerEvent dmaDoneEvent = {
                             .Type = SchedulerEventType::SPDMADone,
                             .ClockStart = cpuClocks,
-                            .ClockTarget = TargetClock + ClockToAdd
+                            .ClockTarget = TargetClock + ClockToAdd,
+                            .Priority = DMAAlreadyUp ? 1 : 0
                     };
                     dmaDoneEvent.Write(ESX_FALSE);
                     dmaDoneEvent.Write(SP_DMA_SPADDR);
@@ -264,22 +305,66 @@ namespace esx {
             }
 
             case ScalarUnitRegisterType::c9: {
+                DPC_END_Register OldDPC_END = DPC_END;
                 DPC_END.write(value);
+
+                U64 TransferLength = (DPC_END.get(layouts::DPC_END_Register::Field::END).as<U32>() & ~0x7) - (DPC_START.get(layouts::DPC_START_Register::Field::START).as<U32>() & ~0x7);
 
                 auto TransferEvent = Scheduler::NextEventOfType(SchedulerEventType::DPDMADone);
                 if (DPC_STATUS.get(layouts::DPC_STATUS_Register::Field::START_PENDING).as<BIT>() == ESX_FALSE) {
-                    //Incremental
-                } else {
-                    if (TransferEvent) {
-                        DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::END_PENDING, ESX_TRUE);
-                        //Prepare/Update pending event
-                    } else {
-                        DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::START_PENDING, ESX_FALSE);
-                        //Start new event
+                    U64 ClockStart = TransferEvent ? TransferEvent.value()->ClockTarget : mRCP->getBus("Root")->getDevice<VR4300>("VR4300")->getClocks();
+                    U64 ClockEnd = ClockStart + (TransferLength * 10) / 37;
+
+                    SchedulerEvent dmaDoneEvent = {
+                            .Type = SchedulerEventType::DPDMADone,
+                            .ClockStart = ClockStart,
+                            .ClockTarget = ClockEnd,
+                            .Priority = TransferEvent ? 1 : 0
+                    };
+                    dmaDoneEvent.Write(TransferEvent ? OldDPC_END.read() : DPC_START.read());
+                    dmaDoneEvent.Write(DPC_END);
+
+                    if (TransferLength > 0) {
+                        Scheduler::ScheduleEvent(dmaDoneEvent);
+                        DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::PIPE_BUSY, ESX_TRUE);
+                        DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::DMA_BUSY, ESX_TRUE);
                     }
                 }
+                else {
+                    if (TransferEvent) {
+                        DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::END_PENDING, ESX_TRUE);
 
-                DPC_CURRENT.set(layouts::DPC_CURRENT_Register::Field::CURRENT, DPC_END.get(layouts::DPC_END_Register::Field::END).as<U32>());
+                        if (mPendingTransfer) {
+                            mPendingTransfer->Start = DPC_START;
+                            mPendingTransfer->End = DPC_END;
+                        } else {
+                            mPendingTransfer = TransferData{
+                                .Start = DPC_START,
+                                .End = DPC_END
+                            };
+                        }
+                    }
+                    else {
+                        DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::START_PENDING, ESX_FALSE);
+                            
+                        U64 ClockStart = mRCP->getBus("Root")->getDevice<VR4300>("VR4300")->getClocks();
+                        U64 ClockEnd = ClockStart + (TransferLength * 10) / 37;
+
+                        SchedulerEvent dmaDoneEvent = {
+                                .Type = SchedulerEventType::DPDMADone,
+                                .ClockStart = ClockStart,
+                                .ClockTarget = ClockEnd
+                        };
+                        dmaDoneEvent.Write(DPC_START.read());
+                        dmaDoneEvent.Write(DPC_END);
+
+                        if (TransferLength > 0) {
+                            Scheduler::ScheduleEvent(dmaDoneEvent);
+                            DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::PIPE_BUSY, ESX_TRUE);
+                            DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::DMA_BUSY, ESX_TRUE);
+                        }
+                    }
+                }
                 break;
             }
 

@@ -59,6 +59,16 @@ namespace esx {
 		c15
 	};
 
+	struct TransferData {
+		DPC_START_Register Start;
+		DPC_END_Register End;
+		
+		U64 Clocks() const {
+			U64 TransferLength = (End.get(layouts::DPC_END_Register::Field::END).as<U32>() & ~0x7) - (Start.get(layouts::DPC_START_Register::Field::START).as<U32>() & ~0x7);
+			return (TransferLength * 10) / 37;;
+		}
+	};
+
 	class ScalarUnit : public Coprocessor<R4000> {
 	public:
 		friend class RSP;
@@ -80,6 +90,7 @@ namespace esx {
 		virtual void setRegister(RegisterIndex reg, U64 value) override;
 	private:
 		RCP* mRCP;
+		Optional<TransferData> mPendingTransfer = {};
 
 		SP_DMA_SPADDR_Register SP_DMA_SPADDR;
 		SP_DMA_RAMADDR_Register SP_DMA_RAMADDR;

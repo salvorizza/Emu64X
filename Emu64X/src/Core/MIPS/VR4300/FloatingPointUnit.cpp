@@ -193,7 +193,7 @@ namespace esx {
 
 		switch (fmt) {
 			case FormatSpec::S: {
-				StoreFPR(fd, fmt, ValueFPR<float>(fs, fmt) + ValueFPR<float>(ft, fmt));
+				StoreFPR(fd, fmt, ValueFPR<F32>(fs, fmt) + ValueFPR<F32>(ft, fmt));
 				break;
 			}
 
@@ -213,7 +213,7 @@ namespace esx {
 
 		switch (fmt) {
 			case FormatSpec::S: {
-				StoreFPR(fd, fmt, ValueFPR<float>(fs, fmt) - ValueFPR<float>(ft, fmt));
+				StoreFPR(fd, fmt, ValueFPR<F32>(fs, fmt) - ValueFPR<F32>(ft, fmt));
 				break;
 			}
 
@@ -233,7 +233,7 @@ namespace esx {
 
 		switch (fmt) {
 			case FormatSpec::S: {
-				StoreFPR(fd, fmt, ValueFPR<float>(fs, fmt) * ValueFPR<float>(ft, fmt));
+				StoreFPR(fd, fmt, ValueFPR<F32>(fs, fmt) * ValueFPR<F32>(ft, fmt));
 				break;
 			}
 
@@ -253,7 +253,7 @@ namespace esx {
 
 		switch (fmt) {
 			case FormatSpec::S: {
-				StoreFPR(fd, fmt, ValueFPR<float>(fs, fmt) / ValueFPR<float>(ft, fmt));
+				StoreFPR(fd, fmt, ValueFPR<F32>(fs, fmt) / ValueFPR<F32>(ft, fmt));
 				break;
 			}
 
@@ -272,7 +272,7 @@ namespace esx {
 
 		switch (fmt) {
 			case FormatSpec::S: {
-				StoreFPR(fd, fmt, std::sqrtf(ValueFPR<float>(fs, fmt)));
+				StoreFPR(fd, fmt, std::sqrtf(ValueFPR<F32>(fs, fmt)));
 				break;
 			}
 
@@ -291,7 +291,7 @@ namespace esx {
 
 		switch (fmt) {
 			case FormatSpec::S: {
-				StoreFPR(fd, fmt, std::fabsf(ValueFPR<float>(fs, fmt)));
+				StoreFPR(fd, fmt, std::fabsf(ValueFPR<F32>(fs, fmt)));
 				break;
 			}
 
@@ -310,7 +310,7 @@ namespace esx {
 
 		switch (fmt) {
 			case FormatSpec::S: {
-				StoreFPR(fd, fmt, ValueFPR<float>(fs, fmt));
+				StoreFPR(fd, fmt, ValueFPR<F32>(fs, fmt));
 				break;
 			}
 
@@ -329,7 +329,7 @@ namespace esx {
 
 		switch (fmt) {
 			case FormatSpec::S: {
-				StoreFPR(fd, fmt, -1 * ValueFPR<float>(fs, fmt));
+				StoreFPR(fd, fmt, -1 * ValueFPR<F32>(fs, fmt));
 				break;
 			}
 
@@ -373,7 +373,7 @@ namespace esx {
 
 		switch (fmt) {
 			case FormatSpec::S: {
-				StoreFPR(fd, FormatSpec::W, ConvertFmt<U32>(std::trunc(ValueFPR<float>(fs, fmt)), fmt, FormatSpec::W));
+				StoreFPR(fd, FormatSpec::W, ConvertFmt<U32>(std::trunc(ValueFPR<F32>(fs, fmt)), fmt, FormatSpec::W));
 				break;
 			}
 
@@ -402,7 +402,7 @@ namespace esx {
 
 		switch (fmt) {
 			case FormatSpec::W: {
-				StoreFPR(fd, FormatSpec::S, ConvertFmt<float>(ValueFPR<U32>(fs, fmt), fmt, FormatSpec::S));
+				StoreFPR(fd, FormatSpec::S, ConvertFmt<F32>(ValueFPR<U32>(fs, fmt), fmt, FormatSpec::S));
 				break;
 			}
 
@@ -427,7 +427,7 @@ namespace esx {
 
 		switch (fmt) {
 			case FormatSpec::S: {
-				StoreFPR(fd, FormatSpec::W, ConvertFmt<U32>(ValueFPR<float>(fs, fmt), fmt, FormatSpec::W));
+				StoreFPR(fd, FormatSpec::W, ConvertFmt<U32>(ValueFPR<F32>(fs, fmt), fmt, FormatSpec::W));
 				break;
 			}
 
@@ -456,8 +456,8 @@ namespace esx {
 
 		switch (fmt) {
 			case FormatSpec::S: {
-				less = ValueFPR<float>(fs, fmt) < ValueFPR<float>(ft, fmt);
-				equal = ValueFPR<float>(fs, fmt) == ValueFPR<float>(ft, fmt);
+				less = ValueFPR<F32>(fs, fmt) < ValueFPR<F32>(ft, fmt);
+				equal = ValueFPR<F32>(fs, fmt) == ValueFPR<F32>(ft, fmt);
 				unordered = ESX_FALSE;
 				break;
 			}

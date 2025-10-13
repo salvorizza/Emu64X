@@ -8,10 +8,12 @@ namespace esx {
 	SchedulerEventContainer Scheduler::sEvents = {};
 	SchedulerEventHandlerContainer Scheduler::sEventHandlers = {};
 	BIT Scheduler::sStopCurrentEvent = ESX_FALSE;
+	U64 Scheduler::sEventSerial = 1;
 
-	void Scheduler::ScheduleEvent(const SchedulerEvent& schedulerEvent)
+	void Scheduler::ScheduleEvent(SchedulerEvent& schedulerEvent)
 	{
-		auto it = std::find_if(sEvents.begin(), sEvents.end(), [&](const SchedulerEvent& ev) { return schedulerEvent.ClockTarget < ev.ClockTarget || (schedulerEvent.ClockTarget == ev.ClockTarget && static_cast<U8>(schedulerEvent.Type) > static_cast<U8>(ev.Type)); });
+		schedulerEvent.Id = sEventSerial++;
+		auto it = std::find_if(sEvents.begin(), sEvents.end(), [&](const SchedulerEvent& ev) { return schedulerEvent.ClockTarget < ev.ClockTarget || (schedulerEvent.ClockTarget == ev.ClockTarget && static_cast<U8>(schedulerEvent.Type) > static_cast<U8>(ev.Type) && schedulerEvent.Priority < ev.Priority); });
 		if (it != sEvents.end()) {
 			sEvents.insert(it, schedulerEvent);
 		} else {
@@ -24,10 +26,10 @@ namespace esx {
 		std::erase_if(sEvents, [&](const SchedulerEvent& ev) { return ev.Type == type; });
 	}
 
-	Optional<SchedulerEvent*> Scheduler::NextEventOfType(SchedulerEventType type)
+	Optional<SchedulerEvent*> Scheduler::NextEventOfType(SchedulerEventType type, U64 idToExclude)
 	{
 		Optional<SchedulerEvent*> result = {};
-		auto it = std::find_if(sEvents.begin(), sEvents.end(), [&](const SchedulerEvent& ev) { return ev.Type == type; });
+		auto it = std::find_if(sEvents.begin(), sEvents.end(), [&](const SchedulerEvent& ev) { return ev.Type == type && ev.Id != idToExclude; });
 		if (it != sEvents.end()) {
 			result.emplace(&*it);
 		}
