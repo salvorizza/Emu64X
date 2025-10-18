@@ -88,6 +88,8 @@ namespace esx {
 
 		virtual U64 getRegister(RegisterIndex reg) override;
 		virtual void setRegister(RegisterIndex reg, U64 value) override;
+
+		void DoTransferRDPCommands(U32 start, U32 end);
 	private:
 		RCP* mRCP;
 		Optional<TransferData> mPendingTransfer = {};

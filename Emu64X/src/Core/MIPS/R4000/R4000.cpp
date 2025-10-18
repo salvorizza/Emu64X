@@ -34,14 +34,9 @@ namespace esx {
 
 	U32 R4000::fetch(U32 virtualAddress)
 	{
-		BIT cached = ESX_FALSE;
 		U32 physicalAddress = 0x04001000 + (virtualAddress & 0xFFF);
 
-		if (cached) {
-			return accessCache(mICache, virtualAddress, physicalAddress);
-		} else {
-			return mRCP->SysADLoad(physicalAddress, 32);
-		}
+		return _byteswap_ulong(*reinterpret_cast<U32*>(&mRCP->mIMEM[physicalAddress - 0x04001000]));
 	}
 
 	static const Array<R4000ExecuteFunction, 64> primaryOpCodeDecode = {
@@ -248,7 +243,7 @@ namespace esx {
 		if (exception) {
 			r = getRegister(mCurrentInstruction.RegisterTarget());
 		} else {
-			r = static_cast<U32>(static_cast<I32>(static_cast<I16>(static_cast<U16>(r))));
+			r = static_cast<I16>(static_cast<U16>(r));
 		}
 
 		setRegister(mCurrentInstruction.RegisterTarget(), r);
@@ -284,7 +279,7 @@ namespace esx {
 		if (exception) {
 			r = getRegister(mCurrentInstruction.RegisterTarget());
 		} else {
-			r = static_cast<U32>(static_cast<I32>(static_cast<I8>(static_cast<U8>(r))));
+			r = static_cast<I8>(static_cast<U8>(r));
 		}
 
 		setRegister(mCurrentInstruction.RegisterTarget(), r);
@@ -790,11 +785,15 @@ namespace esx {
 
 		BIT exception = ESX_FALSE;
 
-		RegisterIndex base = mCurrentInstruction.RegisterSource();
-		U8 vt = mCurrentInstruction.RegisterTarget().Value;
-		U8 opcode = mCurrentInstruction.RegisterDestination().Value;
-		U8 element = mCurrentInstruction.Element();
-		I8 offset = mCurrentInstruction.Offset();
+		VU_LOAD_STORE_INSTRUCTION_Register instruction;
+		instruction.write(mCurrentInstruction.binaryInstruction);
+
+		RegisterIndex base = instruction.get(layouts::VU_LOAD_STORE_INSTRUCTION_Register::Field::base).as<RegisterIndex>();
+		U8 vt = instruction.get(layouts::VU_LOAD_STORE_INSTRUCTION_Register::Field::vt).as<U8>();
+		U8 opcode = instruction.get(layouts::VU_LOAD_STORE_INSTRUCTION_Register::Field::opcode).as<U8>();
+		U8 element = instruction.get(layouts::VU_LOAD_STORE_INSTRUCTION_Register::Field::element).as<U8>();
+		I8 offset = instruction.get(layouts::VU_LOAD_STORE_INSTRUCTION_Register::Field::offset).as<I8>();
+
 		size_t access_size = 1llu << opcode;
 
 		U32 addr = getRegister(base) + offset * access_size;
@@ -824,11 +823,14 @@ namespace esx {
 
 		BIT exception = ESX_FALSE;
 
-		RegisterIndex base = mCurrentInstruction.RegisterSource();
-		U8 vt = mCurrentInstruction.RegisterTarget().Value;
-		U8 opcode = mCurrentInstruction.RegisterDestination().Value;
-		U8 element = mCurrentInstruction.Element();
-		I8 offset = mCurrentInstruction.Offset();
+		VU_LOAD_STORE_INSTRUCTION_Register instruction;
+		instruction.write(mCurrentInstruction.binaryInstruction);
+
+		RegisterIndex base = instruction.get(layouts::VU_LOAD_STORE_INSTRUCTION_Register::Field::base).as<RegisterIndex>();
+		U8 vt = instruction.get(layouts::VU_LOAD_STORE_INSTRUCTION_Register::Field::vt).as<U8>();
+		U8 opcode = instruction.get(layouts::VU_LOAD_STORE_INSTRUCTION_Register::Field::opcode).as<U8>();
+		U8 element = instruction.get(layouts::VU_LOAD_STORE_INSTRUCTION_Register::Field::element).as<U8>();
+		I8 offset = instruction.get(layouts::VU_LOAD_STORE_INSTRUCTION_Register::Field::offset).as<I8>();
 		size_t access_size = 1llu << opcode;
 
 		U32 addr = getRegister(base) + offset * access_size;

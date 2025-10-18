@@ -31,7 +31,7 @@ namespace esx {
 
 		RCP* mRCP;
 
-		U32 mRCPClocks = 0;
+		U64 mRCPClocks = 0;
 
 		SharedPtr<R4000> mCore;
 		SharedPtr<ScalarUnit> mSU;

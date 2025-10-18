@@ -35,7 +35,8 @@ namespace esx {
 				break;
 
 			default:
-				return;
+				temp = mCPU->getRegister(mCPU->mCurrentInstruction.RegisterTarget());
+				break;
 		}
 
 		if (mCPU->is64BitMode()) {

@@ -21,7 +21,7 @@ namespace esx {
 		while (mRCPClocks < newRCPClocks) {
 			mCore->clock();
 
-			mRCPClocks = (mRCPClocks + 1) & 0xFFFFFF;
+			mRCPClocks++;
 		}
 
 		mSU->clock(clocks);
