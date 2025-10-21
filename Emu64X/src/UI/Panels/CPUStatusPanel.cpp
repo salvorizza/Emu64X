@@ -2,6 +2,8 @@
 
 #include <imgui.h>
 
+#include "Core/RCP/RSP/VectorUnit.h"
+
 namespace esx {
 
 
@@ -83,7 +85,7 @@ namespace esx {
 		};
 
 		enum class TabItem {
-			CPU, CP0, CP1
+			CPU, CP0, CP1, CP2
 		};
 
 		static TabItemProc tabItemProc = TabItemProc::VR4300;
@@ -127,6 +129,13 @@ namespace esx {
 			if (tabItemProc == TabItemProc::VR4300) {
 				if (ImGui::BeginTabItem("CP1")) {
 					tabItem = TabItem::CP1;
+					ImGui::EndTabItem();
+				}
+			}
+
+			if (tabItemProc == TabItemProc::RSP) {
+				if (ImGui::BeginTabItem("CP2")) {
+					R4000tabItem = TabItem::CP2;
 					ImGui::EndTabItem();
 				}
 			}
@@ -257,6 +266,28 @@ namespace esx {
 							}
 							
 
+						}
+					}
+
+				}
+				ImGui::EndTable();
+				break;
+			}
+
+			case TabItem::CP2: {
+				if (ImGui::BeginTable("CP2StatusTable", 3, ImGuiTableFlags_SizingStretchSame | ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Hideable)) {
+					ImGui::TableSetupColumn("Register", ImGuiTableColumnFlags_WidthFixed, availWidth * 0.05f);
+					ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, availWidth * 0.90f);
+					ImGui::TableHeadersRow();
+
+					for (int i = 0; i < 32; i++) {
+						ImGui::TableNextRow();
+						ImGui::TableNextColumn();
+						ImGui::Text("v%d", i);
+						ImGui::TableNextColumn();
+						for (I32 j = 0; j < 8; j++) {
+							ImGui::Text("0x%04X", _byteswap_ushort(mInstanceR4000->mRCP->mRSP->mVU->VPR[i][j]));
+							ImGui::SameLine();
 						}
 					}
 

@@ -16,6 +16,7 @@ namespace esx {
 	class R4000;
 
 	class RCP : public BusDevice {
+		friend class CPUStatusPanel;
 		friend class MemoryEditorPanel;
 		friend class R4000;
 	public:

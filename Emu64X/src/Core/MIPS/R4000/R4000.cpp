@@ -35,8 +35,9 @@ namespace esx {
 	U32 R4000::fetch(U32 virtualAddress)
 	{
 		U32 physicalAddress = 0x04001000 + (virtualAddress & 0xFFF);
-
-		return _byteswap_ulong(*reinterpret_cast<U32*>(&mRCP->mIMEM[physicalAddress - 0x04001000]));
+		U32 output = 0;
+		mRCP->load("Root", physicalAddress, output, 0, sizeof(U32));
+		return output;
 	}
 
 	static const Array<R4000ExecuteFunction, 64> primaryOpCodeDecode = {
@@ -113,13 +114,16 @@ namespace esx {
 
 		U64 result = 0;
 		if (accessSize == 8) {
-			result = _byteswap_uint64(*reinterpret_cast<U64*>(&mRCP->mDMEM[physicalAddress - 0x04000000]));
-		} else if  (accessSize == 4) {
-			result = _byteswap_ulong(*reinterpret_cast<U32*>(&mRCP->mDMEM[physicalAddress - 0x04000000]));
-		} else if (accessSize == 2) {
-			result = _byteswap_ushort(*reinterpret_cast<U16*>(&mRCP->mDMEM[physicalAddress - 0x04000000]));
-		} else if (accessSize == 1) {
-			result = mRCP->mDMEM[physicalAddress - 0x04000000];
+			U32 lo,hi;
+
+			mRCP->load("Root", physicalAddress, hi, 0, sizeof(U32) * 8);
+			mRCP->load("Root", physicalAddress + 4, lo, 0, sizeof(U32) * 8);
+
+			result = (static_cast<U64>(hi) << 32) | lo;
+		} else {
+			U32 output;
+			mRCP->load("Root", physicalAddress, output, 0, accessSize * 8);
+			result = output;
 		}
 
 		PRINT_IO_LOAD(physicalAddress, result);
@@ -136,13 +140,10 @@ namespace esx {
 		PRINT_IO_STORE(physicalAddress, value);
 
 		if (accessSize == 8) {
-			*reinterpret_cast<U64*>(&mRCP->mDMEM[physicalAddress - 0x04000000]) = _byteswap_uint64(value);
-		} else if (accessSize == 4) {
-			*reinterpret_cast<U32*>(&mRCP->mDMEM[physicalAddress - 0x04000000]) = _byteswap_ulong(value);
-		} else if (accessSize == 2) {
-			*reinterpret_cast<U16*>(&mRCP->mDMEM[physicalAddress - 0x04000000]) = _byteswap_ushort(value);
-		} else if (accessSize == 1) {
-			mRCP->mDMEM[physicalAddress - 0x04000000] = value;
+			mRCP->store("Root", physicalAddress, value >> 32, 0, sizeof(U32) * 8);
+			mRCP->store("Root", physicalAddress + 4, value & 0xFFFFFFFF, 0, sizeof(U32) * 8);
+		} else {
+			mRCP->store("Root", physicalAddress, value, 0, accessSize * 8);
 		}
 	}
 
@@ -294,7 +295,7 @@ namespace esx {
 
 		U64 m = a + b;
 
-		U32 r = load(m, exception, sizeof(U16));
+		U32 r = load(m, exception, sizeof(U8));
 
 		setRegister(mCurrentInstruction.RegisterTarget(), r);
 	}
@@ -351,7 +352,7 @@ namespace esx {
 
 	void R4000::LUI()
 	{
-		U64 r = mCurrentInstruction.Immediate() << 16;
+		U32 r = static_cast<U32>(mCurrentInstruction.Immediate()) << 16;
 
 		setRegister(mCurrentInstruction.RegisterTarget(), r);
 	}
@@ -489,7 +490,7 @@ namespace esx {
 		U32 a = getRegister(mCurrentInstruction.RegisterTarget());
 		U32 s = mCurrentInstruction.ShiftAmount();
 
-		U64 r = a << s;
+		U32 r = a << s;
 
 		setRegister(mCurrentInstruction.RegisterDestination(), r);
 	}
@@ -519,7 +520,7 @@ namespace esx {
 		U32 a = getRegister(mCurrentInstruction.RegisterTarget());
 		U32 s = getRegister(mCurrentInstruction.RegisterSource());
 
-		U64 r = a << (s & 0x1F);
+		U32 r = a << (s & 0x1F);
 
 		setRegister(mCurrentInstruction.RegisterDestination(), r);
 	}
@@ -529,7 +530,7 @@ namespace esx {
 		U32 a = getRegister(mCurrentInstruction.RegisterTarget());
 		U32 s = getRegister(mCurrentInstruction.RegisterSource());
 
-		U64 r = a >> (s & 0x1F);
+		U32 r = a >> (s & 0x1F);
 
 		setRegister(mCurrentInstruction.RegisterDestination(), r);
 	}
@@ -539,7 +540,7 @@ namespace esx {
 		I32 a = getRegister(mCurrentInstruction.RegisterTarget());
 		U32 s = getRegister(mCurrentInstruction.RegisterSource());
 
-		U64 r = a >> (s & 0x1F);
+		U32 r = a >> (s & 0x1F);
 
 		setRegister(mCurrentInstruction.RegisterDestination(), r);
 	}
@@ -656,7 +657,7 @@ namespace esx {
 
 	void R4000::J()
 	{
-		U64 a = (mNextPC & 0xFFFFFFFFF0000000) | (mCurrentInstruction.PseudoAddress() << 2);
+		U32 a = (mNextPC & 0xF0000000) | (mCurrentInstruction.PseudoAddress() << 2);
 		mNextPC = a;
 		mBranch = ESX_TRUE;
 		mTookBranch = ESX_TRUE;
@@ -794,12 +795,41 @@ namespace esx {
 		U8 element = instruction.get(layouts::VU_LOAD_STORE_INSTRUCTION_Register::Field::element).as<U8>();
 		I8 offset = instruction.get(layouts::VU_LOAD_STORE_INSTRUCTION_Register::Field::offset).as<I8>();
 
-		size_t access_size = 1llu << opcode;
+		switch (opcode) {
+			case 0x00:
+			case 0x01:
+			case 0x02:
+			case 0x03: {
+				size_t access_size = 1llu << opcode;
 
-		U32 addr = getRegister(base) + offset * access_size;
-		U64 data = load(addr, exception, access_size);
+				U32 addr = getRegister(base) + offset * access_size;
+				U64 data = load(addr, exception, access_size);
 
-		vu->setVPRRegisterBytes(vt, data, element, access_size);
+				vu->setVPRRegisterBytes(vt, data, element, access_size);
+				break;
+			}
+
+			case 0x04: {
+				size_t access_size =16;
+
+				U32 addr = getRegister(base) + offset * access_size;
+				U32 unaligned = addr & 0xF;
+				U32 alignedAddr = addr & ~0xF;
+
+				U64 dataHi = load(alignedAddr, exception, sizeof(U64));
+				U64 dataLo = load(alignedAddr + 8, exception, sizeof(U64));
+
+				vu->setVPRRegisterBytes(vt, dataLo, element + 8, sizeof(U64));
+				vu->setVPRRegisterBytes(vt, dataHi, element, sizeof(U64));
+				break;
+			}
+
+			default: {
+				ESX_CORE_LOG_WARNING("Not handled LWC2 {:02x}h opcode", opcode);
+				break;
+			}
+
+		}
 	}
 
 	void R4000::LWC3()
@@ -831,12 +861,41 @@ namespace esx {
 		U8 opcode = instruction.get(layouts::VU_LOAD_STORE_INSTRUCTION_Register::Field::opcode).as<U8>();
 		U8 element = instruction.get(layouts::VU_LOAD_STORE_INSTRUCTION_Register::Field::element).as<U8>();
 		I8 offset = instruction.get(layouts::VU_LOAD_STORE_INSTRUCTION_Register::Field::offset).as<I8>();
-		size_t access_size = 1llu << opcode;
+		
+		switch (opcode) {
+			case 0:
+			case 1:
+			case 2:
+			case 3: {
+				size_t access_size = 1llu << opcode;
 
-		U32 addr = getRegister(base) + offset * access_size;
-		U64 data = vu->getVPRRegisterBytes(vt, element, access_size);
+				U32 addr = getRegister(base) + offset * access_size;
+				U64 data = vu->getVPRRegisterBytes(vt, element, access_size);
 
-		store(addr, data, access_size);
+				store(addr, data, access_size);
+				break;
+			}
+
+			case 0x04: {
+				size_t access_size = 16;
+
+				U32 addr = getRegister(base) + offset * access_size;
+				U32 unaligned = addr & 0xF;
+				U32 alignedAddr = addr & ~0xF;
+
+				U64 dataHi = vu->getVPRRegisterBytes(vt, element, sizeof(U64));
+				U64 dataLo = vu->getVPRRegisterBytes(vt, element + 8, sizeof(U64));
+
+				store(alignedAddr, dataHi, sizeof(U64));
+				store(alignedAddr + 8, dataLo, sizeof(U64));
+				break;
+			}
+
+			default: {
+				ESX_CORE_LOG_WARNING("Not handled SWC2 {:02x}h opcode", opcode);
+				break;
+			}
+		}
 	}
 
 	void R4000::SWC3()
@@ -847,56 +906,5 @@ namespace esx {
 	void R4000::NA()
 	{
 		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
-	}
-
-	void R4000::iCacheStore(U32 address, U32 value)
-	{
-		U32 cacheLineNumber = address / 32;
-		U32 wordAddress = (address & 0xF) / 4;
-
-		auto& instruction = mICache.CacheLines[cacheLineNumber].Words[wordAddress];
-		instruction.Word = value;
-		mICache.CacheLines[cacheLineNumber].Valid = ESX_FALSE;
-	}
-
-	void R4000::addWriteQueueOperation(const StoreOperation& writeOp)
-	{
-		mWriteQueue.push_back(writeOp);
-	}
-
-	void R4000::doWriteQueueOperation(const StoreOperation& writeOp)
-	{
-		/*switch (writeOp.Size) {
-			case sizeof(U8)  :  mRootBus->store(writeOp.Address, static_cast<U8> (writeOp.Data)); break;
-			case sizeof(U16) :	mRootBus->store(writeOp.Address, static_cast<U16>(writeOp.Data)); break;
-			case sizeof(U32) :	mRootBus->store(writeOp.Address, static_cast<U32>(writeOp.Data)); break;
-		}*/
-	}
-
-	BIT R4000::flushWriteQueue(U32 address)
-	{
-		auto foundIt = std::find_if(mWriteQueue.begin(), mWriteQueue.end(), [&](const StoreOperation& storeOp) { return storeOp.Address == address; });
-		if (foundIt != mWriteQueue.end()) {
-			doWriteQueueOperation(*foundIt);
-			mWriteQueue.erase(foundIt);
-			return ESX_TRUE;
-		}
-		return ESX_FALSE;
-	}
-
-	void R4000::flushWriteQueueFirst()
-	{
-		if (mWriteQueue.size() == 0) return;
-		auto it = mWriteQueue.begin();
-		doWriteQueueOperation(*it);
-		mWriteQueue.erase(it);
-	}
-
-	void R4000::flushWriteQueueAll()
-	{
-		for (auto it = mWriteQueue.begin(); it != mWriteQueue.end(); ++it) {
-			doWriteQueueOperation(*it);
-		}
-		mWriteQueue.clear();
 	}
 }

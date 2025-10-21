@@ -55,6 +55,7 @@ namespace esx {
 
 	class VectorUnit : public Coprocessor<R4000> {
 	public:
+		friend class CPUStatusPanel;
 		friend class RSP;
 
 		VectorUnit(R4000* cpu);

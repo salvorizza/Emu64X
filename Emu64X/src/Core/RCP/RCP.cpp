@@ -1,5 +1,7 @@
 #include "RCP.h"
 
+#include "Core/MIPS/VR4300/VR4300.h"
+
 namespace esx {
 	RCP::RCP()
 		:	BusDevice("RCP")
@@ -55,7 +57,11 @@ namespace esx {
 	void RCP::store(const StringView& busName, U32 address, U32 value, U8 lowerBits, U8 accessSize)
 	{
 		if (address >= 0x04000000 && address <= 0x04000FFF) {
-			*reinterpret_cast<U32*>(&mDMEM[address - 0x04000000]) = _byteswap_ulong(value);
+			switch (accessSize) {
+				case sizeof(U8) * 8: *reinterpret_cast<U8*>(&mDMEM[address - 0x04000000]) = value; break;
+				case sizeof(U16) * 8: *reinterpret_cast<U16*>(&mDMEM[address - 0x04000000]) = _byteswap_ushort(value); break;
+				case sizeof(U32) * 8: *reinterpret_cast<U32*>(&mDMEM[address - 0x04000000]) = _byteswap_ulong(value); break;
+			}
 		} 
 		else if (address >= 0x04001000 && address <= 0x04001FFF) {
 			*reinterpret_cast<U32*>(&mIMEM[address - 0x04001000]) = _byteswap_ulong(value);
@@ -102,7 +108,11 @@ namespace esx {
 		output = 0;
 
 		if (address >= 0x04000000 && address <= 0x04000FFF) {
-			output = _byteswap_ulong(*reinterpret_cast<U32*>(&mDMEM[address - 0x04000000]));
+			switch (accessSize) {
+				case sizeof(U8) * 8 : output = *reinterpret_cast<U8*>(&mDMEM[address - 0x04000000]); break;
+				case sizeof(U16) * 8: output = _byteswap_ushort(*reinterpret_cast<U16*>(&mDMEM[address - 0x04000000])); break;
+				case sizeof(U32) * 8: output = _byteswap_ulong(*reinterpret_cast<U32*>(&mDMEM[address - 0x04000000])); break;
+			}
 		}
 		else if (address >= 0x04001000 && address <= 0x04001FFF) {
 			output = _byteswap_ulong(*reinterpret_cast<U32*>(&mIMEM[address - 0x04001000]));

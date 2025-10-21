@@ -198,7 +198,7 @@ namespace esx {
                     U32 NumDWords = (Length / 8) + ((Length % 8) > 0 ? 1 : 0);
                     U32 NumBytes = NumRows * NumDWords * 8;
                     U64 TargetClock = DMAAlreadyUp ? Scheduler::NextEventOfType(SchedulerEventType::SPDMADone).value()->ClockTarget : cpuClocks;
-                    U64 ClockToAdd = (NumBytes * 37) / 10;
+                    U64 ClockToAdd = 1;// (NumBytes * 37) / 10;
 
                     SchedulerEvent dmaDoneEvent = {
                             .Type = SchedulerEventType::SPDMADone,
@@ -232,7 +232,7 @@ namespace esx {
                     U32 NumDWords = (Length / 8) + ((Length % 8) > 0 ? 1 : 0);
                     U32 NumBytes = NumRows * NumDWords * 8;
                     U64 TargetClock = DMAAlreadyUp ? Scheduler::NextEventOfType(SchedulerEventType::SPDMADone).value()->ClockTarget : cpuClocks;
-                    U64 ClockToAdd = (NumBytes * 10) / 37;
+                    U64 ClockToAdd = (NumBytes * 10) / (37 * 2);
 
                     SchedulerEvent dmaDoneEvent = {
                             .Type = SchedulerEventType::SPDMADone,
@@ -318,7 +318,7 @@ namespace esx {
 
                     U64 TransferLength = (DPC_END.get(layouts::DPC_END_Register::Field::END).as<U32>() & ~0x7) - (NewStart.get(layouts::DPC_START_Register::Field::START).as<U32>() & ~0x7);
                     U64 ClockStart = TransferEvent ? TransferEvent.value()->ClockStart : mRCP->getBus("Root")->getDevice<VR4300>("VR4300")->getClocks();
-                    U64 ClockEnd = (TransferEvent ? TransferEvent.value()->ClockTarget : ClockStart) + (TransferLength * 10) / 37;
+                    U64 ClockEnd = (TransferEvent ? TransferEvent.value()->ClockTarget : ClockStart) + (TransferLength * 10) / (37 * 2);
 
                     SchedulerEvent dmaDoneEvent = {
                             .Type = SchedulerEventType::DPDMADone,
@@ -359,7 +359,7 @@ namespace esx {
                         DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::START_PENDING, ESX_FALSE);
                             
                         U64 ClockStart = mRCP->getBus("Root")->getDevice<VR4300>("VR4300")->getClocks();
-                        U64 ClockEnd = ClockStart + (TransferLength * 10) / 37;
+                        U64 ClockEnd = ClockStart + (TransferLength * 10) / (37 * 2);
 
                         SchedulerEvent dmaDoneEvent = {
                                 .Type = SchedulerEventType::DPDMADone,
@@ -486,6 +486,11 @@ namespace esx {
             U64 command = (static_cast<U64>(hi) << 32) | lo;
 
             ESX_CORE_LOG_TRACE("RDP Full Command {:08x}h - Command => {}", command, sCommands[(command >> 56) & 0x3F]);
+
+            if (((command >> 56) & 0x3F) == 0x29) {
+                mRCP->setInterrupt(InterruptType::DP, ESX_FALSE, ESX_TRUE, 0);
+                DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::PIPE_BUSY, ESX_FALSE);
+            }
 
             RDRAMAddr += 8;
         }

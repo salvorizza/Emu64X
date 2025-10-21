@@ -12,6 +12,7 @@ namespace esx {
 	class RCP;
 
 	class RSP {
+		friend class CPUStatusPanel;
 	public:
 		RSP(RCP* rcp);
 		~RSP();
@@ -30,8 +31,6 @@ namespace esx {
 		StringView mName = "RSP";
 
 		RCP* mRCP;
-
-		U64 mRCPClocks = 0;
 
 		SharedPtr<R4000> mCore;
 		SharedPtr<ScalarUnit> mSU;

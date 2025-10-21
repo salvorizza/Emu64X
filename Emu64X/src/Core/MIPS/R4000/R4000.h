@@ -43,12 +43,6 @@ namespace esx {
 		U64 load(U32 virtualAddress, BIT& exception, size_t accessSize);
 		void store(U32 virtualAddress, U64 value, size_t accessSize);
 
-		inline BIT isWriteQueueActive(U32 address) {
-			return ESX_FALSE;
-		}
-
-		inline U64 getClocks() const { return mCycles; }
-
 		//Arithmetic
 		void ADD();
 		void ADDU();
@@ -125,15 +119,6 @@ namespace esx {
 		void SWC3();
 
 		void NA();
-	private:
-		void iCacheStore(U32 address, U32 value);
-
-		inline BIT isWriteQueueFull() { return (mWriteQueue.size() == 4) ? ESX_TRUE : ESX_FALSE; }
-		void addWriteQueueOperation(const StoreOperation& writeOp);
-		void doWriteQueueOperation(const StoreOperation& writeOp);
-		BIT flushWriteQueue(U32 address);
-		void flushWriteQueueFirst();
-		void flushWriteQueueAll();
 	private:
 		RCP* mRCP;
 		R4000iCache mICache = {};

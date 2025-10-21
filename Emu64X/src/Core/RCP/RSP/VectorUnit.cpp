@@ -51,6 +51,21 @@ namespace esx {
         return std::clamp<I32>(accum, std::numeric_limits<I16>::min(), std::numeric_limits<I16>::max());
     }
 
+    Pair<U8, U8> calculate_se_de(unsigned long vd_elem, unsigned long vt_elem) {
+        U8 de = 0, se = 0;
+        unsigned long msb = 0;
+
+        de = vd_elem & 0x7;
+        unsigned char found = _BitScanReverse(&msb, vt_elem);
+        if (!found)
+            msb = 0;
+        
+        unsigned long mask = (0xF << msb) & 0xF;
+        se = ((vd_elem & mask) | (vt_elem & ~mask)) & 0x7;
+
+        return std::make_pair(se, de);
+    }
+
     U32 rcp(I32 input) {
         U32 result = 0;
         unsigned long scale_out = 0;
@@ -488,8 +503,10 @@ namespace esx {
         U8 vd_elem = instruction.get(layouts::VU_SL_INSTRUCTION_Register::Field::vd_elem).as<U8>();
         RegisterIndex vd = instruction.get(layouts::VU_SL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
 
-        U32 result = rcp(static_cast<I32>((static_cast<U32>(DIV_IN) << 16) | VPR[vt][vt_elem]));
-        VPR[vd][vd_elem] = result;
+        auto [se, de] = calculate_se_de(vd_elem, vt_elem);
+
+        U32 result = rcp(static_cast<I32>((static_cast<U32>(DIV_IN) << 16) | VPR[vt][se]));
+        VPR[vd][de] = result;
         DIV_OUT = result >> 16;
         DIV_IN = 0;
         for (I32 i = 0; i < 8; i++) {
@@ -507,8 +524,10 @@ namespace esx {
         U8 vd_elem = instruction.get(layouts::VU_SL_INSTRUCTION_Register::Field::vd_elem).as<U8>();
         RegisterIndex vd = instruction.get(layouts::VU_SL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
 
-        VPR[vd][vd_elem] = DIV_OUT;
-        DIV_IN = VPR[vt][vt_elem];
+        auto [se, de] = calculate_se_de(vd_elem, vt_elem);
+
+        VPR[vd][de] = DIV_OUT;
+        DIV_IN = VPR[vt][se];
         for (I32 i = 0; i < 8; i++) {
             ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, VPR[vt][i]);
         }
@@ -596,8 +615,7 @@ namespace esx {
     void VectorUnit::setVPRRegisterBytes(U8 vt, U64 data, U8 element, size_t access_size)
     {
         for (I32 i = 0; i < access_size; i++) {
-            *(reinterpret_cast<U8*>(&VPR[vt][7]) + 1 - element - i) = data & 0xFF;
-            data >>= 8;
+            *(reinterpret_cast<U8*>(VPR[vt].data()) + element + i) = (data >> ((access_size - 1 - i) * 8)) & 0xFF;
         }
     }
 
@@ -606,7 +624,7 @@ namespace esx {
         U64 data = 0;
 
         for (I32 i = 0; i < access_size; i++) {
-            data |= *(reinterpret_cast<U8*>(&VPR[vt][7]) + 1 - element - i);
+            data |= *(reinterpret_cast<U8*>(VPR[vt].data()) + element + i);
             data <<= 8;
         }
 

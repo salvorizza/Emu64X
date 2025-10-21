@@ -18,10 +18,8 @@ namespace esx {
 	void RSP::clock(U64 clocks)
 	{
 		U64 newRCPClocks = RCP::CPUClocksToRCPClocks(clocks);
-		while (mRCPClocks < newRCPClocks) {
+		while (mCore->getClocks() < newRCPClocks) {
 			mCore->clock();
-
-			mRCPClocks++;
 		}
 
 		mSU->clock(clocks);
@@ -78,6 +76,11 @@ namespace esx {
 				mCore->mNextPC = mCore->mPC + 4;
 				break;
 			}
+
+			default: {
+				ESX_CORE_LOG_WARNING("{} - Store to address 0x{:08x} with value 0x{:08x} not implemented yet", mName, address, value);
+				break;
+			}
 		}
 	}
 
@@ -119,12 +122,16 @@ namespace esx {
 			case 0x04080000: {
 				return mCore->mPC & 0xFFF;
 			}
+
+			default: {
+				ESX_CORE_LOG_WARNING("{} - Load from address 0x{:08x} not implemented yet", mName, address);
+				break;
+			}
 		}
 	}
 
 	void RSP::reset() {
 		mCore->reset();
-		mRCPClocks = 0;
 	}
 
 }
