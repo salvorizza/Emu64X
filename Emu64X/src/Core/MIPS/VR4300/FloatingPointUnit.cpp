@@ -198,6 +198,11 @@ namespace esx {
 				break;
 			}
 
+			case FormatSpec::D: {
+				StoreFPR(fd, fmt, ValueFPR<F64>(fs, fmt) + ValueFPR<F64>(ft, fmt));
+				break;
+			}
+
 			default: {
 				ESX_CORE_LOG_WARNING("{} Not implemented yet with fmt {}", __FUNCTION__, static_cast<U8>(fmt));
 				break;
@@ -215,6 +220,11 @@ namespace esx {
 		switch (fmt) {
 			case FormatSpec::S: {
 				StoreFPR(fd, fmt, ValueFPR<F32>(fs, fmt) - ValueFPR<F32>(ft, fmt));
+				break;
+			}
+
+			case FormatSpec::D: {
+				StoreFPR(fd, fmt, ValueFPR<F64>(fs, fmt) - ValueFPR<F64>(ft, fmt));
 				break;
 			}
 
@@ -238,6 +248,11 @@ namespace esx {
 				break;
 			}
 
+			case FormatSpec::D: {
+				StoreFPR(fd, fmt, ValueFPR<F64>(fs, fmt) * ValueFPR<F64>(ft, fmt));
+				break;
+			}
+
 			default: {
 				ESX_CORE_LOG_WARNING("{} Not implemented yet with fmt {}", __FUNCTION__, static_cast<U8>(fmt));
 				break;
@@ -255,6 +270,11 @@ namespace esx {
 		switch (fmt) {
 			case FormatSpec::S: {
 				StoreFPR(fd, fmt, ValueFPR<F32>(fs, fmt) / ValueFPR<F32>(ft, fmt));
+				break;
+			}
+
+			case FormatSpec::D: {
+				StoreFPR(fd, fmt, ValueFPR<F64>(fs, fmt) / ValueFPR<F64>(ft, fmt));
 				break;
 			}
 
@@ -378,6 +398,11 @@ namespace esx {
 				break;
 			}
 
+			case FormatSpec::D: {
+				StoreFPR(fd, FormatSpec::W, ConvertFmt<U32>(std::trunc(ValueFPR<F64>(fs, fmt)), fmt, FormatSpec::W));
+				break;
+			}
+
 			default: {
 				ESX_CORE_LOG_WARNING("{} Not implemented yet with fmt {}", __FUNCTION__, static_cast<U8>(fmt));
 				break;
@@ -402,6 +427,11 @@ namespace esx {
 		RegisterIndex fd = RegisterIndex(mCPU->mCurrentInstruction.ShiftAmount());
 
 		switch (fmt) {
+			case FormatSpec::D: {
+				StoreFPR(fd, FormatSpec::S, ConvertFmt<F32>(ValueFPR<F64>(fs, fmt), fmt, FormatSpec::S));
+				break;
+			}
+
 			case FormatSpec::W: {
 				StoreFPR(fd, FormatSpec::S, ConvertFmt<F32>(ValueFPR<U32>(fs, fmt), fmt, FormatSpec::S));
 				break;
@@ -416,7 +446,31 @@ namespace esx {
 
 	void FloatingPointUnit::CVTD()
 	{
-		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
+		FormatSpec fmt = static_cast<FormatSpec>(mCPU->mCurrentInstruction.RegisterSource().Value);
+		RegisterIndex fs = mCPU->mCurrentInstruction.RegisterDestination();
+		RegisterIndex fd = RegisterIndex(mCPU->mCurrentInstruction.ShiftAmount());
+
+		switch (fmt) {
+			case FormatSpec::S: {
+				StoreFPR(fd, FormatSpec::D, ConvertFmt<F64>(ValueFPR<F32>(fs, fmt), fmt, FormatSpec::D));
+				break;
+			}
+
+			case FormatSpec::W: {
+				StoreFPR(fd, FormatSpec::D, ConvertFmt<F64>(ValueFPR<U32>(fs, fmt), fmt, FormatSpec::D));
+				break;
+			}
+
+			case FormatSpec::L: {
+				StoreFPR(fd, FormatSpec::D, ConvertFmt<F64>(ValueFPR<U64>(fs, fmt), fmt, FormatSpec::D));
+				break;
+			}
+
+			default: {
+				ESX_CORE_LOG_WARNING("{} Not implemented yet with fmt {}", __FUNCTION__, static_cast<U8>(fmt));
+				break;
+			}
+		}
 	}
 
 	void FloatingPointUnit::CVTW()
@@ -429,6 +483,11 @@ namespace esx {
 		switch (fmt) {
 			case FormatSpec::S: {
 				StoreFPR(fd, FormatSpec::W, ConvertFmt<U32>(ValueFPR<F32>(fs, fmt), fmt, FormatSpec::W));
+				break;
+			}
+
+			case FormatSpec::D: {
+				StoreFPR(fd, FormatSpec::W, ConvertFmt<U32>(ValueFPR<F64>(fs, fmt), fmt, FormatSpec::W));
 				break;
 			}
 
@@ -459,6 +518,13 @@ namespace esx {
 			case FormatSpec::S: {
 				less = ValueFPR<F32>(fs, fmt) < ValueFPR<F32>(ft, fmt);
 				equal = ValueFPR<F32>(fs, fmt) == ValueFPR<F32>(ft, fmt);
+				unordered = ESX_FALSE;
+				break;
+			}
+
+			case FormatSpec::D: {
+				less = ValueFPR<F64>(fs, fmt) < ValueFPR<F64>(ft, fmt);
+				equal = ValueFPR<F64>(fs, fmt) == ValueFPR<F64>(ft, fmt);
 				unordered = ESX_FALSE;
 				break;
 			}

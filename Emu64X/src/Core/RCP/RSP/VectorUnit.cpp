@@ -231,7 +231,20 @@ namespace esx {
 
     void VectorUnit::VMUDH()
     {
-        ESX_CORE_LOG_WARNING("{} not implemented yet", __FUNCTION__);
+        VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
+        instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
+
+        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
+        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
+        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
+        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+
+        for (I32 i = 0; i < 8; i++) {
+            U32 prod = VPR[vs][i] * VPR[vt][i];
+            ACCUM[i].write(0);
+            ACCUM[i].write((((ACCUM[i].read() >> 16) + prod) << 16) | ACCUM[i].read() & 0xFFFF);
+            VPR[vd][i] = clamp_signed(static_cast<I32>(static_cast<U32>(ACCUM[i].read() >> 16)));
+        }
     }
 
     void VectorUnit::VMACF()
