@@ -198,7 +198,7 @@ namespace esx {
                     U32 NumDWords = (Length / 8) + ((Length % 8) > 0 ? 1 : 0);
                     U32 NumBytes = NumRows * NumDWords * 8;
                     U64 TargetClock = DMAAlreadyUp ? Scheduler::NextEventOfType(SchedulerEventType::SPDMADone).value()->ClockTarget : cpuClocks;
-                    U64 ClockToAdd = 1;// (NumBytes * 37) / 10;
+                    U64 ClockToAdd = (NumBytes * 10) / (37 * 2);
 
                     SchedulerEvent dmaDoneEvent = {
                             .Type = SchedulerEventType::SPDMADone,

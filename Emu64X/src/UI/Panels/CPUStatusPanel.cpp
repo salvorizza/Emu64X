@@ -192,6 +192,7 @@ namespace esx {
 
 				}
 				ImGui::EndTable();
+				ImGui::Text("Clocks: 0x%016llX", mInstance->getClocks());
 				break;
 			}
 
