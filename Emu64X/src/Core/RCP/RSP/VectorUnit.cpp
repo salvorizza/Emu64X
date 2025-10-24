@@ -66,6 +66,36 @@ namespace esx {
         return std::make_pair(se, de);
     }
 
+    constexpr Array<Array<U8, 8>, 16> sBroadcastMap = { {
+            // 0–1: Normal register access (no broadcast)
+            {0,1,2,3,4,5,6,7},  // 0: Normal
+            {0,1,2,3,4,5,6,7},  // 1: Normal
+
+            // 2–3: Broadcast 4 of 8 lanes (quarter broadcast)
+            {0,0,2,2,4,4,6,6},  // 2: e(0q)
+            {1,1,3,3,5,5,7,7},  // 3: e(1q)
+
+            // 4–7: Broadcast 2 of 8 lanes (half broadcast)
+            {0,0,0,0,4,4,4,4},  // 4: e(0h)
+            {1,1,1,1,5,5,5,5},  // 5: e(1h)
+            {2,2,2,2,6,6,6,6},  // 6: e(2h)
+            {3,3,3,3,7,7,7,7},  // 7: e(3h)
+
+            // 8–15: Broadcast single lane (full broadcast)
+            {0,0,0,0,0,0,0,0},  // 8: e(0)
+            {1,1,1,1,1,1,1,1},  // 9: e(1)
+            {2,2,2,2,2,2,2,2},  // 10: e(2)
+            {3,3,3,3,3,3,3,3},  // 11: e(3)
+            {4,4,4,4,4,4,4,4},  // 12: e(4)
+            {5,5,5,5,5,5,5,5},  // 13: e(5)
+            {6,6,6,6,6,6,6,6},  // 14: e(6)
+            {7,7,7,7,7,7,7,7},  // 15: e(7)
+    } };
+
+    U8 get_element_index(U8 element, U8 index) {
+        return sBroadcastMap[element][index];
+    }
+
     U32 rcp(I32 input) {
         U32 result = 0;
         unsigned long scale_out = 0;
@@ -102,12 +132,45 @@ namespace esx {
 
     void VectorUnit::MF()
     {
-        ESX_CORE_LOG_WARNING("{} not implemented yet", __FUNCTION__);
+        RegisterIndex rt = mCPU->mCurrentInstruction.RegisterTarget();
+        U8 vs = mCPU->mCurrentInstruction.RegisterDestination().Value;
+        U8 vs_elem = mCPU->mCurrentInstruction.Element();
+
+        U16 data = 0;
+
+        data = getVPRRegisterBytes(vs, vs_elem, vs_elem == 15 ? 1 : 2);
+
+        if (vs_elem == 15) {
+            data <<= 8;
+            data |= getVPRRegisterBytes(vs, 0, 1);
+        }
+
+        mCPU->setRegister(rt, data);
     }
 
     void VectorUnit::CF()
     {
-        ESX_CORE_LOG_WARNING("{} not implemented yet", __FUNCTION__);
+        VU_MOVE_INSTRUCTION_Register instruction;
+        instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
+
+        U8 vs_elem = instruction.get(layouts::VU_MOVE_INSTRUCTION_Register::Field::vs_elem).as<RegisterIndex>();
+        U8 vs = instruction.get(layouts::VU_MOVE_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
+        RegisterIndex rt = instruction.get(layouts::VU_MOVE_INSTRUCTION_Register::Field::rt).as<RegisterIndex>();
+
+        std::bitset<16>* ref = nullptr;
+        switch (vs) {
+            case 0: ref = &VCO; break;
+            case 1: ref = &VCC; break;
+            case 2: ref = &VCE; break;
+            default: return;
+        }
+
+        U16 data = 0;
+        for (I32 i = 0; i < 16; i++) {
+            data |= (ref->test(i) ? 1 : 0) << i;
+        }
+
+        mCPU->setRegister(rt, static_cast<I16>(data));
     }
 
     void VectorUnit::MT()
@@ -122,7 +185,26 @@ namespace esx {
 
     void VectorUnit::CT()
     {
-        ESX_CORE_LOG_WARNING("{} not implemented yet", __FUNCTION__);
+        VU_MOVE_INSTRUCTION_Register instruction;
+        instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
+
+        U8 vs_elem = instruction.get(layouts::VU_MOVE_INSTRUCTION_Register::Field::vs_elem).as<RegisterIndex>();
+        U8 vs = instruction.get(layouts::VU_MOVE_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
+        RegisterIndex rt = instruction.get(layouts::VU_MOVE_INSTRUCTION_Register::Field::rt).as<RegisterIndex>();
+
+        std::bitset<16>* ref = nullptr;
+        switch (vs) {
+            case 0: ref = &VCO; break;
+            case 1: ref = &VCC; break;
+            case 2: ref = &VCE; break;
+            default: return;
+        }
+
+        U16 data = static_cast<U16>(mCPU->getRegister(rt));
+
+        for (I32 i = 0; i < 16; i++) {
+            ref->set(i, (data >> i) & 0x1);
+        }
     }
 
 
@@ -154,25 +236,76 @@ namespace esx {
         RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
 
         for (I32 i = 0; i < 8; i++) {
-            I64 prod = static_cast<I32>(static_cast<I16>(VPR[vs][i]) * static_cast<I16>(VPR[vt][i]) * 2);
-            ACCUM[i].write(static_cast<I64>(static_cast<I32>(prod) + 0x8000));
-            VPR[vd][i] = clamp_signed(static_cast<I32>(ACCUM[i].read() >> 16));
+            U8 element_index = get_element_index(element, i);
+
+            I64 prod = static_cast<I32>(static_cast<I16>(VPR[vs][i]) * static_cast<I16>(VPR[vt][element_index]) * 2);
+
+            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, prod + 0x8000);
+            VPR[vd][i] = clamp_signed(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>());
         }
     }
 
     void VectorUnit::VMULU()
     {
-        ESX_CORE_LOG_WARNING("{} not implemented yet", __FUNCTION__);
+        VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
+        instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
+
+        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
+        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
+        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
+        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+
+        for (I32 i = 0; i < 8; i++) {
+            U8 element_index = get_element_index(element, i);
+
+            I64 prod = static_cast<I32>(static_cast<I16>(VPR[vs][i]) * static_cast<I16>(VPR[vt][element_index]) * 2);
+
+            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, prod + 0x8000);
+            VPR[vd][i] = clamp_unsigned(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>());
+        }
     }
 
     void VectorUnit::VRNDP()
     {
-        ESX_CORE_LOG_WARNING("{} not implemented yet", __FUNCTION__);
+        VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
+        instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
+
+        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
+        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
+        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
+        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+
+        for (I32 i = 0; i < 8; i++) {
+            U8 element_index = get_element_index(element, i);
+
+            I64 prod = static_cast<I32>(static_cast<I16>(VPR[vt][element_index]));
+            if ((VPR[vs][i] >> 0) & 0x1) prod <<= 16;
+            if (((ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM).as<U64>() >> 47) & 0x1) == 0) {
+                ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM).as<I64>() + (prod & 0xFFFFFFFFFFFF));
+            }
+            
+            VPR[vd][i] = clamp_signed(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>());
+        }
     }
 
     void VectorUnit::VMULQ()
     {
-        ESX_CORE_LOG_WARNING("{} not implemented yet", __FUNCTION__);
+        VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
+        instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
+
+        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
+        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
+        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
+        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+
+        for (I32 i = 0; i < 8; i++) {
+            U8 element_index = get_element_index(element, i);
+
+            I64 prod = static_cast<I32>(static_cast<I16>(VPR[vs][i]) * static_cast<I16>(VPR[vt][element_index]));
+            if ((prod >> 31) & 0x1) prod += 0x1F;
+            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, prod << 16);
+            VPR[vd][i] = clamp_signed(prod >> 1) & 0xFFF0;
+        }
     }
 
     void VectorUnit::VMUDL()
@@ -186,10 +319,14 @@ namespace esx {
         RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
 
         for (I32 i = 0; i < 8; i++) {
-            U32 prod = VPR[vs][i] * VPR[vt][i];
+            U8 element_index = get_element_index(element, i);
+
+            U32 prod = VPR[vs][i] * VPR[vt][element_index];
+
             ACCUM[i].write(0);
-            ACCUM[i].write(ACCUM[i].read() + static_cast<I64>(static_cast<I32>(prod >> 16)));
-            VPR[vd][i] = clamp_unsigned(static_cast<I32>(static_cast<U32>(ACCUM[i].read())));
+
+            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM).as<I64>() + (static_cast<I32>(prod) >> 16));
+            VPR[vd][i] = clamp_unsigned(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_D).as<I32>());
         }
     }
 
@@ -204,10 +341,14 @@ namespace esx {
         RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
 
         for (I32 i = 0; i < 8; i++) {
-            U32 prod = VPR[vs][i] * VPR[vt][i];
+            U8 element_index = get_element_index(element, i);
+
+            U32 prod = VPR[vs][i] * VPR[vt][element_index];
+
             ACCUM[i].write(0);
-            ACCUM[i].write(ACCUM[i].read() + static_cast<I64>(static_cast<I32>(prod)));
-            VPR[vd][i] = clamp_signed(static_cast<I32>(static_cast<U32>(ACCUM[i].read())));
+
+            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM).as<I64>() + static_cast<I64>(static_cast<I32>(prod)));
+            VPR[vd][i] = clamp_signed(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>());
         }
     }
 
@@ -222,10 +363,14 @@ namespace esx {
         RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
 
         for (I32 i = 0; i < 8; i++) {
-            U32 prod = VPR[vs][i] * VPR[vt][i];
+            U8 element_index = get_element_index(element, i);
+
+            U32 prod = VPR[vs][i] * VPR[vt][element_index];
+
             ACCUM[i].write(0);
-            ACCUM[i].write(ACCUM[i].read() + static_cast<I64>(static_cast<I32>(prod)));
-            VPR[vd][i] = clamp_unsigned(static_cast<I32>(static_cast<U32>(ACCUM[i].read())));
+
+            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM).as<I64>() + static_cast<I64>(static_cast<I32>(prod)));
+            VPR[vd][i] = clamp_unsigned(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_D).as<I32>());
         }
     }
 
@@ -240,10 +385,14 @@ namespace esx {
         RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
 
         for (I32 i = 0; i < 8; i++) {
-            U32 prod = VPR[vs][i] * VPR[vt][i];
+            U8 element_index = get_element_index(element, i);
+
+            U32 prod = VPR[vs][i] * VPR[vt][element_index];
+
             ACCUM[i].write(0);
-            ACCUM[i].write((((ACCUM[i].read() >> 16) + prod) << 16) | ACCUM[i].read() & 0xFFFF);
-            VPR[vd][i] = clamp_signed(static_cast<I32>(static_cast<U32>(ACCUM[i].read() >> 16)));
+
+            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_M, ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>() + static_cast<I32>(prod));
+            VPR[vd][i] = clamp_signed(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>());
         }
     }
 
@@ -258,20 +407,56 @@ namespace esx {
         RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
 
         for (I32 i = 0; i < 8; i++) {
-            I64 prod = static_cast<I32>(static_cast<I16>(VPR[vs][i]) * static_cast<I16>(VPR[vt][i]) * 2);
-            ACCUM[i].write(ACCUM[i].read() + static_cast<I64>(static_cast<I32>(prod)));
-            VPR[vd][i] = clamp_signed(static_cast<I32>(ACCUM[i].read() >> 16));
+            U8 element_index = get_element_index(element, i);
+
+            I64 prod = static_cast<I32>(static_cast<I16>(VPR[vs][i]) * static_cast<I16>(VPR[vt][element_index]) * 2);
+
+            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM).as<I64>() + static_cast<I64>(static_cast<I32>(prod)));
+            VPR[vd][i] = clamp_signed(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>());
         }
     }
 
     void VectorUnit::VMACU()
     {
-        ESX_CORE_LOG_WARNING("{} not implemented yet", __FUNCTION__);
+        VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
+        instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
+
+        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
+        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
+        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
+        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+
+        for (I32 i = 0; i < 8; i++) {
+            U8 element_index = get_element_index(element, i);
+
+            I64 prod = static_cast<I32>(static_cast<I16>(VPR[vs][i]) * static_cast<I16>(VPR[vt][element_index]) * 2);
+
+            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM).as<I64>() + static_cast<I64>(static_cast<I32>(prod)));
+            VPR[vd][i] = clamp_unsigned(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>());
+        }
     }
 
     void VectorUnit::VRNDN()
     {
-        ESX_CORE_LOG_WARNING("{} not implemented yet", __FUNCTION__);
+        VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
+        instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
+
+        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
+        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
+        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
+        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+
+        for (I32 i = 0; i < 8; i++) {
+            U8 element_index = get_element_index(element, i);
+
+            I64 prod = static_cast<I32>(static_cast<I16>(VPR[vt][element_index]));
+            if ((VPR[vs][i] >> 0) & 0x1) prod <<= 16;
+            if (((ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM).as<U64>() >> 47) & 0x1) == 1) {
+                ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM).as<I64>() + (prod & 0xFFFFFFFFFFFF));
+            }
+
+            VPR[vd][i] = clamp_signed(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>());
+        }
     }
 
     void VectorUnit::VMACQ()
@@ -290,9 +475,12 @@ namespace esx {
         RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
 
         for (I32 i = 0; i < 8; i++) {
-            U32 prod = VPR[vs][i] * VPR[vt][i];
-            ACCUM[i].write(ACCUM[i].read() + static_cast<I64>(static_cast<I32>(prod >> 16)));
-            VPR[vd][i] = clamp_unsigned(static_cast<I32>(static_cast<U32>(ACCUM[i].read())));
+            U8 element_index = get_element_index(element, i);
+
+            U32 prod = VPR[vs][i] * VPR[vt][element_index];
+
+            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM).as<I64>() + (static_cast<I32>(prod) >> 16));
+            VPR[vd][i] = clamp_unsigned(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_D).as<I32>());
         }
     }
 
@@ -307,9 +495,12 @@ namespace esx {
         RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
 
         for (I32 i = 0; i < 8; i++) {
-            U32 prod = VPR[vs][i] * VPR[vt][i];
-            ACCUM[i].write(ACCUM[i].read() + static_cast<I64>(static_cast<I32>(prod)));
-            VPR[vd][i] = clamp_signed(static_cast<I32>(static_cast<U32>(ACCUM[i].read())));
+            U8 element_index = get_element_index(element, i);
+
+            U32 prod = VPR[vs][i] * VPR[vt][element_index];
+
+            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM).as<I64>() + static_cast<I64>(static_cast<I32>(prod)));
+            VPR[vd][i] = clamp_signed(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>());
         }
     }
 
@@ -324,9 +515,12 @@ namespace esx {
         RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
 
         for (I32 i = 0; i < 8; i++) {
-            U32 prod = VPR[vs][i] * VPR[vt][i];
-            ACCUM[i].write(ACCUM[i].read() + static_cast<I64>(static_cast<I32>(prod)));
-            VPR[vd][i] = clamp_unsigned(static_cast<I32>(static_cast<U32>(ACCUM[i].read())));
+            U8 element_index = get_element_index(element, i);
+
+            U32 prod = VPR[vs][i] * VPR[vt][element_index];
+
+            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM).as<I64>() + static_cast<I64>(static_cast<I32>(prod)));
+            VPR[vd][i] = clamp_unsigned(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_D).as<I32>());
         }
     }
 
@@ -341,9 +535,12 @@ namespace esx {
         RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
 
         for (I32 i = 0; i < 8; i++) {
-            U32 prod = VPR[vs][i] * VPR[vt][i];
-            ACCUM[i].write((((ACCUM[i].read() >> 16) + prod) << 16) | ACCUM[i].read() & 0xFFFF);
-            VPR[vd][i] = clamp_signed(static_cast<I32>(static_cast<U32>(ACCUM[i].read() >> 16)));
+            U8 element_index = get_element_index(element, i);
+
+            U32 prod = VPR[vs][i] * VPR[vt][element_index];
+
+            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_M, ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>() + static_cast<I32>(prod));
+            VPR[vd][i] = clamp_signed(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>());
         }
     }
 
@@ -358,11 +555,15 @@ namespace esx {
         RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
 
         for (I32 i = 0; i < 8; i++) {
-            I32 result = VPR[vs][i] + VPR[vt][i] + ((VCO >> i) & 0x1);
+            U8 element_index = get_element_index(element, i);
+
+            I32 result = VPR[vs][i] + VPR[vt][element_index] + (VCO.test(i) ? 1 : 0);
+
             ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, static_cast<U16>(result));
-            VPR[vd][i] = clamp_signed(result);
-            VCO &= ~(1 << i);
-            VCO &= ~(1 << (i + 8));
+            VPR[vd][i] = clamp_signed(static_cast<I32>(static_cast<U32>(result) & 0x1FFFFu));
+
+            VCO.set(i, 0);
+            VCO.set(i + 8, 0);
         }
     }
 
@@ -377,11 +578,15 @@ namespace esx {
         RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
 
         for (I32 i = 0; i < 8; i++) {
-            I32 result = VPR[vs][i] - VPR[vt][i] - ((VCO >> i) & 0x1);
+            U8 element_index = get_element_index(element, i);
+
+            I32 result = VPR[vs][i] - VPR[vt][element_index] - (VCO.test(i) ? 1 : 0);
+
             ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, static_cast<U16>(result));
-            VPR[vd][i] = clamp_signed(result);
-            VCO &= ~(1 << i);
-            VCO &= ~(1 << (i + 8));
+            VPR[vd][i] = clamp_signed(static_cast<I32>(static_cast<U32>(result) & 0x1FFFFu));
+
+            VCO.set(i, 0);
+            VCO.set(i + 8, 0);
         }
     }
 
@@ -397,7 +602,25 @@ namespace esx {
 
     void VectorUnit::VADDC()
     {
-        ESX_CORE_LOG_WARNING("{} not implemented yet", __FUNCTION__);
+        VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
+        instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
+
+        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
+        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
+        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
+        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+
+        for (I32 i = 0; i < 8; i++) {
+            U8 element_index = get_element_index(element, i);
+
+            U32 result = VPR[vs][i] + VPR[vt][element_index];
+
+            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, static_cast<U16>(result));
+            VPR[vd][i] = static_cast<U16>(result);
+
+            VCO.set(i, (result >> 16) & 0x1);
+            VCO.set(i + 8, 0);
+        }
     }
 
     void VectorUnit::VSUBC()
@@ -411,11 +634,15 @@ namespace esx {
         RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
 
         for (I32 i = 0; i < 8; i++) {
-            U32 result = VPR[vs][i] - VPR[vt][i] - ((VCO >> i) & 0x1);
+            U8 element_index = get_element_index(element, i);
+
+            U32 result = VPR[vs][i] - VPR[vt][element_index];
+
             ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, static_cast<U16>(result));
             VPR[vd][i] = static_cast<U16>(result);
-            VCO &= ~((result >> 16) << i);
-            VCO &= ~((result != 0 ? 1 : 0) << (i + 8));
+
+            VCO.set(i, (result >> 16) & 0x1);
+            VCO.set(i + 8, (result & 0x1F) != 0 ? 1 : 0);
         }
     }
 
@@ -456,27 +683,99 @@ namespace esx {
 
     void VectorUnit::VSAW()
     {
-        ESX_CORE_LOG_WARNING("{} not implemented yet", __FUNCTION__);
+        VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
+        instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
+
+        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
+        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
+        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
+        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        element ^= 0x8;
+
+        if (element > 0x2) {
+            return;
+        }
+
+        auto ACCUM_PORTION = static_cast<layouts::VU_ACCUM_Register::Field>(element);
+        for (I32 i = 0; i < 8; i++) {
+            VPR[vd][i] = ACCUM[i].get(ACCUM_PORTION).as<U16>();
+        }
     }
 
     void VectorUnit::VAND()
     {
-        ESX_CORE_LOG_WARNING("{} not implemented yet", __FUNCTION__);
+        VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
+        instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
+
+        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
+        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
+        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
+        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+
+        for (I32 i = 0; i < 8; i++) {
+            U8 element_index = get_element_index(element, i);
+
+            U16 result = VPR[vs][i] & VPR[vt][element_index];
+            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, result);
+            VPR[vd][i] = result;
+        }
     }
 
     void VectorUnit::VNAND()
     {
-        ESX_CORE_LOG_WARNING("{} not implemented yet", __FUNCTION__);
+        VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
+        instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
+
+        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
+        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
+        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
+        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+
+        for (I32 i = 0; i < 8; i++) {
+            U8 element_index = get_element_index(element, i);
+
+            U16 result = ~(VPR[vs][i] & VPR[vt][element_index]);
+            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, result);
+            VPR[vd][i] = result;
+        }
     }
 
     void VectorUnit::VOR()
     {
-        ESX_CORE_LOG_WARNING("{} not implemented yet", __FUNCTION__);
+        VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
+        instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
+
+        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
+        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
+        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
+        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+
+        for (I32 i = 0; i < 8; i++) {
+            U8 element_index = get_element_index(element, i);
+
+            U16 result = VPR[vs][i] | VPR[vt][element_index];
+            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, result);
+            VPR[vd][i] = result;
+        }
     }
 
     void VectorUnit::VNOR()
     {
-        ESX_CORE_LOG_WARNING("{} not implemented yet", __FUNCTION__);
+        VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
+        instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
+
+        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
+        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
+        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
+        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+
+        for (I32 i = 0; i < 8; i++) {
+            U8 element_index = get_element_index(element, i);
+
+            U16 result = ~(VPR[vs][i] | VPR[vt][element_index]);
+            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, result);
+            VPR[vd][i] = result;
+        }
     }
 
     void VectorUnit::VXOR()
@@ -490,7 +789,9 @@ namespace esx {
         RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
 
         for (I32 i = 0; i < 8; i++) {
-            U16 result = VPR[vs][i] ^ VPR[vt][i];
+            U8 element_index = get_element_index(element, i);
+
+            U16 result = VPR[vs][i] ^ VPR[vt][element_index];
             ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, result);
             VPR[vd][i] = result;
         }
@@ -498,12 +799,41 @@ namespace esx {
 
     void VectorUnit::VNXOR()
     {
-        ESX_CORE_LOG_WARNING("{} not implemented yet", __FUNCTION__);
+        VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
+        instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
+
+        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
+        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
+        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
+        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+
+        for (I32 i = 0; i < 8; i++) {
+            U8 element_index = get_element_index(element, i);
+
+            U16 result = ~(VPR[vs][i] ^ VPR[vt][element_index]);
+            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, result);
+            VPR[vd][i] = result;
+        }
     }
 
     void VectorUnit::VRCP()
     {
-        ESX_CORE_LOG_WARNING("{} not implemented yet", __FUNCTION__);
+        VU_SL_INSTRUCTION_Register instruction;
+        instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
+
+        U8 vt_elem = instruction.get(layouts::VU_SL_INSTRUCTION_Register::Field::vt_elem).as<U8>();
+        RegisterIndex vt = instruction.get(layouts::VU_SL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
+        U8 vd_elem = instruction.get(layouts::VU_SL_INSTRUCTION_Register::Field::vd_elem).as<U8>();
+        RegisterIndex vd = instruction.get(layouts::VU_SL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+
+        auto [se, de] = calculate_se_de(vd_elem, vt_elem);
+
+        U32 result = rcp(static_cast<I16>(VPR[vt][se]));
+        VPR[vd][de] = result;
+        DIV_OUT = result >> 16;
+        for (I32 i = 0; i < 8; i++) {
+            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, VPR[vt][i]);
+        }
     }
 
     void VectorUnit::VRCPL()
@@ -568,32 +898,151 @@ namespace esx {
 
     void VectorUnit::VLT()
     {
-        ESX_CORE_LOG_WARNING("{} not implemented yet", __FUNCTION__);
+        VU_SELECT_INSTRUCTION_Register instruction;
+        instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
+
+        U8 element = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::element).as<U8>();
+        RegisterIndex vt = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
+        RegisterIndex vs = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
+        RegisterIndex vd = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+
+        for (I32 i = 0; i < 8; i++) {
+            U8 element_index = get_element_index(element, i);
+
+            BIT eql = VPR[vs][i] == VPR[vt][element_index];
+            BIT neg = VCO.test(i + 8) && VCO.test(i) && eql;
+            VCC.set(i, neg || (VPR[vs][i] < VPR[vt][element_index]));
+            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, VCC.test(i) ? VPR[vs][i] : VPR[vt][element_index]);
+            VPR[vd][i] = ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_LO).as<U16>();
+
+            VCC.set(i + 8, 0);
+            VCO.set(i + 8, 0);
+            VCO.set(i, 0);
+        }
     }
 
     void VectorUnit::VEQ()
     {
-        ESX_CORE_LOG_WARNING("{} not implemented yet", __FUNCTION__);
+        VU_SELECT_INSTRUCTION_Register instruction;
+        instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
+
+        U8 element = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::element).as<U8>();
+        RegisterIndex vt = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
+        RegisterIndex vs = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
+        RegisterIndex vd = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+
+        for (I32 i = 0; i < 8; i++) {
+            U8 element_index = get_element_index(element, i);
+
+            VCC.set(i, !VCO.test(i + 8) && (VPR[vs][i] == VPR[vt][element_index]));
+            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, VCC.test(i) ? VPR[vs][i] : VPR[vt][element_index]);
+            VPR[vd][i] = ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_LO).as<U16>();
+
+            VCC.set(i + 8, 0);
+            VCO.set(i + 8, 0);
+            VCO.set(i, 0);
+        }
     }
 
     void VectorUnit::VNE()
     {
-        ESX_CORE_LOG_WARNING("{} not implemented yet", __FUNCTION__);
+        VU_SELECT_INSTRUCTION_Register instruction;
+        instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
+
+        U8 element = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::element).as<U8>();
+        RegisterIndex vt = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
+        RegisterIndex vs = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
+        RegisterIndex vd = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+
+        for (I32 i = 0; i < 8; i++) {
+            U8 element_index = get_element_index(element, i);
+
+            VCC.set(i, VCO.test(i + 8) || (VPR[vs][i] == VPR[vt][element_index]));
+            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, VCC.test(i) ? VPR[vs][i] : VPR[vt][element_index]);
+            VPR[vd][i] = ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_LO).as<U16>();
+
+            VCC.set(i + 8, 0);
+            VCO.set(i + 8, 0);
+            VCO.set(i, 0);
+        }
     }
 
     void VectorUnit::VGE()
     {
-        ESX_CORE_LOG_WARNING("{} not implemented yet", __FUNCTION__);
+        VU_SELECT_INSTRUCTION_Register instruction;
+        instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
+
+        U8 element = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::element).as<U8>();
+        RegisterIndex vt = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
+        RegisterIndex vs = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
+        RegisterIndex vd = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+
+        for (I32 i = 0; i < 8; i++) {
+            U8 element_index = get_element_index(element, i);
+
+            BIT eql = VPR[vs][i] == VPR[vt][element_index];
+            BIT neg = !(VCO.test(i + 8) && VCO.test(i)) && eql;
+            VCC.set(i, neg || (VPR[vs][i] > VPR[vt][element_index]));
+            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, VCC.test(i) ? VPR[vs][i] : VPR[vt][element_index]);
+            VPR[vd][i] = ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_LO).as<U16>();
+
+            VCC.set(i + 8, 0);
+            VCO.set(i + 8, 0);
+            VCO.set(i, 0);
+        }
     }
 
     void VectorUnit::VCL()
     {
-        ESX_CORE_LOG_WARNING("{} not implemented yet", __FUNCTION__);
+        VU_SELECT_INSTRUCTION_Register instruction;
+        instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
+
+        U8 element = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::element).as<U8>();
+        RegisterIndex vt = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
+        RegisterIndex vs = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
+        RegisterIndex vd = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+
+        for (I32 i = 0; i < 8; i++) {
+            U8 element_index = get_element_index(element, i);
+
+            if (!VCO.test(i) && !VCO.test(i + 8)) {
+                VCC.set(i + 8, VPR[vs][i] >= VPR[vt][element_index] ? 1 : 0);
+            } else if (VCO.test(i) && !VCO.test(i + 8)) {
+                BIT lte = VPR[vs][i] <= static_cast<U16>(-1 * VPR[vt][element_index]) ? ESX_TRUE : ESX_FALSE;
+                BIT eql = VPR[vs][i] == static_cast<U16>(-1 * VPR[vt][element_index]) ? ESX_TRUE : ESX_FALSE;
+
+                VCC.set(i, VCE.test(i) ? lte : eql);
+            }
+            BIT clip = VCO.test(i) ? VCC.test(i) : VCC.test(i + 8);
+            U16 vt_abs = VCO.test(i) ? static_cast<U16>(-1 * VPR[vt][element_index]) : VPR[vt][element_index];
+            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, clip == ESX_TRUE ? vt_abs : VPR[vs][i]);
+            VPR[vd][i] = ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_LO).as<U16>();
+        }
     }
 
     void VectorUnit::VCH()
     {
-        ESX_CORE_LOG_WARNING("{} not implemented yet", __FUNCTION__);
+        VU_SELECT_INSTRUCTION_Register instruction;
+        instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
+
+        U8 element = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::element).as<U8>();
+        RegisterIndex vt = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
+        RegisterIndex vs = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
+        RegisterIndex vd = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+
+        for (I32 i = 0; i < 8; i++) {
+            U8 element_index = get_element_index(element, i);
+
+            VCO.set(i, VPR[vs][i] != VPR[vt][element_index] ? 1 : 0);
+            U16 vt_abs = VCO.test(i) ? static_cast<U16>(-1 * VPR[vt][element_index]) : VPR[vt][element_index];
+            VCE.set(i, (VCO.test(i) && (VPR[vs][i] == (static_cast<U16>(-1 * VPR[vt][element_index]) - 1))) ? 1 : 0);
+            VCO.set(i + 8, (!VCE.test(i) && (VPR[vs][i] != vt_abs)) ? 1 : 0);
+            VCC.set(i, VPR[vs][i] <= static_cast<U16>(-1 * VPR[vt][element_index]));
+            VCC.set(i + 8, VPR[vs][i] >= VPR[vt][element_index]);
+            BIT clip = VCO.test(i) ? VCC.test(i) : VCC.test(i + 8);
+            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, clip == ESX_TRUE ? vt_abs : VPR[vs][i]);
+            VPR[vd][i] = ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_LO).as<U16>();
+        }
     }
 
     void VectorUnit::VCR()
@@ -603,7 +1052,20 @@ namespace esx {
 
     void VectorUnit::VMRG()
     {
-        ESX_CORE_LOG_WARNING("{} not implemented yet", __FUNCTION__);
+        VU_SELECT_INSTRUCTION_Register instruction;
+        instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
+
+        U8 element = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::element).as<U8>();
+        RegisterIndex vt = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
+        RegisterIndex vs = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
+        RegisterIndex vd = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+
+        for (I32 i = 0; i < 8; i++) {
+            U8 element_index = get_element_index(element, i);
+
+            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, VCC.test(i) ? VPR[vs][i] : VPR[vt][element_index]);
+            VPR[vd][i] = ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_LO).as<U16>();
+        }
     }
 
     void VectorUnit::unusable()
@@ -628,6 +1090,10 @@ namespace esx {
     void VectorUnit::setVPRRegisterBytes(U8 vt, U64 data, U8 element, size_t access_size)
     {
         for (I32 i = 0; i < access_size; i++) {
+            if ((element + i) > 15) {
+                break;
+            }
+
             *(reinterpret_cast<U8*>(VPR[vt].data()) + element + i) = (data >> ((access_size - 1 - i) * 8)) & 0xFF;
         }
     }
@@ -637,8 +1103,12 @@ namespace esx {
         U64 data = 0;
 
         for (I32 i = 0; i < access_size; i++) {
-            data |= *(reinterpret_cast<U8*>(VPR[vt].data()) + element + i);
+            if ((element + i) > 15) {
+                break;
+            }
+
             data <<= 8;
+            data |= *(reinterpret_cast<U8*>(VPR[vt].data()) + element + i);
         }
 
         return data;

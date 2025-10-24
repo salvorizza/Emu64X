@@ -30,10 +30,18 @@
     M(vt,16,20)              \
     M(element,21,24)
 
+#define VU_MOVE_INSTRUCTION_FIELDS(M) \
+    M(vs_elem,8,10)              \
+    M(vs,11,15)              \
+    M(rt,16,20)              
+
 #define VU_ACCUM_FIELDS(M)		 \
     M(ACCUM_LO,0,15)              \
     M(ACCUM_MD,16,31)              \
-    M(ACCUM_HI,32,47)
+    M(ACCUM_HI,32,47)				\
+	M(ACCUM_D,0,31)					\
+	M(ACCUM_M,16,47)				 \
+	M(ACCUM,0,47)
 
 #include "Core/MIPS/Common/Coprocessor.h"
 
@@ -42,6 +50,7 @@ namespace esx {
 	DEFINE_REGISTER_LAYOUT(VU_SL_INSTRUCTION_Register, U32, VU_SL_INSTRUCTION_FIELDS)
 	DEFINE_REGISTER_LAYOUT(VU_COMPUTATIONAL_INSTRUCTION_Register, U32, VU_COMPUTATIONAL_INSTRUCTION_FIELDS)
 	DEFINE_REGISTER_LAYOUT(VU_SELECT_INSTRUCTION_Register, U32, VU_SELECT_INSTRUCTION_FIELDS)
+	DEFINE_REGISTER_LAYOUT(VU_MOVE_INSTRUCTION_Register, U32, VU_MOVE_INSTRUCTION_FIELDS)
 	DEFINE_REGISTER_LAYOUT(VU_ACCUM_Register, U64, VU_ACCUM_FIELDS)
 
 	class R4000;
@@ -147,7 +156,7 @@ namespace esx {
 		Array<VectorUnitRegister, 32> VPR = {};
 		VectorUnitAccumulator ACCUM = {};
 		VectorUnitRegisterLane DIV_IN = {}, DIV_OUT = {};
-		U16 VCC = {}, VCO = {}, VCE = {};
+		std::bitset<16> VCC = {}, VCO = {}, VCE = {};
 	};
 
 	typedef void (VectorUnit::* VectorOpFunc)();

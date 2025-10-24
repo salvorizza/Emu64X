@@ -810,17 +810,41 @@ namespace esx {
 			}
 
 			case 0x04: {
-				size_t access_size =16;
+				size_t access_size = 16;
 
 				U32 addr = getRegister(base) + offset * access_size;
-				U32 unaligned = addr & 0xF;
-				U32 alignedAddr = addr & ~0xF;
+				U32 end = addr | 0xF;
+				U32 size = std::min<U32>(end - addr, 15 - element);
 
-				U64 dataHi = load(alignedAddr, exception, sizeof(U64));
-				U64 dataLo = load(alignedAddr + 8, exception, sizeof(U64));
+				U64 dataHi = load(addr, exception, sizeof(U64));
+				U64 dataLo = load(addr + 8, exception, sizeof(U64));
 
-				vu->setVPRRegisterBytes(vt, dataLo, element + 8, sizeof(U64));
-				vu->setVPRRegisterBytes(vt, dataHi, element, sizeof(U64));
+				if (size > 8) {
+					vu->setVPRRegisterBytes(vt, dataLo, element + 8, (size - 8) + 1);
+					vu->setVPRRegisterBytes(vt, dataHi, element, (size % 8) + 1);
+				} else if (size > 0) {
+					vu->setVPRRegisterBytes(vt, dataLo, element + 8, size);
+				}
+				break;
+			}
+
+			case 0x05: {
+				size_t access_size = 16;
+
+				U32 end = getRegister(base) + offset * access_size;
+				U32 addr = end & ~0x10;
+				U32 size = std::min<U32>(end - addr, 15 - element);
+
+				U64 dataHi = load(addr, exception, sizeof(U64));
+				U64 dataLo = load(addr + 8, exception, sizeof(U64));
+
+				if (size > 8) {
+					vu->setVPRRegisterBytes(vt, dataLo, element + 8, (size - 8) + 1);
+					vu->setVPRRegisterBytes(vt, dataHi, element, (size % 8) + 1);
+				}
+				else if (size > 0) {
+					vu->setVPRRegisterBytes(vt, dataLo, element + 8, size);
+				}
 				break;
 			}
 

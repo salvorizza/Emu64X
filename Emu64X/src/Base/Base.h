@@ -20,6 +20,7 @@
 #include <mutex>
 #include <span>
 #include <optional>
+#include <bitset>
 
 
 namespace esx {
