@@ -284,11 +284,11 @@ namespace esx {
 					for (int i = 0; i < 32; i++) {
 						ImGui::TableNextRow();
 						ImGui::TableNextColumn();
-						ImGui::Text("v%d", i);
+						ImGui::Text("v%02d", i);
 						ImGui::TableNextColumn();
-						for (I32 j = 0; j < 8; j++) {
-							ImGui::Text("0x%04X", _byteswap_ushort(mInstanceR4000->mRCP->mRSP->mVU->VPR[i][j]));
-							ImGui::SameLine();
+						for (I32 j = 0; j < 16; j++) {
+							ImGui::Text("%02X", *(reinterpret_cast<U8*>(mInstanceR4000->mRCP->mRSP->mVU->VPR[i].data()) + j));
+							ImGui::SameLine(0,(j % 2) == 1 ? -1 : 0);
 						}
 					}
 

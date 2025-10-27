@@ -802,49 +802,33 @@ namespace esx {
 			case 0x03: {
 				size_t access_size = 1llu << opcode;
 
-				U32 addr = getRegister(base) + offset * access_size;
-				U64 data = load(addr, exception, access_size);
-
-				vu->setVPRRegisterBytes(vt, data, element, access_size);
+				U32 addr = (getRegister(base) + offset * access_size) & 0xFFF;
+				Span<U8> dmem = Span<U8>(&mRCP->mDMEM[addr], &mRCP->mDMEM[addr + access_size]);
+				vu->setVPRRegisterBytes(vt, dmem, element, access_size);
 				break;
 			}
 
 			case 0x04: {
 				size_t access_size = 16;
 
-				U32 addr = getRegister(base) + offset * access_size;
+				U32 addr = (getRegister(base) + offset * access_size) & 0xFFF;
 				U32 end = addr | 0xF;
 				U32 size = std::min<U32>(end - addr, 15 - element);
 
-				U64 dataHi = load(addr, exception, sizeof(U64));
-				U64 dataLo = load(addr + 8, exception, sizeof(U64));
-
-				if (size > 8) {
-					vu->setVPRRegisterBytes(vt, dataLo, element + 8, (size - 8) + 1);
-					vu->setVPRRegisterBytes(vt, dataHi, element, (size % 8) + 1);
-				} else if (size > 0) {
-					vu->setVPRRegisterBytes(vt, dataLo, element + 8, size);
-				}
+				Span<U8> dmem = Span<U8>(&mRCP->mDMEM[addr], &mRCP->mDMEM[addr + size + 1]);
+				vu->setVPRRegisterBytes(vt, dmem, element, size + 1);
 				break;
 			}
 
 			case 0x05: {
 				size_t access_size = 16;
 
-				U32 end = getRegister(base) + offset * access_size;
+				U32 end = (getRegister(base) + offset * access_size) & 0xFFF;
 				U32 addr = end & ~0x10;
 				U32 size = std::min<U32>(end - addr, 15 - element);
 
-				U64 dataHi = load(addr, exception, sizeof(U64));
-				U64 dataLo = load(addr + 8, exception, sizeof(U64));
-
-				if (size > 8) {
-					vu->setVPRRegisterBytes(vt, dataLo, element + 8, (size - 8) + 1);
-					vu->setVPRRegisterBytes(vt, dataHi, element, (size % 8) + 1);
-				}
-				else if (size > 0) {
-					vu->setVPRRegisterBytes(vt, dataLo, element + 8, size);
-				}
+				Span<U8> dmem = Span<U8>(&mRCP->mDMEM[addr], &mRCP->mDMEM[addr + size + 1]);
+				vu->setVPRRegisterBytes(vt, dmem, element, size + 1);
 				break;
 			}
 
@@ -893,25 +877,21 @@ namespace esx {
 			case 3: {
 				size_t access_size = 1llu << opcode;
 
-				U32 addr = getRegister(base) + offset * access_size;
-				U64 data = vu->getVPRRegisterBytes(vt, element, access_size);
-
-				store(addr, data, access_size);
+				U32 addr = (getRegister(base) + offset * access_size) & 0xFFF;
+				Span<U8> data = vu->getVPRRegisterBytes(vt, element, access_size);
+				memcpy(&mRCP->mDMEM[addr], data.data(), data.size_bytes());
 				break;
 			}
 
 			case 0x04: {
 				size_t access_size = 16;
 
-				U32 addr = getRegister(base) + offset * access_size;
-				U32 unaligned = addr & 0xF;
-				U32 alignedAddr = addr & ~0xF;
+				U32 addr = (getRegister(base) + offset * access_size) & 0xFFF;
+				U32 end = addr | 0xF;
+				U32 size = std::min<U32>(end - addr, 15 - element);
 
-				U64 dataHi = vu->getVPRRegisterBytes(vt, element, sizeof(U64));
-				U64 dataLo = vu->getVPRRegisterBytes(vt, element + 8, sizeof(U64));
-
-				store(alignedAddr, dataHi, sizeof(U64));
-				store(alignedAddr + 8, dataLo, sizeof(U64));
+				Span<U8> data = vu->getVPRRegisterBytes(vt, element, size + 1);
+				memcpy(&mRCP->mDMEM[addr], data.data(), data.size_bytes());
 				break;
 			}
 

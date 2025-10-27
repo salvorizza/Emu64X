@@ -197,6 +197,7 @@ namespace esx {
             EPC = mCPU->mPC;
             mCPU->mBranchSlot = mCPU->mBranch;
             mCPU->mTookBranchSlot = mCPU->mTookBranch;
+            mCPU->mNullifyBranchSlot = ESX_FALSE;
         }
         else {
             EPC = mCPU->mCurrentPC;

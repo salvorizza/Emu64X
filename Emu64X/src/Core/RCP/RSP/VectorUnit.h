@@ -149,8 +149,8 @@ namespace esx {
 		virtual U64 getRegister(RegisterIndex reg) override;
 		virtual void setRegister(RegisterIndex reg, U64 value) override;
 
-		void setVPRRegisterBytes(U8 vt, U64 data, U8 element, size_t access_size);
-		U64 getVPRRegisterBytes(U8 vt, U8 element, size_t access_size);
+		void setVPRRegisterBytes(U8 vt, Span<U8>& data, U8 element, size_t access_size);
+		Span<U8> getVPRRegisterBytes(U8 vt, U8 element, size_t access_size);
 
 	private:
 		Array<VectorUnitRegister, 32> VPR = {};

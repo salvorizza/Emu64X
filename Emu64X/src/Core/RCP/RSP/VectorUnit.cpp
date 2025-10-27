@@ -138,11 +138,13 @@ namespace esx {
 
         U16 data = 0;
 
-        data = getVPRRegisterBytes(vs, vs_elem, vs_elem == 15 ? 1 : 2);
+        auto hi = getVPRRegisterBytes(vs, vs_elem, vs_elem == 15 ? 1 : 2);
+        if (hi.size_bytes() == 1) {
+            auto lo = getVPRRegisterBytes(vs, 0, 1);
 
-        if (vs_elem == 15) {
-            data <<= 8;
-            data |= getVPRRegisterBytes(vs, 0, 1);
+            data = (static_cast<U16>(hi[0]) << 8) | lo[0];
+        } else {
+            data = _byteswap_ushort(*reinterpret_cast<U16*>(hi.data()));
         }
 
         mCPU->setRegister(rt, data);
@@ -180,7 +182,8 @@ namespace esx {
         U8 vs_elem = mCPU->mCurrentInstruction.Element();
 
         U16 data = mCPU->getRegister(rt);
-        setVPRRegisterBytes(vs, data, vs_elem, vs_elem == 15 ? 1 : 2);
+        auto s = Span<U8>(reinterpret_cast<U8*>(&data), reinterpret_cast<U8*>(&data) + 2);
+        setVPRRegisterBytes(vs, s, vs_elem, vs_elem == 15 ? 1 : 2);
     }
 
     void VectorUnit::CT()
@@ -1087,31 +1090,19 @@ namespace esx {
     {
     }
 
-    void VectorUnit::setVPRRegisterBytes(U8 vt, U64 data, U8 element, size_t access_size)
+    void VectorUnit::setVPRRegisterBytes(U8 vt, Span<U8>& data, U8 element, size_t access_size)
     {
-        for (I32 i = 0; i < access_size; i++) {
-            if ((element + i) > 15) {
-                break;
-            }
-
-            *(reinterpret_cast<U8*>(VPR[vt].data()) + element + i) = (data >> ((access_size - 1 - i) * 8)) & 0xFF;
-        }
+        U8 start = std::min<U8>(element, 15);
+        U8 end = std::min<U8>(element + access_size - 1, 15);
+        memcpy_s(reinterpret_cast<U8*>(VPR[vt].data()) + start, VPR[vt].size() * sizeof(VectorUnitRegisterLane) - start, data.data(), data.size_bytes());
     }
 
-    U64 VectorUnit::getVPRRegisterBytes(U8 vt, U8 element, size_t access_size)
+    Span<U8> VectorUnit::getVPRRegisterBytes(U8 vt, U8 element, size_t access_size)
     {
-        U64 data = 0;
+        U8 start = std::min<U8>(element, 15);
+        U8 end = std::min<U8>(element + access_size - 1, 15);
 
-        for (I32 i = 0; i < access_size; i++) {
-            if ((element + i) > 15) {
-                break;
-            }
-
-            data <<= 8;
-            data |= *(reinterpret_cast<U8*>(VPR[vt].data()) + element + i);
-        }
-
-        return data;
+        return Span<U8>(reinterpret_cast<U8*>(VPR[vt].data()) + start, reinterpret_cast<U8*>(VPR[vt].data()) + end + 1);
     }
 
 }

@@ -869,7 +869,29 @@ namespace esx {
 					case 0x31:
 					case 0x32: {
 						U8 cpn = COP_N(binaryInstruction);
-						return FormatString(ESX_TEXT("lwc{} ${},0x{:08x}"), cpn, (U8)RegisterTarget(), cpuState->getRegister(RegisterSource()) + ImmediateSE());
+
+						if (cpn == 2) {
+							U32 immediate = Immediate25();
+
+							I8 offset = static_cast<I8>(static_cast<U8>((immediate >> 0) & 0x7F));
+							U8 element = (immediate >> 7) & 0xF;
+							U8 opcode = (immediate >> 11) & 0x1F;
+							U8 vt = (immediate >> 16) & 0x1F;
+							U8 base = (immediate >> 21) & 0x1F;
+
+							static constexpr Array<StringView, 32> sOpCodes = {
+								"lbv","lsv","llv","ldv","lqv","lrv","lpv","luv",
+								"lhv","lfv","*","ltv","*","*","*","*",
+								"*","*","*","*","*","*","*","*",
+								"*","*","*","*","*","*","*","*"
+							};
+
+							return FormatString(ESX_TEXT("{} $v{:02d},e({}),{},{}"), sOpCodes[opcode], vt, element, offset, registersMnemonics[base]);
+
+						} else {
+							return FormatString(ESX_TEXT("lwc{} ${},0x{:08x}"), cpn, (U8)RegisterTarget(), cpuState->getRegister(RegisterSource()) + ImmediateSE());
+						}
+
 						break;
 					}
 
