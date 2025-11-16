@@ -1,4 +1,4 @@
-#include "VectorUnit.h"
+ï»¿#include "VectorUnit.h"
 
 #include <intrin.h>
 
@@ -67,21 +67,21 @@ namespace esx {
     }
 
     constexpr Array<Array<U8, 8>, 16> sBroadcastMap = { {
-            // 0–1: Normal register access (no broadcast)
+            // 0â€“1: Normal register access (no broadcast)
             {0,1,2,3,4,5,6,7},  // 0: Normal
             {0,1,2,3,4,5,6,7},  // 1: Normal
 
-            // 2–3: Broadcast 4 of 8 lanes (quarter broadcast)
+            // 2â€“3: Broadcast 4 of 8 lanes (quarter broadcast)
             {0,0,2,2,4,4,6,6},  // 2: e(0q)
             {1,1,3,3,5,5,7,7},  // 3: e(1q)
 
-            // 4–7: Broadcast 2 of 8 lanes (half broadcast)
+            // 4â€“7: Broadcast 2 of 8 lanes (half broadcast)
             {0,0,0,0,4,4,4,4},  // 4: e(0h)
             {1,1,1,1,5,5,5,5},  // 5: e(1h)
             {2,2,2,2,6,6,6,6},  // 6: e(2h)
             {3,3,3,3,7,7,7,7},  // 7: e(3h)
 
-            // 8–15: Broadcast single lane (full broadcast)
+            // 8â€“15: Broadcast single lane (full broadcast)
             {0,0,0,0,0,0,0,0},  // 8: e(0)
             {1,1,1,1,1,1,1,1},  // 9: e(1)
             {2,2,2,2,2,2,2,2},  // 10: e(2)
@@ -241,7 +241,7 @@ namespace esx {
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
 
-            I64 prod = static_cast<I32>(static_cast<I16>(VPR[vs][i]) * static_cast<I16>(VPR[vt][element_index]) * 2);
+            I32 prod = static_cast<I16>(VPR[vs][i]) * static_cast<I16>(VPR[vt][element_index]) * 2;
 
             ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, prod + 0x8000);
             VPR[vd][i] = clamp_signed(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>());
@@ -261,7 +261,7 @@ namespace esx {
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
 
-            I64 prod = static_cast<I32>(static_cast<I16>(VPR[vs][i]) * static_cast<I16>(VPR[vt][element_index]) * 2);
+            I32 prod = static_cast<I16>(VPR[vs][i]) * static_cast<I16>(VPR[vt][element_index]) * 2;
 
             ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, prod + 0x8000);
             VPR[vd][i] = clamp_unsigned(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>());
@@ -304,9 +304,9 @@ namespace esx {
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
 
-            I64 prod = static_cast<I32>(static_cast<I16>(VPR[vs][i]) * static_cast<I16>(VPR[vt][element_index]));
+            I32 prod = static_cast<I16>(VPR[vs][i]) * static_cast<I16>(VPR[vt][element_index]);
             if ((prod >> 31) & 0x1) prod += 0x1F;
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, prod << 16);
+            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, static_cast<I64>(prod) << 16);
             VPR[vd][i] = clamp_signed(prod >> 1) & 0xFFF0;
         }
     }
@@ -328,7 +328,7 @@ namespace esx {
 
             ACCUM[i].write(0);
 
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM).as<I64>() + (static_cast<I32>(prod) >> 16));
+            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM).as<I64>() + (prod >> 16));
             VPR[vd][i] = clamp_unsigned(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_D).as<I32>());
         }
     }
@@ -390,11 +390,11 @@ namespace esx {
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
 
-            U32 prod = VPR[vs][i] * VPR[vt][element_index];
+            I32 prod = static_cast<I16>(VPR[vs][i]) * static_cast<I16>(VPR[vt][element_index]);
 
             ACCUM[i].write(0);
 
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_M, ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>() + static_cast<I32>(prod));
+            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_M, ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>() + prod);
             VPR[vd][i] = clamp_signed(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>());
         }
     }
@@ -412,9 +412,9 @@ namespace esx {
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
 
-            I64 prod = static_cast<I32>(static_cast<I16>(VPR[vs][i]) * static_cast<I16>(VPR[vt][element_index]) * 2);
+            I32 prod = static_cast<I16>(VPR[vs][i]) * static_cast<I16>(VPR[vt][element_index]) * 2;
 
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM).as<I64>() + static_cast<I64>(static_cast<I32>(prod)));
+            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM).as<I64>() + prod);
             VPR[vd][i] = clamp_signed(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>());
         }
     }
@@ -540,9 +540,9 @@ namespace esx {
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
 
-            U32 prod = VPR[vs][i] * VPR[vt][element_index];
+            I32 prod = static_cast<I16>(VPR[vs][i]) * static_cast<I16>(VPR[vt][element_index]);
 
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_M, ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>() + static_cast<I32>(prod));
+            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_M, ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>() + prod);
             VPR[vd][i] = clamp_signed(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>());
         }
     }
@@ -1092,17 +1092,36 @@ namespace esx {
 
     void VectorUnit::setVPRRegisterBytes(U8 vt, Span<U8>& data, U8 element, size_t access_size)
     {
-        U8 start = std::min<U8>(element, 15);
-        U8 end = std::min<U8>(element + access_size - 1, 15);
-        memcpy_s(reinterpret_cast<U8*>(VPR[vt].data()) + start, VPR[vt].size() * sizeof(VectorUnitRegisterLane) - start, data.data(), data.size_bytes());
+        U8* dst = reinterpret_cast<U8*>(VPR[vt].data());
+
+        for (size_t i = 0; i < access_size; ++i) {
+            U8 reg_index = (element + i) & 0xF;
+            U8 lane = reg_index >> 1;
+            bool high_byte = (reg_index & 1) == 0;
+
+            if (high_byte)
+                dst[lane * 2 + 1] = data[i];
+            else
+                dst[lane * 2 + 0] = data[i];
+        }
     }
 
     Span<U8> VectorUnit::getVPRRegisterBytes(U8 vt, U8 element, size_t access_size)
     {
-        U8 start = std::min<U8>(element, 15);
-        U8 end = std::min<U8>(element + access_size - 1, 15);
+        U8* src = reinterpret_cast<U8*>(VPR[vt].data());
+        static std::array<U8, 16> temp{};
+        for (size_t i = 0; i < access_size; ++i) {
+            U8 reg_index = (element + i) & 0xF;
+            U8 lane = reg_index >> 1;
+            bool high_byte = (reg_index & 1) == 0;
 
-        return Span<U8>(reinterpret_cast<U8*>(VPR[vt].data()) + start, reinterpret_cast<U8*>(VPR[vt].data()) + end + 1);
+            if (high_byte)
+                temp[i] = src[lane * 2 + 1];
+            else
+                temp[i] = src[lane * 2 + 0];
+        }
+        return Span<U8>(temp.data(), temp.data() + access_size);
     }
+
 
 }

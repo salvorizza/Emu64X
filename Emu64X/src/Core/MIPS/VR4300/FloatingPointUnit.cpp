@@ -1,5 +1,7 @@
 #include "FloatingPointUnit.h"
 
+#include <cfenv>
+
 #include "Core/MIPS/VR4300/VR4300.h"
 
 namespace esx {
@@ -13,6 +15,7 @@ namespace esx {
 
 	void FloatingPointUnit::clock(U64 clocks)
 	{
+		
 	}
 
 	void FloatingPointUnit::CF()
@@ -62,9 +65,7 @@ namespace esx {
 
 		FCR31.write(temp);
 
-		if (FCR31.get(layouts::FCR31Register::Field::Cause).as<U8>() & FCR31.get(layouts::FCR31Register::Field::Enables).as<U8>()) {
-			mCPU->raiseException(ExceptionType::FloatingPoint);
-		}
+		FCR31.set(layouts::FCR31Register::Field::Flags, 0);
 	}
 
 	void FloatingPointUnit::CO()
@@ -75,6 +76,20 @@ namespace esx {
 		}
 
 		U8 function = mCPU->mCurrentInstruction.Function();
+
+		U8 rm = FCR31.get(layouts::FCR31Register::Field::RM).as<U8>();
+		int feRoundMode = FE_TONEAREST;
+		switch (rm) {
+			case 0: feRoundMode = FE_TONEAREST; break;
+			case 1: feRoundMode = FE_TOWARDZERO; break;
+			case 2: feRoundMode = FE_UPWARD; break;
+			case 3: feRoundMode = FE_DOWNWARD; break;
+		}
+
+		int oldRoundMode = std::fegetround();
+		std::fesetround(feRoundMode);
+
+		std::feclearexcept(FE_ALL_EXCEPT);
 
 		switch (function)
 		{
@@ -183,6 +198,18 @@ namespace esx {
 				break;
 			}
 		}
+
+		if (std::fetestexcept(FE_INEXACT)) signal(FPUException::I);
+		if (std::fetestexcept(FE_UNDERFLOW)) signal(FPUException::U);
+		if (std::fetestexcept(FE_OVERFLOW)) signal(FPUException::O);
+		if (std::fetestexcept(FE_DIVBYZERO)) signal(FPUException::Z);
+		if (std::fetestexcept(FE_INVALID)) signal(FPUException::V);
+
+		std::fesetround(oldRoundMode);
+
+		if (checkExceptions()) {
+			mCPU->raiseException(ExceptionType::FloatingPoint);
+		}
 	}
 
 	void FloatingPointUnit::ADD()
@@ -205,6 +232,7 @@ namespace esx {
 
 			default: {
 				ESX_CORE_LOG_WARNING("{} Not implemented yet with fmt {}", __FUNCTION__, static_cast<U8>(fmt));
+				signal(FPUException::E);
 				break;
 			}
 		}
@@ -230,6 +258,7 @@ namespace esx {
 
 			default: {
 				ESX_CORE_LOG_WARNING("{} Not implemented yet with fmt {}", __FUNCTION__, static_cast<U8>(fmt));
+				signal(FPUException::E);
 				break;
 			}
 		}
@@ -255,6 +284,7 @@ namespace esx {
 
 			default: {
 				ESX_CORE_LOG_WARNING("{} Not implemented yet with fmt {}", __FUNCTION__, static_cast<U8>(fmt));
+				signal(FPUException::E);
 				break;
 			}
 		}
@@ -280,6 +310,7 @@ namespace esx {
 
 			default: {
 				ESX_CORE_LOG_WARNING("{} Not implemented yet with fmt {}", __FUNCTION__, static_cast<U8>(fmt));
+				signal(FPUException::E);
 				break;
 			}
 		}
@@ -299,6 +330,7 @@ namespace esx {
 
 			default: {
 				ESX_CORE_LOG_WARNING("{} Not implemented yet with fmt {}", __FUNCTION__, static_cast<U8>(fmt));
+				signal(FPUException::E);
 				break;
 			}
 		}
@@ -318,6 +350,7 @@ namespace esx {
 
 			default: {
 				ESX_CORE_LOG_WARNING("{} Not implemented yet with fmt {}", __FUNCTION__, static_cast<U8>(fmt));
+				signal(FPUException::E);
 				break;
 			}
 		}
@@ -337,6 +370,7 @@ namespace esx {
 
 			default: {
 				ESX_CORE_LOG_WARNING("{} Not implemented yet with fmt {}", __FUNCTION__, static_cast<U8>(fmt));
+				signal(FPUException::E);
 				break;
 			}
 		}
@@ -356,6 +390,7 @@ namespace esx {
 
 			default: {
 				ESX_CORE_LOG_WARNING("{} Not implemented yet with fmt {}", __FUNCTION__, static_cast<U8>(fmt));
+				signal(FPUException::E);
 				break;
 			}
 		}
@@ -405,6 +440,7 @@ namespace esx {
 
 			default: {
 				ESX_CORE_LOG_WARNING("{} Not implemented yet with fmt {}", __FUNCTION__, static_cast<U8>(fmt));
+				signal(FPUException::E);
 				break;
 			}
 		}
@@ -439,6 +475,7 @@ namespace esx {
 
 			default: {
 				ESX_CORE_LOG_WARNING("{} Not implemented yet with fmt {}", __FUNCTION__, static_cast<U8>(fmt));
+				signal(FPUException::E);
 				break;
 			}
 		}
@@ -468,6 +505,7 @@ namespace esx {
 
 			default: {
 				ESX_CORE_LOG_WARNING("{} Not implemented yet with fmt {}", __FUNCTION__, static_cast<U8>(fmt));
+				signal(FPUException::E);
 				break;
 			}
 		}
@@ -493,6 +531,7 @@ namespace esx {
 
 			default: {
 				ESX_CORE_LOG_WARNING("{} Not implemented yet with fmt {}", __FUNCTION__, static_cast<U8>(fmt));
+				signal(FPUException::E);
 				break;
 			}
 		}
@@ -516,21 +555,43 @@ namespace esx {
 
 		switch (fmt) {
 			case FormatSpec::S: {
-				less = ValueFPR<F32>(fs, fmt) < ValueFPR<F32>(ft, fmt);
-				equal = ValueFPR<F32>(fs, fmt) == ValueFPR<F32>(ft, fmt);
-				unordered = ESX_FALSE;
+				if (std::isnan(ValueFPR<F32>(fs, fmt)) || std::isnan(ValueFPR<F32>(ft, fmt))) {
+					less = ESX_FALSE;
+					equal = ESX_FALSE;
+					unordered = ESX_TRUE;
+
+					if ((cond >> 3) & 0x1) {
+						signal(FPUException::V);
+					}
+				} else {
+					less = ValueFPR<F32>(fs, fmt) < ValueFPR<F32>(ft, fmt);
+					equal = ValueFPR<F32>(fs, fmt) == ValueFPR<F32>(ft, fmt);
+					unordered = ESX_FALSE;
+				}
+
 				break;
 			}
 
 			case FormatSpec::D: {
-				less = ValueFPR<F64>(fs, fmt) < ValueFPR<F64>(ft, fmt);
-				equal = ValueFPR<F64>(fs, fmt) == ValueFPR<F64>(ft, fmt);
-				unordered = ESX_FALSE;
+				if (std::isnan(ValueFPR<F64>(fs, fmt)) || std::isnan(ValueFPR<F64>(ft, fmt))) {
+					less = ESX_FALSE;
+					equal = ESX_FALSE;
+					unordered = ESX_TRUE;
+
+					if ((cond >> 3) & 0x1) {
+						signal(FPUException::V);
+					}
+				} else {
+					less = ValueFPR<F64>(fs, fmt) < ValueFPR<F64>(ft, fmt);
+					equal = ValueFPR<F64>(fs, fmt) == ValueFPR<F64>(ft, fmt);
+					unordered = ESX_FALSE;
+				}
 				break;
 			}
 
 			default: {
 				ESX_CORE_LOG_WARNING("{} Not implemented yet with fmt {}", __FUNCTION__, static_cast<U8>(fmt));
+				signal(FPUException::E);
 				break;
 			}
 		}
@@ -546,7 +607,25 @@ namespace esx {
 
 	void FloatingPointUnit::reserved()
 	{
-		mCPU->raiseException(ExceptionType::ReservedInstruction);
+		signal(FPUException::E);
+	}
+
+	void FloatingPointUnit::signal(FPUException exception)
+	{
+		U8 cause = FCR31.get(layouts::FCR31Register::Field::Cause).as<U8>();
+		cause |= 1 << static_cast<U8>(exception);
+		FCR31.set(layouts::FCR31Register::Field::Cause, cause);
+	}
+
+	BIT FloatingPointUnit::checkExceptions()
+	{
+		U8 cause = FCR31.get(layouts::FCR31Register::Field::Cause).as<U8>();
+		U8 enables = FCR31.get(layouts::FCR31Register::Field::Enables).as<U8>();
+		U8 exceptions = cause & enables;
+		U8 flags = cause & (~enables);
+		FCR31.set(layouts::FCR31Register::Field::Flags, flags);
+
+		return exceptions != 0;
 	}
 
 	U64 FloatingPointUnit::getRegister(RegisterIndex reg)
