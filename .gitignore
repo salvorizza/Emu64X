@@ -400,5 +400,19 @@ FodyWeavers.xsd
 bin/
 bin-int/
 
+# Premake generated project files
+*.sln
+*.slnx
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+Makefile
+*.make
+
+# Temporary build/test artifacts
+*.log
+warnings.txt
+build_output.txt
+
 EmuStationX/commons/games/**
 EmuStationX/commons/bios/**
