@@ -5,7 +5,6 @@
 namespace esx {
 
 	RDRAMInterface::RDRAMInterface(RCP* rcp)
-		: mRCP(rcp)
 	{
 	}
 
@@ -78,9 +77,9 @@ namespace esx {
 			case 0x04700008: {
 				RI_CURRENT_LOAD_Register reg;
 				reg.write(0b00110);
-				reg.set(layouts::RI_CURRENT_LOAD_Register::Field::Ack, RI_ERROR.get(layouts::RI_ERROR_Register::Field::Ack).as<BIT>());
-				reg.set(layouts::RI_CURRENT_LOAD_Register::Field::STOP_R, RI_MODE.get(layouts::RI_MODE_Register::Field::STOP_R).as<BIT>());
-				reg.set(layouts::RI_CURRENT_LOAD_Register::Field::TSEL, RI_SELECT.get(layouts::RI_SELECT_Register::Field::TSEL).as<U8>() & 0x1);
+				reg.set<layouts::RI_CURRENT_LOAD_Register::Ack>(RI_ERROR.get<layouts::RI_ERROR_Register::Ack>());
+				reg.set<layouts::RI_CURRENT_LOAD_Register::STOP_R>(RI_MODE.get<layouts::RI_MODE_Register::STOP_R>());
+				reg.set<layouts::RI_CURRENT_LOAD_Register::TSEL>(RI_SELECT.get<layouts::RI_SELECT_Register::TSEL>() & 0x1);
 
 				return reg.read();
 			}

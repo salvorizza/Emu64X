@@ -489,11 +489,10 @@ namespace esx {
 			mHI = a;
 
 			if (a >= 0) {
-				mLO = 0x7FFFFFFF;
+				mLO = 0x7FFFFFFFFFFFFFFF;
 			} else {
-				mLO = 0x80000001;
+				mLO = 0x8000000000000001;
 			}
-			mLO = static_cast<I32>(mLO);
 		}
 	}
 
@@ -1064,8 +1063,8 @@ namespace esx {
 
 	void VR4300::SLTIU()
 	{
-		U32 a = getRegister(mCurrentInstruction.RegisterSource());
-		U32 b = mCurrentInstruction.ImmediateSE();
+		U64 a = getRegister(mCurrentInstruction.RegisterSource());
+		U64 b = static_cast<U64>(static_cast<I64>(mCurrentInstruction.ImmediateSE()));
 
 		U32 r = a < b;
 
@@ -1236,11 +1235,10 @@ namespace esx {
 
 	void VR4300::SRA()
 	{
-		//32-bit Shift Right Arithmetic Bug
-		I64 a = getRegister(mCurrentInstruction.RegisterTarget());
+		I32 a = static_cast<I32>(static_cast<U32>(getRegister(mCurrentInstruction.RegisterTarget())));
 		U32 s = mCurrentInstruction.ShiftAmount();
 
-		U64 r = a >> s;
+		U64 r = static_cast<U64>(static_cast<I64>(a >> s));
 
 		if (mCP0->is64BitMode()) {
 			r = static_cast<I32>(static_cast<U32>(r));
@@ -1345,11 +1343,10 @@ namespace esx {
 
 	void VR4300::SRAV()
 	{
-		//32-bit Shift Right Arithmetic Bug
-		I64 a = getRegister(mCurrentInstruction.RegisterTarget());
+		I32 a = static_cast<I32>(static_cast<U32>(getRegister(mCurrentInstruction.RegisterTarget())));
 		U32 s = getRegister(mCurrentInstruction.RegisterSource());
 
-		U64 r = a >> (s & 0x1F);
+		U64 r = static_cast<U64>(static_cast<I64>(a >> (s & 0x1F)));
 
 		if (mCP0->is64BitMode()) {
 			r = static_cast<I32>(static_cast<U32>(r));
@@ -1632,7 +1629,7 @@ namespace esx {
 	void VR4300::TGEIU()
 	{
 		U64 a = getRegister(mCurrentInstruction.RegisterSource());
-		U64 b = mCurrentInstruction.Immediate();
+		U64 b = static_cast<U64>(static_cast<I64>(mCurrentInstruction.ImmediateSE()));
 
 		if (a >= b) {
 			raiseException(ExceptionType::Trap);
@@ -1672,7 +1669,7 @@ namespace esx {
 	void VR4300::TLTIU()
 	{
 		U64 a = getRegister(mCurrentInstruction.RegisterSource());
-		U64 b = mCurrentInstruction.Immediate();
+		U64 b = static_cast<U64>(static_cast<I64>(mCurrentInstruction.ImmediateSE()));
 
 		if (a < b) {
 			raiseException(ExceptionType::Trap);

@@ -22,7 +22,11 @@ namespace esx {
 	{
 		for (const auto& [targetClocks, interruptType] : mDelayedInterrupts) {
 			if (clocks >= targetClocks) {
-				mInterruptStatus |= (1 << static_cast<U8>(interruptType));
+				U8 bit = static_cast<U8>(interruptType);
+				if (!(mInterruptStatus & (1 << bit))) {
+					ESX_CORE_LOG_INFO("MI: interrupt {} raised, status {:02x}h->({:02x}h) mask={:02x}h", bit, mInterruptStatus, mInterruptStatus | (1 << bit), mInterruptMask);
+				}
+				mInterruptStatus |= (1 << bit);
 			}
 		}
 		std::erase_if(mDelayedInterrupts, [&](const Pair<U64, InterruptType>& pair) { return clocks >= pair.first; });
@@ -35,39 +39,40 @@ namespace esx {
 				MI_MODE_WRITE_Register writeReg;
 				writeReg.write(value);
 
-				if(writeReg.get(layouts::MI_MODE_WRITE_Register::Field::ClearUpper).as<BIT>() == ESX_TRUE) {
-					MI_MODE.set(layouts::MI_MODE_Register::Field::Upper, ESX_FALSE);
+				if(writeReg.get<layouts::MI_MODE_WRITE_Register::ClearUpper>() == ESX_TRUE) {
+					MI_MODE.set<layouts::MI_MODE_Register::Upper>(ESX_FALSE);
 				}
 
-				if (writeReg.get(layouts::MI_MODE_WRITE_Register::Field::SetUpper).as<BIT>() == ESX_TRUE) {
+				if (writeReg.get<layouts::MI_MODE_WRITE_Register::SetUpper>() == ESX_TRUE) {
 					ESX_CORE_LOG_WARNING("{} - Upper mode not implemented yet", mName);
 
-					MI_MODE.set(layouts::MI_MODE_Register::Field::Upper, ESX_TRUE);
+					MI_MODE.set<layouts::MI_MODE_Register::Upper>(ESX_TRUE);
 				}
 
-				if (writeReg.get(layouts::MI_MODE_WRITE_Register::Field::ClearEBus).as<BIT>() == ESX_TRUE) {
-					MI_MODE.set(layouts::MI_MODE_Register::Field::Ebus, ESX_FALSE);
+				if (writeReg.get<layouts::MI_MODE_WRITE_Register::ClearEBus>() == ESX_TRUE) {
+					MI_MODE.set<layouts::MI_MODE_Register::Ebus>(ESX_FALSE);
 				}
 
-				if (writeReg.get(layouts::MI_MODE_WRITE_Register::Field::SetEBus).as<BIT>() == ESX_TRUE) {
+				if (writeReg.get<layouts::MI_MODE_WRITE_Register::SetEBus>() == ESX_TRUE) {
 					ESX_CORE_LOG_WARNING("{} - EBus mode not implemented yet", mName);
 
-					MI_MODE.set(layouts::MI_MODE_Register::Field::Ebus, ESX_TRUE);
+					MI_MODE.set<layouts::MI_MODE_Register::Ebus>(ESX_TRUE);
 				}
 
-				if (writeReg.get(layouts::MI_MODE_WRITE_Register::Field::ClearRepeat).as<BIT>() == ESX_TRUE) {
-					MI_MODE.set(layouts::MI_MODE_Register::Field::Repeat, ESX_FALSE);
+				if (writeReg.get<layouts::MI_MODE_WRITE_Register::ClearRepeat>() == ESX_TRUE) {
+					MI_MODE.set<layouts::MI_MODE_Register::Repeat>(ESX_FALSE);
 				}
 
-				if (writeReg.get(layouts::MI_MODE_WRITE_Register::Field::SetRepeat).as<BIT>() == ESX_TRUE) {
+				if (writeReg.get<layouts::MI_MODE_WRITE_Register::SetRepeat>() == ESX_TRUE) {
 					ESX_CORE_LOG_WARNING("{} - Repeat mode not implemented yet", mName);
 
-					MI_MODE.set(layouts::MI_MODE_Register::Field::Repeat, ESX_TRUE);
+					MI_MODE.set<layouts::MI_MODE_Register::Repeat>(ESX_TRUE);
 				}
 
-				MI_MODE.set(layouts::MI_MODE_Register::Field::RepeatCount, writeReg.get(layouts::MI_MODE_WRITE_Register::Field::RepeatCount).as<U8>());
+				MI_MODE.set<layouts::MI_MODE_Register::RepeatCount>(writeReg.get<layouts::MI_MODE_WRITE_Register::RepeatCount>());
 
-				if (writeReg.get(layouts::MI_MODE_WRITE_Register::Field::ClearDP).as<BIT>() == ESX_TRUE) {
+				if (writeReg.get<layouts::MI_MODE_WRITE_Register::ClearDP>() == ESX_TRUE) {
+					ESX_CORE_LOG_INFO("MI: ClearDP interrupt, status was {:02x}h", mInterruptStatus);
 					clearInterrupt(InterruptType::DP);
 				}
 
@@ -108,6 +113,7 @@ namespace esx {
 				break;
 			}
 		}
+	return 0;
 	}
 
 	void MIPSInterface::reset()
@@ -136,7 +142,7 @@ namespace esx {
 
 	void MIPSInterface::setInterruptMask(U32 value)
 	{
-		for (I32 i = 0; i < 5; i++) {
+		for (I32 i = 0; i < 6; i++) {
 			if (value & (1 << (i * 2))) mInterruptMask &= ~(1 << i);
 			if (value & (1 << (i * 2 + 1))) mInterruptMask |= 1 << i;
 		}

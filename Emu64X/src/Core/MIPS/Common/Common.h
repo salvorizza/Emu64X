@@ -157,6 +157,10 @@ namespace esx {
 	template<typename Address, typename Register, typename Execute>
 	class MIPSProcessor : public BusDevice {
 	public:
+		using BusDevice::clock;
+		using BusDevice::load;
+		using BusDevice::store;
+
 		MIPSProcessor(const StringView& name) : BusDevice(name) { reset(); }
 		virtual ~MIPSProcessor() = default;
 

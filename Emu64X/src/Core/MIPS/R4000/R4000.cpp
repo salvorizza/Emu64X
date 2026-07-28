@@ -36,7 +36,7 @@ namespace esx {
 	{
 		U32 physicalAddress = 0x04001000 + (virtualAddress & 0xFFF);
 		U32 output = 0;
-		mRCP->load("Root", physicalAddress, output, 0, sizeof(U32));
+		mRCP->load("Root", physicalAddress, output, 0, sizeof(U32) * 8);
 		return output;
 	}
 
@@ -107,7 +107,6 @@ namespace esx {
 	}
 
 	U64 R4000::load(U32 virtualAddress, BIT& exception, size_t accessSize) {
-		BIT cached = ESX_FALSE;
 		U32 physicalAddress = 0x04000000 + (virtualAddress & 0xFFF);
 
 		PRINT_LOAD(physicalAddress);
@@ -132,8 +131,6 @@ namespace esx {
 	}
 
 	void R4000::store(U32 virtualAddress, U64 value, size_t accessSize) {
-
-		BIT cached = ESX_FALSE;
 		U32 physicalAddress = 0x04000000 + (virtualAddress & 0xFFF);
 
 		PRINT_STORE(physicalAddress, value);
@@ -784,16 +781,14 @@ namespace esx {
 	{
 		SharedPtr<VectorUnit> vu = std::dynamic_pointer_cast<VectorUnit>(mCOPs[2]);
 
-		BIT exception = ESX_FALSE;
-
 		VU_LOAD_STORE_INSTRUCTION_Register instruction;
 		instruction.write(mCurrentInstruction.binaryInstruction);
 
-		RegisterIndex base = instruction.get(layouts::VU_LOAD_STORE_INSTRUCTION_Register::Field::base).as<RegisterIndex>();
-		U8 vt = instruction.get(layouts::VU_LOAD_STORE_INSTRUCTION_Register::Field::vt).as<U8>();
-		U8 opcode = instruction.get(layouts::VU_LOAD_STORE_INSTRUCTION_Register::Field::opcode).as<U8>();
-		U8 element = instruction.get(layouts::VU_LOAD_STORE_INSTRUCTION_Register::Field::element).as<U8>();
-		I8 offset = instruction.get(layouts::VU_LOAD_STORE_INSTRUCTION_Register::Field::offset).as<I8>();
+		RegisterIndex base = instruction.get<layouts::VU_LOAD_STORE_INSTRUCTION_Register::base>();
+		U8 vt = instruction.get<layouts::VU_LOAD_STORE_INSTRUCTION_Register::vt>();
+		U8 opcode = instruction.get<layouts::VU_LOAD_STORE_INSTRUCTION_Register::opcode>();
+		U8 element = instruction.get<layouts::VU_LOAD_STORE_INSTRUCTION_Register::element>();
+		I8 offset = instruction.get<layouts::VU_LOAD_STORE_INSTRUCTION_Register::offset>();
 
 		switch (opcode) {
 			case 0x00:
@@ -859,16 +854,14 @@ namespace esx {
 	{
 		SharedPtr<VectorUnit> vu = std::dynamic_pointer_cast<VectorUnit>(mCOPs[2]);
 
-		BIT exception = ESX_FALSE;
-
 		VU_LOAD_STORE_INSTRUCTION_Register instruction;
 		instruction.write(mCurrentInstruction.binaryInstruction);
 
-		RegisterIndex base = instruction.get(layouts::VU_LOAD_STORE_INSTRUCTION_Register::Field::base).as<RegisterIndex>();
-		U8 vt = instruction.get(layouts::VU_LOAD_STORE_INSTRUCTION_Register::Field::vt).as<U8>();
-		U8 opcode = instruction.get(layouts::VU_LOAD_STORE_INSTRUCTION_Register::Field::opcode).as<U8>();
-		U8 element = instruction.get(layouts::VU_LOAD_STORE_INSTRUCTION_Register::Field::element).as<U8>();
-		I8 offset = instruction.get(layouts::VU_LOAD_STORE_INSTRUCTION_Register::Field::offset).as<I8>();
+		RegisterIndex base = instruction.get<layouts::VU_LOAD_STORE_INSTRUCTION_Register::base>();
+		U8 vt = instruction.get<layouts::VU_LOAD_STORE_INSTRUCTION_Register::vt>();
+		U8 opcode = instruction.get<layouts::VU_LOAD_STORE_INSTRUCTION_Register::opcode>();
+		U8 element = instruction.get<layouts::VU_LOAD_STORE_INSTRUCTION_Register::element>();
+		I8 offset = instruction.get<layouts::VU_LOAD_STORE_INSTRUCTION_Register::offset>();
 		
 		switch (opcode) {
 			case 0:

@@ -10,7 +10,7 @@ namespace esx {
 		:	Coprocessor(cpu, 1),
 			FGR({})
 	{
-		FCR0.set(layouts::FCR0Register::Field::Imp, 0x0B);
+		FCR0.set<layouts::FCR0Register::Imp>(0x0B);
 	}
 
 	void FloatingPointUnit::clock(U64 clocks)
@@ -64,8 +64,6 @@ namespace esx {
 		}
 
 		FCR31.write(temp);
-
-		FCR31.set(layouts::FCR31Register::Field::Flags, 0);
 	}
 
 	void FloatingPointUnit::CO()
@@ -77,7 +75,7 @@ namespace esx {
 
 		U8 function = mCPU->mCurrentInstruction.Function();
 
-		U8 rm = FCR31.get(layouts::FCR31Register::Field::RM).as<U8>();
+		U8 rm = FCR31.get<layouts::FCR31Register::RM>();
 		int feRoundMode = FE_TONEAREST;
 		switch (rm) {
 			case 0: feRoundMode = FE_TONEAREST; break;
@@ -90,6 +88,7 @@ namespace esx {
 		std::fesetround(feRoundMode);
 
 		std::feclearexcept(FE_ALL_EXCEPT);
+		FCR31.set<layouts::FCR31Register::Cause>((U8)0);
 
 		switch (function)
 		{
@@ -199,11 +198,13 @@ namespace esx {
 			}
 		}
 
+		BIT fsEnabled = FCR31.get<layouts::FCR31Register::FS>();
+
 		if (std::fetestexcept(FE_INEXACT)) signal(FPUException::I);
 		if (std::fetestexcept(FE_UNDERFLOW)) signal(FPUException::U);
 		if (std::fetestexcept(FE_OVERFLOW)) signal(FPUException::O);
 		if (std::fetestexcept(FE_DIVBYZERO)) signal(FPUException::Z);
-		if (std::fetestexcept(FE_INVALID)) signal(FPUException::V);
+		if (std::fetestexcept(FE_INVALID) && !fsEnabled) signal(FPUException::V);
 
 		std::fesetround(oldRoundMode);
 
@@ -328,6 +329,11 @@ namespace esx {
 				break;
 			}
 
+			case FormatSpec::D: {
+				StoreFPR(fd, fmt, std::sqrt(ValueFPR<F64>(fs, fmt)));
+				break;
+			}
+
 			default: {
 				ESX_CORE_LOG_WARNING("{} Not implemented yet with fmt {}", __FUNCTION__, static_cast<U8>(fmt));
 				signal(FPUException::E);
@@ -345,6 +351,11 @@ namespace esx {
 		switch (fmt) {
 			case FormatSpec::S: {
 				StoreFPR(fd, fmt, std::fabsf(ValueFPR<F32>(fs, fmt)));
+				break;
+			}
+
+			case FormatSpec::D: {
+				StoreFPR(fd, fmt, std::fabs(ValueFPR<F64>(fs, fmt)));
 				break;
 			}
 
@@ -368,6 +379,11 @@ namespace esx {
 				break;
 			}
 
+			case FormatSpec::D: {
+				StoreFPR(fd, fmt, ValueFPR<F64>(fs, fmt));
+				break;
+			}
+
 			default: {
 				ESX_CORE_LOG_WARNING("{} Not implemented yet with fmt {}", __FUNCTION__, static_cast<U8>(fmt));
 				signal(FPUException::E);
@@ -384,7 +400,12 @@ namespace esx {
 
 		switch (fmt) {
 			case FormatSpec::S: {
-				StoreFPR(fd, fmt, -1 * ValueFPR<F32>(fs, fmt));
+				StoreFPR(fd, fmt, -ValueFPR<F32>(fs, fmt));
+				break;
+			}
+
+			case FormatSpec::D: {
+				StoreFPR(fd, fmt, -ValueFPR<F64>(fs, fmt));
 				break;
 			}
 
@@ -398,27 +419,137 @@ namespace esx {
 
 	void FloatingPointUnit::ROUNDL()
 	{
-		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
+		FormatSpec fmt = static_cast<FormatSpec>(mCPU->mCurrentInstruction.RegisterSource().Value);
+		RegisterIndex fs = mCPU->mCurrentInstruction.RegisterDestination();
+		RegisterIndex fd = RegisterIndex(mCPU->mCurrentInstruction.ShiftAmount());
+
+		int oldRm = std::fegetround();
+		std::fesetround(FE_TONEAREST);
+
+		switch (fmt) {
+			case FormatSpec::S: {
+				StoreFPR(fd, FormatSpec::L, ConvertFmt<U64>(std::nearbyint(ValueFPR<F32>(fs, fmt)), fmt, FormatSpec::L));
+				break;
+			}
+
+			case FormatSpec::D: {
+				StoreFPR(fd, FormatSpec::L, ConvertFmt<U64>(std::nearbyint(ValueFPR<F64>(fs, fmt)), fmt, FormatSpec::L));
+				break;
+			}
+
+			default: {
+				ESX_CORE_LOG_WARNING("{} Not implemented yet with fmt {}", __FUNCTION__, static_cast<U8>(fmt));
+				signal(FPUException::E);
+				break;
+			}
+		}
+
+		std::fesetround(oldRm);
 	}
 
 	void FloatingPointUnit::TRUNCL()
 	{
-		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
+		FormatSpec fmt = static_cast<FormatSpec>(mCPU->mCurrentInstruction.RegisterSource().Value);
+		RegisterIndex fs = mCPU->mCurrentInstruction.RegisterDestination();
+		RegisterIndex fd = RegisterIndex(mCPU->mCurrentInstruction.ShiftAmount());
+
+		switch (fmt) {
+			case FormatSpec::S: {
+				StoreFPR(fd, FormatSpec::L, ConvertFmt<U64>(std::trunc(ValueFPR<F32>(fs, fmt)), fmt, FormatSpec::L));
+				break;
+			}
+
+			case FormatSpec::D: {
+				StoreFPR(fd, FormatSpec::L, ConvertFmt<U64>(std::trunc(ValueFPR<F64>(fs, fmt)), fmt, FormatSpec::L));
+				break;
+			}
+
+			default: {
+				ESX_CORE_LOG_WARNING("{} Not implemented yet with fmt {}", __FUNCTION__, static_cast<U8>(fmt));
+				signal(FPUException::E);
+				break;
+			}
+		}
 	}
 
 	void FloatingPointUnit::CEILL()
 	{
-		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
+		FormatSpec fmt = static_cast<FormatSpec>(mCPU->mCurrentInstruction.RegisterSource().Value);
+		RegisterIndex fs = mCPU->mCurrentInstruction.RegisterDestination();
+		RegisterIndex fd = RegisterIndex(mCPU->mCurrentInstruction.ShiftAmount());
+
+		switch (fmt) {
+			case FormatSpec::S: {
+				StoreFPR(fd, FormatSpec::L, ConvertFmt<U64>(std::ceil(ValueFPR<F32>(fs, fmt)), fmt, FormatSpec::L));
+				break;
+			}
+
+			case FormatSpec::D: {
+				StoreFPR(fd, FormatSpec::L, ConvertFmt<U64>(std::ceil(ValueFPR<F64>(fs, fmt)), fmt, FormatSpec::L));
+				break;
+			}
+
+			default: {
+				ESX_CORE_LOG_WARNING("{} Not implemented yet with fmt {}", __FUNCTION__, static_cast<U8>(fmt));
+				signal(FPUException::E);
+				break;
+			}
+		}
 	}
 
 	void FloatingPointUnit::FLOORL()
 	{
-		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
+		FormatSpec fmt = static_cast<FormatSpec>(mCPU->mCurrentInstruction.RegisterSource().Value);
+		RegisterIndex fs = mCPU->mCurrentInstruction.RegisterDestination();
+		RegisterIndex fd = RegisterIndex(mCPU->mCurrentInstruction.ShiftAmount());
+
+		switch (fmt) {
+			case FormatSpec::S: {
+				StoreFPR(fd, FormatSpec::L, ConvertFmt<U64>(std::floor(ValueFPR<F32>(fs, fmt)), fmt, FormatSpec::L));
+				break;
+			}
+
+			case FormatSpec::D: {
+				StoreFPR(fd, FormatSpec::L, ConvertFmt<U64>(std::floor(ValueFPR<F64>(fs, fmt)), fmt, FormatSpec::L));
+				break;
+			}
+
+			default: {
+				ESX_CORE_LOG_WARNING("{} Not implemented yet with fmt {}", __FUNCTION__, static_cast<U8>(fmt));
+				signal(FPUException::E);
+				break;
+			}
+		}
 	}
 
 	void FloatingPointUnit::ROUNDW()
 	{
-		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
+		FormatSpec fmt = static_cast<FormatSpec>(mCPU->mCurrentInstruction.RegisterSource().Value);
+		RegisterIndex fs = mCPU->mCurrentInstruction.RegisterDestination();
+		RegisterIndex fd = RegisterIndex(mCPU->mCurrentInstruction.ShiftAmount());
+
+		int oldRm = std::fegetround();
+		std::fesetround(FE_TONEAREST);
+
+		switch (fmt) {
+			case FormatSpec::S: {
+				StoreFPR(fd, FormatSpec::W, ConvertFmt<U32>(std::nearbyint(ValueFPR<F32>(fs, fmt)), fmt, FormatSpec::W));
+				break;
+			}
+
+			case FormatSpec::D: {
+				StoreFPR(fd, FormatSpec::W, ConvertFmt<U32>(std::nearbyint(ValueFPR<F64>(fs, fmt)), fmt, FormatSpec::W));
+				break;
+			}
+
+			default: {
+				ESX_CORE_LOG_WARNING("{} Not implemented yet with fmt {}", __FUNCTION__, static_cast<U8>(fmt));
+				signal(FPUException::E);
+				break;
+			}
+		}
+
+		std::fesetround(oldRm);
 	}
 
 	void FloatingPointUnit::TRUNCW()
@@ -448,12 +579,52 @@ namespace esx {
 
 	void FloatingPointUnit::CEILW()
 	{
-		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
+		FormatSpec fmt = static_cast<FormatSpec>(mCPU->mCurrentInstruction.RegisterSource().Value);
+		RegisterIndex fs = mCPU->mCurrentInstruction.RegisterDestination();
+		RegisterIndex fd = RegisterIndex(mCPU->mCurrentInstruction.ShiftAmount());
+
+		switch (fmt) {
+			case FormatSpec::S: {
+				StoreFPR(fd, FormatSpec::W, ConvertFmt<U32>(std::ceil(ValueFPR<F32>(fs, fmt)), fmt, FormatSpec::W));
+				break;
+			}
+
+			case FormatSpec::D: {
+				StoreFPR(fd, FormatSpec::W, ConvertFmt<U32>(std::ceil(ValueFPR<F64>(fs, fmt)), fmt, FormatSpec::W));
+				break;
+			}
+
+			default: {
+				ESX_CORE_LOG_WARNING("{} Not implemented yet with fmt {}", __FUNCTION__, static_cast<U8>(fmt));
+				signal(FPUException::E);
+				break;
+			}
+		}
 	}
 
 	void FloatingPointUnit::FLOORW()
 	{
-		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
+		FormatSpec fmt = static_cast<FormatSpec>(mCPU->mCurrentInstruction.RegisterSource().Value);
+		RegisterIndex fs = mCPU->mCurrentInstruction.RegisterDestination();
+		RegisterIndex fd = RegisterIndex(mCPU->mCurrentInstruction.ShiftAmount());
+
+		switch (fmt) {
+			case FormatSpec::S: {
+				StoreFPR(fd, FormatSpec::W, ConvertFmt<U32>(std::floor(ValueFPR<F32>(fs, fmt)), fmt, FormatSpec::W));
+				break;
+			}
+
+			case FormatSpec::D: {
+				StoreFPR(fd, FormatSpec::W, ConvertFmt<U32>(std::floor(ValueFPR<F64>(fs, fmt)), fmt, FormatSpec::W));
+				break;
+			}
+
+			default: {
+				ESX_CORE_LOG_WARNING("{} Not implemented yet with fmt {}", __FUNCTION__, static_cast<U8>(fmt));
+				signal(FPUException::E);
+				break;
+			}
+		}
 	}
 
 	void FloatingPointUnit::CVTS()
@@ -539,7 +710,27 @@ namespace esx {
 
 	void FloatingPointUnit::CVTL()
 	{
-		ESX_CORE_LOG_WARNING("{} Not implemented yet", __FUNCTION__);
+		FormatSpec fmt = static_cast<FormatSpec>(mCPU->mCurrentInstruction.RegisterSource().Value);
+		RegisterIndex fs = mCPU->mCurrentInstruction.RegisterDestination();
+		RegisterIndex fd = RegisterIndex(mCPU->mCurrentInstruction.ShiftAmount());
+
+		switch (fmt) {
+			case FormatSpec::S: {
+				StoreFPR(fd, FormatSpec::L, ConvertFmt<U64>(ValueFPR<F32>(fs, fmt), fmt, FormatSpec::L));
+				break;
+			}
+
+			case FormatSpec::D: {
+				StoreFPR(fd, FormatSpec::L, ConvertFmt<U64>(ValueFPR<F64>(fs, fmt), fmt, FormatSpec::L));
+				break;
+			}
+
+			default: {
+				ESX_CORE_LOG_WARNING("{} Not implemented yet with fmt {}", __FUNCTION__, static_cast<U8>(fmt));
+				signal(FPUException::E);
+				break;
+			}
+		}
 	}
 
 	void FloatingPointUnit::C()
@@ -597,7 +788,7 @@ namespace esx {
 		}
 
 		BIT condition = (((cond >> 2) & 0x1) && less) || (((cond >> 1) & 0x1) && equal) || (((cond >> 0) & 0x1) && unordered);
-		FCR31.set(layouts::FCR31Register::Field::C, condition);
+		FCR31.set<layouts::FCR31Register::C>(condition);
 	}
 
 	void FloatingPointUnit::unusable()
@@ -612,18 +803,19 @@ namespace esx {
 
 	void FloatingPointUnit::signal(FPUException exception)
 	{
-		U8 cause = FCR31.get(layouts::FCR31Register::Field::Cause).as<U8>();
+		U8 cause = FCR31.get<layouts::FCR31Register::Cause>();
 		cause |= 1 << static_cast<U8>(exception);
-		FCR31.set(layouts::FCR31Register::Field::Cause, cause);
+		FCR31.set<layouts::FCR31Register::Cause>(cause);
 	}
 
 	BIT FloatingPointUnit::checkExceptions()
 	{
-		U8 cause = FCR31.get(layouts::FCR31Register::Field::Cause).as<U8>();
-		U8 enables = FCR31.get(layouts::FCR31Register::Field::Enables).as<U8>();
+		U8 cause = FCR31.get<layouts::FCR31Register::Cause>();
+		U8 enables = FCR31.get<layouts::FCR31Register::Enables>();
 		U8 exceptions = cause & enables;
-		U8 flags = cause & (~enables);
-		FCR31.set(layouts::FCR31Register::Field::Flags, flags);
+		U8 flagBits = cause & (~enables);
+		U8 oldFlags = FCR31.get<layouts::FCR31Register::Flags>();
+		FCR31.set<layouts::FCR31Register::Flags>(oldFlags | flagBits);
 
 		return exceptions != 0;
 	}
@@ -633,7 +825,8 @@ namespace esx {
 		if (mCPU->mCP0->useAdditionalFPR() == ESX_TRUE) {
 			return FGR[reg.Value];
 		} else {
-			return (FGR[reg.Value + 1] << 32) | FGR[reg.Value + 0];
+			U8 even = reg.Value & ~1;
+			return (FGR[even + 1] << 32) | FGR[even];
 		}
 	}
 
@@ -642,14 +835,15 @@ namespace esx {
 		if (mCPU->mCP0->useAdditionalFPR() == ESX_TRUE) {
 			FGR[reg.Value] = value;
 		} else {
-			FGR[reg.Value + 0] = (value >> 0)  & 0xFFFFFFFF;
-			FGR[reg.Value + 1] = (value >> 32) & 0xFFFFFFFF;
+			U8 even = reg.Value & ~1;
+			FGR[even + 0] = (value >> 0)  & 0xFFFFFFFF;
+			FGR[even + 1] = (value >> 32) & 0xFFFFFFFF;
 		}
 	}
 
 	BIT FloatingPointUnit::COC()
 	{
-		return FCR31.get(layouts::FCR31Register::Field::C).as<BIT>();
+		return FCR31.get<layouts::FCR31Register::C>();
 	}
 
 }

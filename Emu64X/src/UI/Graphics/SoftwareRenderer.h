@@ -28,7 +28,7 @@ namespace esx {
 		void SetForceAlpha(BIT value) override;
 		void SetCheckMask(BIT value) override;
 		void SetDisplayMode24(BIT value) override;
-		void SetTextureWindow(U32 maskX, U32 maskY, U32 offsetMaskX, U32 offsetMaskY);
+		void SetTextureWindow(U32 maskX, U32 maskY, U32 offsetMaskX, U32 offsetMaskY) override;
 		void Clear(U16 x, U16 y, U16 w, U16 h, const Color& color) override;
 		void DrawPolygon(Array<PolygonVertex, 4>& vertices, U32 numVertices) override;
 		void DrawLineStrip(Vector<PolygonVertex>& vertices) override;

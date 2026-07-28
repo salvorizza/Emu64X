@@ -58,9 +58,7 @@ namespace esx {
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, mColorAttachment->getRendererID(), 0);
 
 		GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-		if (status != GL_FRAMEBUFFER_COMPLETE) {
-			int i = 0;
-		}
+		(void)status;
 
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	}

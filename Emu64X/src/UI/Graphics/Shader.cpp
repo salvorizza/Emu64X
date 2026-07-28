@@ -119,10 +119,8 @@ namespace esx {
 	{
 
 		DataBuffer vertexSource, fragmentSource;
-		errno_t err;
-
-		err = ReadFile(vertexPath, vertexSource);
-		err = ReadFile(fragmentPath, fragmentSource);
+		(void)ReadFile(vertexPath, vertexSource);
+		(void)ReadFile(fragmentPath, fragmentSource);
 
 		std::shared_ptr<Shader> shader = std::make_shared<Shader>(vertexSource, fragmentSource);
 

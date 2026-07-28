@@ -42,8 +42,6 @@ namespace esx {
 	private:
 		StringView mName = "RDRAMInterface";
 
-		RCP* mRCP;
-
 		RI_MODE_Register RI_MODE;
 		RI_CONFIG_Register RI_CONFIG;
 		RI_SELECT_Register RI_SELECT;

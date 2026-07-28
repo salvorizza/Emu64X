@@ -6,25 +6,25 @@ namespace esx {
     SystemControlCoprocessor::SystemControlCoprocessor(VR4300* cpu)
         : Coprocessor(cpu, 0)
     {
-        mRandomRegister.set(layouts::RandomRegister::Field::Random, 31);
+        mRandomRegister.set<layouts::RandomRegister::Random>(31);
     }
 
     void SystemControlCoprocessor::clock(U64 clocks)
     {
-        if (mCountRegister.get(layouts::CountRegister::Field::Value).as<U32>() == mCompareRegister.get(layouts::CompareRegister::Field::Value).as<U32>()) {
+        U32 oldCount = mCountRegister.get<layouts::CountRegister::Value>();
+        U32 newCount = oldCount + 1;
+        mCountRegister.set<layouts::CountRegister::Value>(newCount);
+        if (newCount == mCompareRegister.get<layouts::CompareRegister::Value>()) {
             generateInterrupt(Interrupt::IP7);
         }
-        mCountRegister.set(layouts::CountRegister::Field::Value, clocks * 2);
 
-        U8 random = mRandomRegister.get(layouts::RandomRegister::Field::Random).as<U8>();
-        U8 wired = mWiredRegister.get(layouts::WiredRegister::Field::Wired).as<U8>();
+        U8 random = mRandomRegister.get<layouts::RandomRegister::Random>();
+        U8 wired = mWiredRegister.get<layouts::WiredRegister::Wired>();
         random--;
         if (random < wired) random = wired;
-        mRandomRegister.set(layouts::RandomRegister::Field::Random, random);
+        mRandomRegister.set<layouts::RandomRegister::Random>(random);
 
         Coprocessor::clock(clocks);
-
-        handleInterrupts();
     }
 
     void SystemControlCoprocessor::CO()
@@ -51,7 +51,6 @@ namespace esx {
             }
 
             case 16: {
-                raiseException(ExceptionType::ReservedInstruction);
                 break;
             }
 
@@ -79,7 +78,7 @@ namespace esx {
             return;
         }
 
-        U8 index = mIndexRegister.get(layouts::IndexRegister::Field::Index).as<U8>();
+        U8 index = mIndexRegister.get<layouts::IndexRegister::Index>();
 
         TLBEntry& entry = mTLB[index];
 
@@ -88,10 +87,10 @@ namespace esx {
         mEntryHiRegister.write(entry.EntryHi.read() & ~(entry.PageMask.read()));
 
         mEntryLo1Register.write(entry.EntryLo1.read());
-        mEntryLo1Register.set(layouts::EntryLoRegister::Field::G, entry.EntryHi.get(layouts::EntryHiRegister::Field::G).as<BIT>());
+        mEntryLo1Register.set<layouts::EntryLoRegister::G>(entry.EntryHi.get<layouts::EntryHiRegister::G>());
 
         mEntryLo0Register.write(entry.EntryLo0.read());
-        mEntryLo0Register.set(layouts::EntryLoRegister::Field::G, entry.EntryHi.get(layouts::EntryHiRegister::Field::G).as<BIT>());
+        mEntryLo0Register.set<layouts::EntryLoRegister::G>(entry.EntryHi.get<layouts::EntryHiRegister::G>());
     }
 
     void SystemControlCoprocessor::TLBWI()
@@ -101,14 +100,14 @@ namespace esx {
             return;
         }
 
-        U8 index = mIndexRegister.get(layouts::IndexRegister::Field::Index).as<U8>();
+        U8 index = mIndexRegister.get<layouts::IndexRegister::Index>();
 
         TLBEntry& entry = mTLB[index];
 
         entry.PageMask.write(mPageMaskRegister.read());
 
         entry.EntryHi.write(mEntryHiRegister.read() & ~(mPageMaskRegister.read()));
-        entry.EntryHi.set(layouts::EntryHiRegister::Field::G, mEntryLo0Register.get(layouts::EntryLoRegister::Field::G).as<BIT>() & mEntryLo1Register.get(layouts::EntryLoRegister::Field::G).as<BIT>());
+        entry.EntryHi.set<layouts::EntryHiRegister::G>(mEntryLo0Register.get<layouts::EntryLoRegister::G>() & mEntryLo1Register.get<layouts::EntryLoRegister::G>());
 
         entry.EntryLo1.write(mEntryLo1Register.read());
         
@@ -122,14 +121,14 @@ namespace esx {
             return;
         }
 
-        U8 index = mRandomRegister.get(layouts::RandomRegister::Field::Random).as<U8>();
+        U8 index = mRandomRegister.get<layouts::RandomRegister::Random>();
 
         TLBEntry& entry = mTLB[index];
 
         entry.PageMask.write(mPageMaskRegister.read());
 
         entry.EntryHi.write(mEntryHiRegister.read() & ~(mPageMaskRegister.read()));
-        entry.EntryHi.set(layouts::EntryHiRegister::Field::G, mEntryLo0Register.get(layouts::EntryLoRegister::Field::G).as<BIT>() & mEntryLo1Register.get(layouts::EntryLoRegister::Field::G).as<BIT>());
+        entry.EntryHi.set<layouts::EntryHiRegister::G>(mEntryLo0Register.get<layouts::EntryLoRegister::G>() & mEntryLo1Register.get<layouts::EntryLoRegister::G>());
 
         entry.EntryLo1.write(mEntryLo1Register.read());
 
@@ -143,19 +142,19 @@ namespace esx {
             return;
         }
 
-        U8 ASID = mEntryHiRegister.get(layouts::EntryHiRegister::Field::ASID).as<U32>();
-        U8 VPN2 = mEntryHiRegister.get(layouts::EntryHiRegister::Field::VPN2).as<U32>();
+        U8 ASID = mEntryHiRegister.get<layouts::EntryHiRegister::ASID>();
+        U8 VPN2 = mEntryHiRegister.get<layouts::EntryHiRegister::VPN2>();
 
-        mIndexRegister.set(layouts::IndexRegister::Field::Probe, ESX_TRUE);
+        mIndexRegister.set<layouts::IndexRegister::Probe>(ESX_TRUE);
         for (U8 i = 0; i < mTLB.size(); i++) {
             TLBEntry& entry = mTLB[i];
 
             if (
-                (entry.EntryHi.get(layouts::EntryHiRegister::Field::VPN2).as<U32>() == VPN2) &&
-                (entry.EntryHi.get(layouts::EntryHiRegister::Field::G).as<BIT>() == ESX_TRUE || (entry.EntryHi.get(layouts::EntryHiRegister::Field::ASID).as<U8>() == ASID))
+                (entry.EntryHi.get<layouts::EntryHiRegister::VPN2>() == VPN2) &&
+                (entry.EntryHi.get<layouts::EntryHiRegister::G>() == ESX_TRUE || (entry.EntryHi.get<layouts::EntryHiRegister::ASID>() == ASID))
                 ) {
-                mIndexRegister.set(layouts::IndexRegister::Field::Index, i);
-                mIndexRegister.set(layouts::IndexRegister::Field::Probe, ESX_FALSE);
+                mIndexRegister.set<layouts::IndexRegister::Index>(i);
+                mIndexRegister.set<layouts::IndexRegister::Probe>(ESX_FALSE);
             }
         }
     }
@@ -163,12 +162,12 @@ namespace esx {
     void SystemControlCoprocessor::ERET()
     {
         U64 PC = 0;
-        if (mStatusRegister.get(layouts::StatusRegister::Field::ERL).as<BIT>() == ESX_TRUE) {
-            PC = mErrorEPCRegister.get(layouts::ErrorEPCRegister::Field::Value).as<U64>();
-            mStatusRegister.set(layouts::StatusRegister::Field::ERL, ESX_FALSE);
+        if (mStatusRegister.get<layouts::StatusRegister::ERL>() == ESX_TRUE) {
+            PC = mErrorEPCRegister.get<layouts::ErrorEPCRegister::Value>();
+            mStatusRegister.set<layouts::StatusRegister::ERL>(ESX_FALSE);
         } else {
-            PC = mEPCRegister.get(layouts::EPCRegister::Field::Value).as<U64>();
-            mStatusRegister.set(layouts::StatusRegister::Field::EXL, ESX_FALSE);
+            PC = mEPCRegister.get<layouts::EPCRegister::Value>();
+            mStatusRegister.set<layouts::StatusRegister::EXL>(ESX_FALSE);
         }
 
         mCPU->mPC = PC;
@@ -187,10 +186,10 @@ namespace esx {
     void SystemControlCoprocessor::raiseException(ExceptionType type, U32 parameter)
     {
         if (type == ExceptionType::AddressErrorLoad || type == ExceptionType::AddressErrorStore) 
-            mBadVAddrRegister.set(layouts::BadVAddrRegister::Field::Value, parameter);
-        mCauseRegister.set(layouts::CauseRegister::Field::ExcCode, (U8)type);
+            mBadVAddrRegister.set<layouts::BadVAddrRegister::Value>(parameter);
+        mCauseRegister.set<layouts::CauseRegister::ExcCode>((U8)type);
         if(type == ExceptionType::CoprocessorUnusable) 
-            mCauseRegister.set(layouts::CauseRegister::Field::CE, parameter);
+            mCauseRegister.set<layouts::CauseRegister::CE>(parameter);
 
         U64 EPC = 0;
         if (type == ExceptionType::Interrupt) {
@@ -205,19 +204,20 @@ namespace esx {
 
 
         U32 vecOffset = 0x180;
-        if (mStatusRegister.get(layouts::StatusRegister::Field::EXL).as<BIT>() == ESX_FALSE) {
+        if (mStatusRegister.get<layouts::StatusRegister::EXL>() == ESX_FALSE) {
             if (mCPU->mBranchSlot == ESX_FALSE) {
-                mCauseRegister.set(layouts::CauseRegister::Field::BD, ESX_FALSE);
-                mEPCRegister.set(layouts::EPCRegister::Field::Value, EPC);
+                mCauseRegister.set<layouts::CauseRegister::BD>(ESX_FALSE);
+                mEPCRegister.set<layouts::EPCRegister::Value>(EPC);
             } else {
-                mCauseRegister.set(layouts::CauseRegister::Field::BD, ESX_TRUE);
-                mEPCRegister.set(layouts::EPCRegister::Field::Value, EPC - 4);
+                mCauseRegister.set<layouts::CauseRegister::BD>(ESX_TRUE);
+                mEPCRegister.set<layouts::EPCRegister::Value>(EPC - 4);
             }
+
         }
 
-        mStatusRegister.set(layouts::StatusRegister::Field::EXL, ESX_TRUE);
+        mStatusRegister.set<layouts::StatusRegister::EXL>(ESX_TRUE);
 
-        if (mStatusRegister.get(layouts::StatusRegister::Field::BEV).as<BIT>() == ESX_TRUE) {
+        if (mStatusRegister.get<layouts::StatusRegister::BEV>() == ESX_TRUE) {
             mCPU->mPC = 0xBFC00200 + vecOffset;
         } else {
             mCPU->mPC = 0x80000000 + vecOffset;
@@ -230,26 +230,26 @@ namespace esx {
     void SystemControlCoprocessor::raiseTLBException(TLBExceptionType type, U32 virtualAddress)
     {
         if (type == TLBExceptionType::TLBMissLoadFetch || type == TLBExceptionType::TLBMissStore) {
-            mContextRegister.set(layouts::ContextRegister::Field::BadVPN2, virtualAddress >> 13);
-            mBadVAddrRegister.set(layouts::BadVAddrRegister::Field::Value, virtualAddress);
+            mContextRegister.set<layouts::ContextRegister::BadVPN2>(virtualAddress >> 13);
+            mBadVAddrRegister.set<layouts::BadVAddrRegister::Value>(virtualAddress);
         }
 
         if (type == TLBExceptionType::TLBMissLoadFetch || type == TLBExceptionType::TLBMissStore) {
-            mXContextRegister.set(layouts::XContextRegister::Field::BadVPN2, virtualAddress >> 13);
-            mXContextRegister.set(layouts::XContextRegister::Field::R, (virtualAddress >> 62) & 0x3);
+            mXContextRegister.set<layouts::XContextRegister::BadVPN2>(virtualAddress >> 13);
+            mXContextRegister.set<layouts::XContextRegister::R>((virtualAddress >> 62) & 0x3);
         }
 
-        mCauseRegister.set(layouts::CauseRegister::Field::ExcCode, (U8)type);
+        mCauseRegister.set<layouts::CauseRegister::ExcCode>((U8)type);
 
         U32 vecOffset = 0x000;
-        if (mStatusRegister.get(layouts::StatusRegister::Field::EXL).as<BIT>() == ESX_FALSE) {
+        if (mStatusRegister.get<layouts::StatusRegister::EXL>() == ESX_FALSE) {
             if (mCPU->mBranchSlot == ESX_FALSE) {
-                mCauseRegister.set(layouts::CauseRegister::Field::BD, ESX_FALSE);
-                mEPCRegister.set(layouts::EPCRegister::Field::Value, mCPU->mCurrentPC);
+                mCauseRegister.set<layouts::CauseRegister::BD>(ESX_FALSE);
+                mEPCRegister.set<layouts::EPCRegister::Value>(mCPU->mCurrentPC);
             }
             else {
-                mCauseRegister.set(layouts::CauseRegister::Field::BD, ESX_TRUE);
-                mEPCRegister.set(layouts::EPCRegister::Field::Value, mCPU->mCurrentPC - 4);
+                mCauseRegister.set<layouts::CauseRegister::BD>(ESX_TRUE);
+                mEPCRegister.set<layouts::EPCRegister::Value>(mCPU->mCurrentPC - 4);
             }
 
             vecOffset = is64BitMode() ? 0x080 : 0x000;
@@ -257,9 +257,9 @@ namespace esx {
             vecOffset = 0x180;
         }
 
-        mStatusRegister.set(layouts::StatusRegister::Field::EXL, ESX_TRUE);
+        mStatusRegister.set<layouts::StatusRegister::EXL>(ESX_TRUE);
 
-        if (mStatusRegister.get(layouts::StatusRegister::Field::BEV).as<BIT>() == ESX_TRUE) {
+        if (mStatusRegister.get<layouts::StatusRegister::BEV>() == ESX_TRUE) {
             mCPU->mPC = 0xBFC00200 + vecOffset;
         }
         else {
@@ -272,10 +272,10 @@ namespace esx {
 
     void SystemControlCoprocessor::watchAddress(U32 physicalAddress, BIT store)
     {
-        if (store == ESX_TRUE && mWatchLoRegister.get(layouts::WatchLoRegister::Field::W).as<BIT>() == ESX_TRUE && mWatchLoRegister.get(layouts::WatchLoRegister::Field::PAddr0).as<U32>() == physicalAddress >> 3)
+        if (store == ESX_TRUE && mWatchLoRegister.get<layouts::WatchLoRegister::W>() == ESX_TRUE && mWatchLoRegister.get<layouts::WatchLoRegister::PAddr0>() == physicalAddress >> 3)
             raiseException(ExceptionType::Watch);
 
-        if (store == ESX_FALSE && mWatchLoRegister.get(layouts::WatchLoRegister::Field::R).as<BIT>() == ESX_TRUE && mWatchLoRegister.get(layouts::WatchLoRegister::Field::PAddr0).as<U32>() == physicalAddress >> 3)
+        if (store == ESX_FALSE && mWatchLoRegister.get<layouts::WatchLoRegister::R>() == ESX_TRUE && mWatchLoRegister.get<layouts::WatchLoRegister::PAddr0>() == physicalAddress >> 3)
             raiseException(ExceptionType::Watch);
     }
 
@@ -291,7 +291,7 @@ namespace esx {
             U8 pageSelect = (virtualAddress >> 12) & 0x1;
             U16 pageOffset = virtualAddress & 0xFFF;
 
-            U8 ASID = mEntryHiRegister.get(layouts::EntryHiRegister::Field::ASID).as<U32>();
+            U8 ASID = mEntryHiRegister.get<layouts::EntryHiRegister::ASID>();
 
             BIT matchFound = ESX_FALSE;
             for (U8 i = 0; i < mTLB.size(); i++) {
@@ -300,24 +300,24 @@ namespace esx {
                 U32 VPN2 = (virtualAddress & ~entry.PageMask.read()) >> 13;
 
                 if (
-                    (entry.EntryHi.get(layouts::EntryHiRegister::Field::VPN2).as<U32>() == VPN2) &&
-                    (entry.EntryHi.get(layouts::EntryHiRegister::Field::G).as<BIT>() == ESX_TRUE || (entry.EntryHi.get(layouts::EntryHiRegister::Field::ASID).as<U8>() == ASID))
+                    (entry.EntryHi.get<layouts::EntryHiRegister::VPN2>() == VPN2) &&
+                    (entry.EntryHi.get<layouts::EntryHiRegister::G>() == ESX_TRUE || (entry.EntryHi.get<layouts::EntryHiRegister::ASID>() == ASID))
                     ) {
 
                     EntryLoRegister& lo = pageSelect == 0 ? entry.EntryLo0 : entry.EntryLo1;
 
-                    if (lo.get(layouts::EntryLoRegister::Field::V).as<BIT>() == ESX_FALSE) {
+                    if (lo.get<layouts::EntryLoRegister::V>() == ESX_FALSE) {
                         raiseTLBException(store ? TLBExceptionType::TLBInvalidStore : TLBExceptionType::TLBInvalidLoadFetch, virtualAddress);
                         break;
                     }
 
-                    if (store == ESX_TRUE && lo.get(layouts::EntryLoRegister::Field::D).as<BIT>() == ESX_TRUE) {
+                    if (store == ESX_TRUE && lo.get<layouts::EntryLoRegister::D>() == ESX_FALSE) {
                         raiseTLBException(TLBExceptionType::TLBMod, virtualAddress);
                         break;
                     }
 
-                    physicalAddress = (lo.get(layouts::EntryLoRegister::Field::PFN).as<U32>() << 12) | pageOffset;
-                    cached = lo.get(layouts::EntryLoRegister::Field::C).as<BIT>();
+                    physicalAddress = (lo.get<layouts::EntryLoRegister::PFN>() << 12) | pageOffset;
+                    cached = lo.get<layouts::EntryLoRegister::C>();
 
                     matchFound = ESX_TRUE;
 
@@ -325,7 +325,7 @@ namespace esx {
                 }
             }
 
-            if (matchFound == ESX_TRUE) {
+            if (matchFound == ESX_FALSE) {
                 raiseTLBException(store ? TLBExceptionType::TLBMissStore : TLBExceptionType::TLBMissLoadFetch, virtualAddress);
             }
         } else {
@@ -382,7 +382,7 @@ namespace esx {
 
             case SystemControlRegisterType::Wired: {
                 mWiredRegister.write(value); 
-                mRandomRegister.set(layouts::RandomRegister::Field::Random, 31);
+                mRandomRegister.set<layouts::RandomRegister::Random>(31);
                 break;
             }
 
@@ -401,7 +401,7 @@ namespace esx {
                 CauseRegister temp;
                 temp.write(value);
 
-                mCauseRegister.set(layouts::CauseRegister::Field::IP, (mCauseRegister.get(layouts::CauseRegister::Field::IP).as<U8>() & ~0x83) | (temp.get(layouts::CauseRegister::Field::IP).as<U8>() & 0x3));
+                mCauseRegister.set<layouts::CauseRegister::IP>((mCauseRegister.get<layouts::CauseRegister::IP>() & ~0x83) | (temp.get<layouts::CauseRegister::IP>() & 0x3));
                 break;
             }
 
@@ -415,26 +415,27 @@ namespace esx {
             case SystemControlRegisterType::TagLo:    mTagLoRegister.write(value); break;
             case SystemControlRegisterType::TagHi:    mTagHiRegister.write(value); break;
             case SystemControlRegisterType::ErrorEPC: mErrorEPCRegister.write(value); break;
+            default: break;
         }
     }
 
     void SystemControlCoprocessor::clearInterrupt(Interrupt interrupt)
     {
-        mCauseRegister.set(layouts::CauseRegister::Field::IP, mCauseRegister.get(layouts::CauseRegister::Field::IP).as<U8>() & (~static_cast<U8>(interrupt)));
+        mCauseRegister.set<layouts::CauseRegister::IP>(mCauseRegister.get<layouts::CauseRegister::IP>() & (~static_cast<U8>(interrupt)));
     }
 
     void SystemControlCoprocessor::generateInterrupt(Interrupt interrupt)
     {
-        mCauseRegister.set(layouts::CauseRegister::Field::IP, mCauseRegister.get(layouts::CauseRegister::Field::IP).as<U8>() | static_cast<U8>(interrupt));
+        mCauseRegister.set<layouts::CauseRegister::IP>(mCauseRegister.get<layouts::CauseRegister::IP>() | static_cast<U8>(interrupt));
     }
 
     OperatingMode SystemControlCoprocessor::getCurrentOperatingMode() const
     {
-        if (mStatusRegister.get(layouts::StatusRegister::Field::EXL).as<BIT>() == ESX_TRUE || mStatusRegister.get(layouts::StatusRegister::Field::ERL).as<BIT>() == ESX_TRUE) {
+        if (mStatusRegister.get<layouts::StatusRegister::EXL>() == ESX_TRUE || mStatusRegister.get<layouts::StatusRegister::ERL>() == ESX_TRUE) {
             return OperatingMode::Kernel;
         }
 
-        return mStatusRegister.get(layouts::StatusRegister::Field::KSU).as<OperatingMode>();
+        return static_cast<OperatingMode>(mStatusRegister.get<layouts::StatusRegister::KSU>());
     }
 
     BIT SystemControlCoprocessor::isAddressLegal(U32 virtualAddress) const
@@ -446,6 +447,7 @@ namespace esx {
             case OperatingMode::Supervisor: return (segment >= 0 && segment <= 3) || segment == 6;
             case OperatingMode::User: return segment >= 0 && segment <= 3;
         }
+        return ESX_FALSE;
     }
 
     BIT SystemControlCoprocessor::isAdressMapped(U32 virtualAddress) const
@@ -457,10 +459,11 @@ namespace esx {
     BIT SystemControlCoprocessor::is64BitMode() const
     {
         switch (getCurrentOperatingMode()) {
-            case OperatingMode::Kernel: return mStatusRegister.get(layouts::StatusRegister::Field::KX).as<BIT>();
-            case OperatingMode::Supervisor: return mStatusRegister.get(layouts::StatusRegister::Field::SX).as<BIT>();
-            case OperatingMode::User: return mStatusRegister.get(layouts::StatusRegister::Field::UX).as<BIT>();
+            case OperatingMode::Kernel: return mStatusRegister.get<layouts::StatusRegister::KX>();
+            case OperatingMode::Supervisor: return mStatusRegister.get<layouts::StatusRegister::SX>();
+            case OperatingMode::User: return mStatusRegister.get<layouts::StatusRegister::UX>();
         }
+        return ESX_FALSE;
     }
 
     BIT SystemControlCoprocessor::isCoprocessorUsable(U8 copNumber) const
@@ -468,38 +471,39 @@ namespace esx {
         if (copNumber == 0 && getCurrentOperatingMode() == OperatingMode::Kernel)
             return ESX_TRUE;
 
-        return mStatusRegister.get(layouts::StatusRegister::Field::CU).as<U8>() & (1 << copNumber);
+        return mStatusRegister.get<layouts::StatusRegister::CU>() & (1 << copNumber);
     }
 
     BIT SystemControlCoprocessor::isReserved64BitInstruction() const
     {
         switch (getCurrentOperatingMode()) {
             case OperatingMode::Kernel: return ESX_FALSE;
-            case OperatingMode::Supervisor: return mStatusRegister.get(layouts::StatusRegister::Field::SX).as<BIT>() == ESX_FALSE;
-            case OperatingMode::User: return mStatusRegister.get(layouts::StatusRegister::Field::UX).as<BIT>() == ESX_FALSE;
+            case OperatingMode::Supervisor: return mStatusRegister.get<layouts::StatusRegister::SX>() == ESX_FALSE;
+            case OperatingMode::User: return mStatusRegister.get<layouts::StatusRegister::UX>() == ESX_FALSE;
         }
+        return ESX_FALSE;
     }
 
     BIT SystemControlCoprocessor::areInterruptsPending() const
     {
-        return mCauseRegister.get(layouts::CauseRegister::Field::IP).as<U8>() & mStatusRegister.get(layouts::StatusRegister::Field::IM).as<U8>();
+        return mCauseRegister.get<layouts::CauseRegister::IP>() & mStatusRegister.get<layouts::StatusRegister::IM>();
     }
 
     BIT SystemControlCoprocessor::areInterruptsEnabled() const
     {
-        return mStatusRegister.get(layouts::StatusRegister::Field::IE).as<BIT>() == ESX_TRUE &&
-                mStatusRegister.get(layouts::StatusRegister::Field::EXL).as<BIT>() == ESX_FALSE &&
-                mStatusRegister.get(layouts::StatusRegister::Field::ERL).as<BIT>() == ESX_FALSE;
+        return mStatusRegister.get<layouts::StatusRegister::IE>() == ESX_TRUE &&
+                mStatusRegister.get<layouts::StatusRegister::EXL>() == ESX_FALSE &&
+                mStatusRegister.get<layouts::StatusRegister::ERL>() == ESX_FALSE;
     }
 
     void SystemControlCoprocessor::setLLAddrToLastTranslation()
     {
-        mLLAddrRegister.set(layouts::LLAddrRegister::Field::Value, mLastPhysicalAddress);
+        mLLAddrRegister.set<layouts::LLAddrRegister::Value>(mLastPhysicalAddress);
     }
 
     BIT SystemControlCoprocessor::useAdditionalFPR()
     {
-        return mStatusRegister.get(layouts::StatusRegister::Field::FR).as<BIT>();
+        return mStatusRegister.get<layouts::StatusRegister::FR>();
     }
 
 }

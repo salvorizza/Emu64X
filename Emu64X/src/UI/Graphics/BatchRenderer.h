@@ -19,7 +19,7 @@ namespace esx {
 		BatchRenderer();
 		~BatchRenderer() = default;
 
-		void Begin();
+		void Begin() override;
 		void end();
 		void Flush() override;
 		void FlushVRAMWrites() override;

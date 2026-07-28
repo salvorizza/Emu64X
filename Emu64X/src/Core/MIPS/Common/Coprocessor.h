@@ -112,7 +112,7 @@ namespace esx {
 				data &= 0xFFFFFFFF;
 
 				if ((rd & 0x1) == 0) {
-					r = r & 0xFFFFFFFF00000000 | data;
+					r = (r & 0xFFFFFFFF00000000) | data;
 				}
 				else {
 					r = (data << 32) | (r & 0xFFFFFFFF);

@@ -23,6 +23,7 @@
 #include "Core/RDRAM.h"
 #include "Core/PIExternalBus.h"
 #include "Core/RCP/RCP.h"
+#include "Core/Scheduler.h"
 
 
 #ifdef ESX_PLATFORM_WINDOWS
@@ -35,6 +36,7 @@
 #include <imgui_internal.h>
 
 #include <iostream>
+#include <sstream>
 
 #include "optick.h"
 #include "miniaudio.h"
@@ -42,8 +44,8 @@
 
 
 using namespace esx;
-#undef max;
-#undef min;
+#undef max
+#undef min
 
 struct FPSCounter {
 	LoopTimer Timer = {};
@@ -155,7 +157,6 @@ public:
 		mFileDialogPanel->setCurrentPath("commons/games");
 		mFileDialogPanel->setOnFileSelectedCallback(std::bind(&Emu64X::onFileSelected, this, std::placeholders::_1));
 
-		constexpr size_t t = MIBI(8);
 		root = MakeShared<Bus>(ESX_TEXT("Root"));
 		mVR4300 = MakeShared<VR4300>();
 		mRDRAM = MakeShared<RDRAM>();
@@ -426,13 +427,141 @@ private:
 	SharedPtr<BatchRenderer> mBatchRenderer;
 	SharedPtr<ViewportPanel> mViewportPanel;
 	SharedPtr<FileDialogPanel> mFileDialogPanel;
-	glm::mat4 mProjectionMatrix;
 
 	ma_device mAudioDevice;
 	const U32 PRERENDERED_SIZE = 10;
 	U32 mNumPrerendered = 0;
 	String mCurrentGame = "";
 };
+
+struct HeadlessConfig {
+	String romPath;
+	String logPath = "emu64x_headless.log";
+	U32 frames = 60;
+	BIT valid = ESX_FALSE;
+};
+
+static String readNextArg(std::istringstream& iss) {
+	String result;
+	iss >> std::ws;
+	if (iss.peek() == '"') {
+		iss.get();
+		std::getline(iss, result, '"');
+	} else {
+		iss >> result;
+	}
+	return result;
+}
+
+HeadlessConfig parseHeadlessArgs(LPSTR lpCmdLine) {
+	HeadlessConfig cfg;
+	std::istringstream iss(lpCmdLine);
+	String token;
+
+	while (iss >> token) {
+		if (token == "--headless") {
+			cfg.valid = ESX_TRUE;
+		} else if (token == "--rom") {
+			cfg.romPath = readNextArg(iss);
+		} else if (token == "--log") {
+			cfg.logPath = readNextArg(iss);
+		} else if (token == "--frames") {
+			String val = readNextArg(iss);
+			if (!val.empty()) cfg.frames = std::stoul(val);
+		}
+	}
+
+	if (cfg.romPath.empty()) cfg.valid = ESX_FALSE;
+	return cfg;
+}
+
+int runHeadless(const HeadlessConfig& cfg) {
+	LoggingSpecifications specs(cfg.logPath);
+	LoggingSystem::Start(specs);
+
+	ESX_CORE_LOG_INFO("=== Emu64X Headless Mode ===");
+	ESX_CORE_LOG_INFO("ROM: {}", cfg.romPath);
+	ESX_CORE_LOG_INFO("Log: {}", cfg.logPath);
+	ESX_CORE_LOG_INFO("Frames: {}", cfg.frames);
+
+	auto root = MakeShared<Bus>(ESX_TEXT("Root"));
+	auto vr4300 = MakeShared<VR4300>();
+	auto rdram = MakeShared<RDRAM>();
+	auto rcp = MakeShared<RCP>();
+	auto piExternalBus = MakeShared<PIExternalBus>();
+	auto siExternalBus = MakeShared<SIExternalBus>("commons/bios/boot.rom");
+
+	root->connectDevice(vr4300);
+	vr4300->connectToBus(root);
+
+	root->connectDevice(rdram);
+	rdram->connectToBus(root);
+
+	root->connectDevice(rcp);
+	rcp->connectToBus(root);
+
+	root->connectDevice(piExternalBus);
+	piExternalBus->connectToBus(root);
+
+	root->connectDevice(siExternalBus);
+	siExternalBus->connectToBus(root);
+
+	root->sortRanges();
+
+	ESX_CORE_LOG_INFO("Loading ROM...");
+	if (!std::filesystem::exists(cfg.romPath)) {
+		ESX_CORE_LOG_FATAL("ROM file not found: {}", cfg.romPath);
+		LoggingSystem::Shutdown();
+		return 1;
+	}
+	piExternalBus->loadGame(cfg.romPath);
+	String gameCode = piExternalBus->getGameCode();
+	ESX_CORE_LOG_INFO("Game code: {}", gameCode);
+
+	vr4300->reset();
+	rdram->reset();
+	piExternalBus->reset();
+	siExternalBus->reset();
+
+	ESX_CORE_LOG_INFO("Starting emulation for {} frames...", cfg.frames);
+
+	U32 framesCompleted = 0;
+	BIT running = ESX_TRUE;
+
+	while (running && framesCompleted < cfg.frames) {
+		BIT newFrameAvailable = ESX_FALSE;
+		while (newFrameAvailable == ESX_FALSE) {
+			while (Scheduler::HasEvents() == ESX_FALSE || vr4300->getClocks() < Scheduler::NextEvent().ClockTarget) {
+				vr4300->clock();
+
+				if (vr4300->getHalt()) {
+					ESX_CORE_LOG_ERROR("CPU halted at frame {}, clocks {}", framesCompleted, vr4300->getClocks());
+					running = ESX_FALSE;
+					break;
+				}
+			}
+
+			if (!running) break;
+
+			if (Scheduler::HasEvents() && vr4300->getClocks() >= Scheduler::NextEvent().ClockTarget) {
+				if (Scheduler::NextEvent().Type == SchedulerEventType::GPUFrameStart) {
+					newFrameAvailable = ESX_TRUE;
+				}
+
+				Scheduler::ExecuteEvent();
+				Scheduler::Progress();
+			}
+		}
+
+		framesCompleted++;
+		ESX_CORE_LOG_INFO("Frame {}/{} PC={:08x}h clocks={}", framesCompleted, cfg.frames, (U32)vr4300->mPC, vr4300->getClocks());
+	}
+
+	ESX_CORE_LOG_INFO("=== Headless run finished: {}/{} frames, {} total clocks ===", framesCompleted, cfg.frames, vr4300->getClocks());
+
+	LoggingSystem::Shutdown();
+	return 0;
+}
 
 int
 #if !defined(_MAC)
@@ -450,6 +579,11 @@ WinMain(
 	_In_ LPSTR lpCmdLine,
 	_In_ int nShowCmd
 ) {
+	HeadlessConfig headlessCfg = parseHeadlessArgs(lpCmdLine);
+	if (headlessCfg.valid) {
+		return runHeadless(headlessCfg);
+	}
+
 	LoggingSpecifications specs(ESX_TEXT(""));
 	LoggingSystem::Start(specs);
 

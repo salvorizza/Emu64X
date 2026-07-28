@@ -155,9 +155,8 @@ namespace esx {
         VU_MOVE_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 vs_elem = instruction.get(layouts::VU_MOVE_INSTRUCTION_Register::Field::vs_elem).as<RegisterIndex>();
-        U8 vs = instruction.get(layouts::VU_MOVE_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex rt = instruction.get(layouts::VU_MOVE_INSTRUCTION_Register::Field::rt).as<RegisterIndex>();
+        U8 vs = instruction.get<layouts::VU_MOVE_INSTRUCTION_Register::vs>();
+        RegisterIndex rt = instruction.get<layouts::VU_MOVE_INSTRUCTION_Register::rt>();
 
         std::bitset<16>* ref = nullptr;
         switch (vs) {
@@ -191,9 +190,8 @@ namespace esx {
         VU_MOVE_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 vs_elem = instruction.get(layouts::VU_MOVE_INSTRUCTION_Register::Field::vs_elem).as<RegisterIndex>();
-        U8 vs = instruction.get(layouts::VU_MOVE_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex rt = instruction.get(layouts::VU_MOVE_INSTRUCTION_Register::Field::rt).as<RegisterIndex>();
+        U8 vs = instruction.get<layouts::VU_MOVE_INSTRUCTION_Register::vs>();
+        RegisterIndex rt = instruction.get<layouts::VU_MOVE_INSTRUCTION_Register::rt>();
 
         std::bitset<16>* ref = nullptr;
         switch (vs) {
@@ -233,18 +231,18 @@ namespace esx {
         VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::element>();
+        RegisterIndex vt = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vt>();
+        RegisterIndex vs = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vs>();
+        RegisterIndex vd = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vd>();
 
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
 
             I32 prod = static_cast<I16>(VPR[vs][i]) * static_cast<I16>(VPR[vt][element_index]) * 2;
 
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, prod + 0x8000);
-            VPR[vd][i] = clamp_signed(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>());
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM>(prod + 0x8000);
+            VPR[vd][i] = clamp_signed(ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM_M>());
         }
     }
 
@@ -253,18 +251,18 @@ namespace esx {
         VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::element>();
+        RegisterIndex vt = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vt>();
+        RegisterIndex vs = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vs>();
+        RegisterIndex vd = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vd>();
 
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
 
             I32 prod = static_cast<I16>(VPR[vs][i]) * static_cast<I16>(VPR[vt][element_index]) * 2;
 
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, prod + 0x8000);
-            VPR[vd][i] = clamp_unsigned(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>());
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM>(prod + 0x8000);
+            VPR[vd][i] = clamp_unsigned(ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM_M>());
         }
     }
 
@@ -273,21 +271,21 @@ namespace esx {
         VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::element>();
+        RegisterIndex vt = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vt>();
+        RegisterIndex vs = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vs>();
+        RegisterIndex vd = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vd>();
 
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
 
             I64 prod = static_cast<I32>(static_cast<I16>(VPR[vt][element_index]));
             if ((VPR[vs][i] >> 0) & 0x1) prod <<= 16;
-            if (((ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM).as<U64>() >> 47) & 0x1) == 0) {
-                ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM).as<I64>() + (prod & 0xFFFFFFFFFFFF));
+            if (((ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM>() >> 47) & 0x1) == 0) {
+                ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM>(ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM>() + (prod & 0xFFFFFFFFFFFF));
             }
             
-            VPR[vd][i] = clamp_signed(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>());
+            VPR[vd][i] = clamp_signed(ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM_M>());
         }
     }
 
@@ -296,17 +294,17 @@ namespace esx {
         VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::element>();
+        RegisterIndex vt = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vt>();
+        RegisterIndex vs = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vs>();
+        RegisterIndex vd = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vd>();
 
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
 
             I32 prod = static_cast<I16>(VPR[vs][i]) * static_cast<I16>(VPR[vt][element_index]);
             if ((prod >> 31) & 0x1) prod += 0x1F;
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, static_cast<I64>(prod) << 16);
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM>(static_cast<I64>(prod) << 16);
             VPR[vd][i] = clamp_signed(prod >> 1) & 0xFFF0;
         }
     }
@@ -316,10 +314,10 @@ namespace esx {
         VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::element>();
+        RegisterIndex vt = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vt>();
+        RegisterIndex vs = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vs>();
+        RegisterIndex vd = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vd>();
 
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
@@ -328,8 +326,8 @@ namespace esx {
 
             ACCUM[i].write(0);
 
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM).as<I64>() + (prod >> 16));
-            VPR[vd][i] = clamp_unsigned(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_D).as<I32>());
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM>(ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM>() + (prod >> 16));
+            VPR[vd][i] = clamp_unsigned(ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM_D>());
         }
     }
 
@@ -338,10 +336,10 @@ namespace esx {
         VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::element>();
+        RegisterIndex vt = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vt>();
+        RegisterIndex vs = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vs>();
+        RegisterIndex vd = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vd>();
 
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
@@ -350,8 +348,8 @@ namespace esx {
 
             ACCUM[i].write(0);
 
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM).as<I64>() + static_cast<I64>(static_cast<I32>(prod)));
-            VPR[vd][i] = clamp_signed(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>());
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM>(ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM>() + static_cast<I64>(static_cast<I32>(prod)));
+            VPR[vd][i] = clamp_signed(ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM_M>());
         }
     }
 
@@ -360,10 +358,10 @@ namespace esx {
         VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::element>();
+        RegisterIndex vt = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vt>();
+        RegisterIndex vs = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vs>();
+        RegisterIndex vd = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vd>();
 
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
@@ -372,8 +370,8 @@ namespace esx {
 
             ACCUM[i].write(0);
 
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM).as<I64>() + static_cast<I64>(static_cast<I32>(prod)));
-            VPR[vd][i] = clamp_unsigned(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_D).as<I32>());
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM>(ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM>() + static_cast<I64>(static_cast<I32>(prod)));
+            VPR[vd][i] = clamp_unsigned(ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM_D>());
         }
     }
 
@@ -382,10 +380,10 @@ namespace esx {
         VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::element>();
+        RegisterIndex vt = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vt>();
+        RegisterIndex vs = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vs>();
+        RegisterIndex vd = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vd>();
 
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
@@ -394,8 +392,8 @@ namespace esx {
 
             ACCUM[i].write(0);
 
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_M, ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>() + prod);
-            VPR[vd][i] = clamp_signed(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>());
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM_M>(ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM_M>() + prod);
+            VPR[vd][i] = clamp_signed(ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM_M>());
         }
     }
 
@@ -404,18 +402,18 @@ namespace esx {
         VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::element>();
+        RegisterIndex vt = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vt>();
+        RegisterIndex vs = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vs>();
+        RegisterIndex vd = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vd>();
 
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
 
             I32 prod = static_cast<I16>(VPR[vs][i]) * static_cast<I16>(VPR[vt][element_index]) * 2;
 
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM).as<I64>() + prod);
-            VPR[vd][i] = clamp_signed(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>());
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM>(ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM>() + prod);
+            VPR[vd][i] = clamp_signed(ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM_M>());
         }
     }
 
@@ -424,18 +422,18 @@ namespace esx {
         VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::element>();
+        RegisterIndex vt = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vt>();
+        RegisterIndex vs = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vs>();
+        RegisterIndex vd = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vd>();
 
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
 
             I64 prod = static_cast<I32>(static_cast<I16>(VPR[vs][i]) * static_cast<I16>(VPR[vt][element_index]) * 2);
 
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM).as<I64>() + static_cast<I64>(static_cast<I32>(prod)));
-            VPR[vd][i] = clamp_unsigned(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>());
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM>(ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM>() + static_cast<I64>(static_cast<I32>(prod)));
+            VPR[vd][i] = clamp_unsigned(ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM_M>());
         }
     }
 
@@ -444,21 +442,21 @@ namespace esx {
         VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::element>();
+        RegisterIndex vt = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vt>();
+        RegisterIndex vs = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vs>();
+        RegisterIndex vd = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vd>();
 
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
 
             I64 prod = static_cast<I32>(static_cast<I16>(VPR[vt][element_index]));
             if ((VPR[vs][i] >> 0) & 0x1) prod <<= 16;
-            if (((ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM).as<U64>() >> 47) & 0x1) == 1) {
-                ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM).as<I64>() + (prod & 0xFFFFFFFFFFFF));
+            if (((ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM>() >> 47) & 0x1) == 1) {
+                ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM>(ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM>() + (prod & 0xFFFFFFFFFFFF));
             }
 
-            VPR[vd][i] = clamp_signed(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>());
+            VPR[vd][i] = clamp_signed(ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM_M>());
         }
     }
 
@@ -472,18 +470,18 @@ namespace esx {
         VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::element>();
+        RegisterIndex vt = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vt>();
+        RegisterIndex vs = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vs>();
+        RegisterIndex vd = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vd>();
 
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
 
             U32 prod = VPR[vs][i] * VPR[vt][element_index];
 
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM).as<I64>() + (static_cast<I32>(prod) >> 16));
-            VPR[vd][i] = clamp_unsigned(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_D).as<I32>());
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM>(ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM>() + (static_cast<I32>(prod) >> 16));
+            VPR[vd][i] = clamp_unsigned(ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM_D>());
         }
     }
 
@@ -492,18 +490,18 @@ namespace esx {
         VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::element>();
+        RegisterIndex vt = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vt>();
+        RegisterIndex vs = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vs>();
+        RegisterIndex vd = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vd>();
 
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
 
             U32 prod = VPR[vs][i] * VPR[vt][element_index];
 
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM).as<I64>() + static_cast<I64>(static_cast<I32>(prod)));
-            VPR[vd][i] = clamp_signed(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>());
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM>(ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM>() + static_cast<I64>(static_cast<I32>(prod)));
+            VPR[vd][i] = clamp_signed(ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM_M>());
         }
     }
 
@@ -512,18 +510,18 @@ namespace esx {
         VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::element>();
+        RegisterIndex vt = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vt>();
+        RegisterIndex vs = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vs>();
+        RegisterIndex vd = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vd>();
 
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
 
             U32 prod = VPR[vs][i] * VPR[vt][element_index];
 
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM, ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM).as<I64>() + static_cast<I64>(static_cast<I32>(prod)));
-            VPR[vd][i] = clamp_unsigned(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_D).as<I32>());
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM>(ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM>() + static_cast<I64>(static_cast<I32>(prod)));
+            VPR[vd][i] = clamp_unsigned(ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM_D>());
         }
     }
 
@@ -532,18 +530,18 @@ namespace esx {
         VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::element>();
+        RegisterIndex vt = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vt>();
+        RegisterIndex vs = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vs>();
+        RegisterIndex vd = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vd>();
 
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
 
             I32 prod = static_cast<I16>(VPR[vs][i]) * static_cast<I16>(VPR[vt][element_index]);
 
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_M, ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>() + prod);
-            VPR[vd][i] = clamp_signed(ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_M).as<I32>());
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM_M>(ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM_M>() + prod);
+            VPR[vd][i] = clamp_signed(ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM_M>());
         }
     }
 
@@ -552,17 +550,17 @@ namespace esx {
         VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::element>();
+        RegisterIndex vt = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vt>();
+        RegisterIndex vs = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vs>();
+        RegisterIndex vd = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vd>();
 
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
 
             I32 result = VPR[vs][i] + VPR[vt][element_index] + (VCO.test(i) ? 1 : 0);
 
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, static_cast<U16>(result));
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM_LO>(static_cast<U16>(result));
             VPR[vd][i] = clamp_signed(static_cast<I32>(static_cast<U32>(result) & 0x1FFFFu));
 
             VCO.set(i, 0);
@@ -575,17 +573,17 @@ namespace esx {
         VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::element>();
+        RegisterIndex vt = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vt>();
+        RegisterIndex vs = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vs>();
+        RegisterIndex vd = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vd>();
 
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
 
             I32 result = VPR[vs][i] - VPR[vt][element_index] - (VCO.test(i) ? 1 : 0);
 
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, static_cast<U16>(result));
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM_LO>(static_cast<U16>(result));
             VPR[vd][i] = clamp_signed(static_cast<I32>(static_cast<U32>(result) & 0x1FFFFu));
 
             VCO.set(i, 0);
@@ -608,17 +606,17 @@ namespace esx {
         VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::element>();
+        RegisterIndex vt = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vt>();
+        RegisterIndex vs = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vs>();
+        RegisterIndex vd = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vd>();
 
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
 
             U32 result = VPR[vs][i] + VPR[vt][element_index];
 
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, static_cast<U16>(result));
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM_LO>(static_cast<U16>(result));
             VPR[vd][i] = static_cast<U16>(result);
 
             VCO.set(i, (result >> 16) & 0x1);
@@ -631,17 +629,17 @@ namespace esx {
         VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::element>();
+        RegisterIndex vt = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vt>();
+        RegisterIndex vs = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vs>();
+        RegisterIndex vd = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vd>();
 
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
 
             U32 result = VPR[vs][i] - VPR[vt][element_index];
 
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, static_cast<U16>(result));
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM_LO>(static_cast<U16>(result));
             VPR[vd][i] = static_cast<U16>(result);
 
             VCO.set(i, (result >> 16) & 0x1);
@@ -689,19 +687,20 @@ namespace esx {
         VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::element>();
+        RegisterIndex vd = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vd>();
         element ^= 0x8;
 
         if (element > 0x2) {
             return;
         }
 
-        auto ACCUM_PORTION = static_cast<layouts::VU_ACCUM_Register::Field>(element);
         for (I32 i = 0; i < 8; i++) {
-            VPR[vd][i] = ACCUM[i].get(ACCUM_PORTION).as<U16>();
+            switch (element) {
+                case 0: VPR[vd][i] = ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM_LO>(); break;
+                case 1: VPR[vd][i] = ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM_MD>(); break;
+                case 2: VPR[vd][i] = ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM_HI>(); break;
+            }
         }
     }
 
@@ -710,16 +709,16 @@ namespace esx {
         VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::element>();
+        RegisterIndex vt = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vt>();
+        RegisterIndex vs = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vs>();
+        RegisterIndex vd = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vd>();
 
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
 
             U16 result = VPR[vs][i] & VPR[vt][element_index];
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, result);
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM_LO>(result);
             VPR[vd][i] = result;
         }
     }
@@ -729,16 +728,16 @@ namespace esx {
         VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::element>();
+        RegisterIndex vt = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vt>();
+        RegisterIndex vs = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vs>();
+        RegisterIndex vd = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vd>();
 
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
 
             U16 result = ~(VPR[vs][i] & VPR[vt][element_index]);
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, result);
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM_LO>(result);
             VPR[vd][i] = result;
         }
     }
@@ -748,16 +747,16 @@ namespace esx {
         VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::element>();
+        RegisterIndex vt = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vt>();
+        RegisterIndex vs = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vs>();
+        RegisterIndex vd = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vd>();
 
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
 
             U16 result = VPR[vs][i] | VPR[vt][element_index];
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, result);
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM_LO>(result);
             VPR[vd][i] = result;
         }
     }
@@ -767,16 +766,16 @@ namespace esx {
         VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::element>();
+        RegisterIndex vt = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vt>();
+        RegisterIndex vs = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vs>();
+        RegisterIndex vd = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vd>();
 
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
 
             U16 result = ~(VPR[vs][i] | VPR[vt][element_index]);
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, result);
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM_LO>(result);
             VPR[vd][i] = result;
         }
     }
@@ -786,16 +785,16 @@ namespace esx {
         VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::element>();
+        RegisterIndex vt = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vt>();
+        RegisterIndex vs = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vs>();
+        RegisterIndex vd = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vd>();
 
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
 
             U16 result = VPR[vs][i] ^ VPR[vt][element_index];
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, result);
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM_LO>(result);
             VPR[vd][i] = result;
         }
     }
@@ -805,16 +804,16 @@ namespace esx {
         VU_COMPUTATIONAL_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::element>();
+        RegisterIndex vt = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vt>();
+        RegisterIndex vs = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vs>();
+        RegisterIndex vd = instruction.get<layouts::VU_COMPUTATIONAL_INSTRUCTION_Register::vd>();
 
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
 
             U16 result = ~(VPR[vs][i] ^ VPR[vt][element_index]);
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, result);
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM_LO>(result);
             VPR[vd][i] = result;
         }
     }
@@ -824,10 +823,10 @@ namespace esx {
         VU_SL_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 vt_elem = instruction.get(layouts::VU_SL_INSTRUCTION_Register::Field::vt_elem).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_SL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        U8 vd_elem = instruction.get(layouts::VU_SL_INSTRUCTION_Register::Field::vd_elem).as<U8>();
-        RegisterIndex vd = instruction.get(layouts::VU_SL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 vt_elem = instruction.get<layouts::VU_SL_INSTRUCTION_Register::vt_elem>();
+        RegisterIndex vt = instruction.get<layouts::VU_SL_INSTRUCTION_Register::vt>();
+        U8 vd_elem = instruction.get<layouts::VU_SL_INSTRUCTION_Register::vd_elem>();
+        RegisterIndex vd = instruction.get<layouts::VU_SL_INSTRUCTION_Register::vd>();
 
         auto [se, de] = calculate_se_de(vd_elem, vt_elem);
 
@@ -835,7 +834,7 @@ namespace esx {
         VPR[vd][de] = result;
         DIV_OUT = result >> 16;
         for (I32 i = 0; i < 8; i++) {
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, VPR[vt][i]);
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM_LO>(VPR[vt][i]);
         }
     }
 
@@ -844,10 +843,10 @@ namespace esx {
         VU_SL_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 vt_elem = instruction.get(layouts::VU_SL_INSTRUCTION_Register::Field::vt_elem).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_SL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        U8 vd_elem = instruction.get(layouts::VU_SL_INSTRUCTION_Register::Field::vd_elem).as<U8>();
-        RegisterIndex vd = instruction.get(layouts::VU_SL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 vt_elem = instruction.get<layouts::VU_SL_INSTRUCTION_Register::vt_elem>();
+        RegisterIndex vt = instruction.get<layouts::VU_SL_INSTRUCTION_Register::vt>();
+        U8 vd_elem = instruction.get<layouts::VU_SL_INSTRUCTION_Register::vd_elem>();
+        RegisterIndex vd = instruction.get<layouts::VU_SL_INSTRUCTION_Register::vd>();
 
         auto [se, de] = calculate_se_de(vd_elem, vt_elem);
 
@@ -856,7 +855,7 @@ namespace esx {
         DIV_OUT = result >> 16;
         DIV_IN = 0;
         for (I32 i = 0; i < 8; i++) {
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, VPR[vt][i]);
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM_LO>(VPR[vt][i]);
         }
     }
 
@@ -865,17 +864,17 @@ namespace esx {
         VU_SL_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 vt_elem = instruction.get(layouts::VU_SL_INSTRUCTION_Register::Field::vt_elem).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_SL_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        U8 vd_elem = instruction.get(layouts::VU_SL_INSTRUCTION_Register::Field::vd_elem).as<U8>();
-        RegisterIndex vd = instruction.get(layouts::VU_SL_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 vt_elem = instruction.get<layouts::VU_SL_INSTRUCTION_Register::vt_elem>();
+        RegisterIndex vt = instruction.get<layouts::VU_SL_INSTRUCTION_Register::vt>();
+        U8 vd_elem = instruction.get<layouts::VU_SL_INSTRUCTION_Register::vd_elem>();
+        RegisterIndex vd = instruction.get<layouts::VU_SL_INSTRUCTION_Register::vd>();
 
         auto [se, de] = calculate_se_de(vd_elem, vt_elem);
 
         VPR[vd][de] = DIV_OUT;
         DIV_IN = VPR[vt][se];
         for (I32 i = 0; i < 8; i++) {
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, VPR[vt][i]);
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM_LO>(VPR[vt][i]);
         }
     }
 
@@ -904,10 +903,10 @@ namespace esx {
         VU_SELECT_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_SELECT_INSTRUCTION_Register::element>();
+        RegisterIndex vt = instruction.get<layouts::VU_SELECT_INSTRUCTION_Register::vt>();
+        RegisterIndex vs = instruction.get<layouts::VU_SELECT_INSTRUCTION_Register::vs>();
+        RegisterIndex vd = instruction.get<layouts::VU_SELECT_INSTRUCTION_Register::vd>();
 
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
@@ -915,8 +914,8 @@ namespace esx {
             BIT eql = VPR[vs][i] == VPR[vt][element_index];
             BIT neg = VCO.test(i + 8) && VCO.test(i) && eql;
             VCC.set(i, neg || (VPR[vs][i] < VPR[vt][element_index]));
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, VCC.test(i) ? VPR[vs][i] : VPR[vt][element_index]);
-            VPR[vd][i] = ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_LO).as<U16>();
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM_LO>(VCC.test(i) ? VPR[vs][i] : VPR[vt][element_index]);
+            VPR[vd][i] = ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM_LO>();
 
             VCC.set(i + 8, 0);
             VCO.set(i + 8, 0);
@@ -929,17 +928,17 @@ namespace esx {
         VU_SELECT_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_SELECT_INSTRUCTION_Register::element>();
+        RegisterIndex vt = instruction.get<layouts::VU_SELECT_INSTRUCTION_Register::vt>();
+        RegisterIndex vs = instruction.get<layouts::VU_SELECT_INSTRUCTION_Register::vs>();
+        RegisterIndex vd = instruction.get<layouts::VU_SELECT_INSTRUCTION_Register::vd>();
 
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
 
             VCC.set(i, !VCO.test(i + 8) && (VPR[vs][i] == VPR[vt][element_index]));
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, VCC.test(i) ? VPR[vs][i] : VPR[vt][element_index]);
-            VPR[vd][i] = ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_LO).as<U16>();
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM_LO>(VCC.test(i) ? VPR[vs][i] : VPR[vt][element_index]);
+            VPR[vd][i] = ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM_LO>();
 
             VCC.set(i + 8, 0);
             VCO.set(i + 8, 0);
@@ -952,17 +951,17 @@ namespace esx {
         VU_SELECT_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_SELECT_INSTRUCTION_Register::element>();
+        RegisterIndex vt = instruction.get<layouts::VU_SELECT_INSTRUCTION_Register::vt>();
+        RegisterIndex vs = instruction.get<layouts::VU_SELECT_INSTRUCTION_Register::vs>();
+        RegisterIndex vd = instruction.get<layouts::VU_SELECT_INSTRUCTION_Register::vd>();
 
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
 
             VCC.set(i, VCO.test(i + 8) || (VPR[vs][i] == VPR[vt][element_index]));
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, VCC.test(i) ? VPR[vs][i] : VPR[vt][element_index]);
-            VPR[vd][i] = ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_LO).as<U16>();
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM_LO>(VCC.test(i) ? VPR[vs][i] : VPR[vt][element_index]);
+            VPR[vd][i] = ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM_LO>();
 
             VCC.set(i + 8, 0);
             VCO.set(i + 8, 0);
@@ -975,10 +974,10 @@ namespace esx {
         VU_SELECT_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_SELECT_INSTRUCTION_Register::element>();
+        RegisterIndex vt = instruction.get<layouts::VU_SELECT_INSTRUCTION_Register::vt>();
+        RegisterIndex vs = instruction.get<layouts::VU_SELECT_INSTRUCTION_Register::vs>();
+        RegisterIndex vd = instruction.get<layouts::VU_SELECT_INSTRUCTION_Register::vd>();
 
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
@@ -986,8 +985,8 @@ namespace esx {
             BIT eql = VPR[vs][i] == VPR[vt][element_index];
             BIT neg = !(VCO.test(i + 8) && VCO.test(i)) && eql;
             VCC.set(i, neg || (VPR[vs][i] > VPR[vt][element_index]));
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, VCC.test(i) ? VPR[vs][i] : VPR[vt][element_index]);
-            VPR[vd][i] = ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_LO).as<U16>();
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM_LO>(VCC.test(i) ? VPR[vs][i] : VPR[vt][element_index]);
+            VPR[vd][i] = ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM_LO>();
 
             VCC.set(i + 8, 0);
             VCO.set(i + 8, 0);
@@ -1000,10 +999,10 @@ namespace esx {
         VU_SELECT_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_SELECT_INSTRUCTION_Register::element>();
+        RegisterIndex vt = instruction.get<layouts::VU_SELECT_INSTRUCTION_Register::vt>();
+        RegisterIndex vs = instruction.get<layouts::VU_SELECT_INSTRUCTION_Register::vs>();
+        RegisterIndex vd = instruction.get<layouts::VU_SELECT_INSTRUCTION_Register::vd>();
 
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
@@ -1018,8 +1017,8 @@ namespace esx {
             }
             BIT clip = VCO.test(i) ? VCC.test(i) : VCC.test(i + 8);
             U16 vt_abs = VCO.test(i) ? static_cast<U16>(-1 * VPR[vt][element_index]) : VPR[vt][element_index];
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, clip == ESX_TRUE ? vt_abs : VPR[vs][i]);
-            VPR[vd][i] = ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_LO).as<U16>();
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM_LO>(clip == ESX_TRUE ? vt_abs : VPR[vs][i]);
+            VPR[vd][i] = ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM_LO>();
         }
     }
 
@@ -1028,10 +1027,10 @@ namespace esx {
         VU_SELECT_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_SELECT_INSTRUCTION_Register::element>();
+        RegisterIndex vt = instruction.get<layouts::VU_SELECT_INSTRUCTION_Register::vt>();
+        RegisterIndex vs = instruction.get<layouts::VU_SELECT_INSTRUCTION_Register::vs>();
+        RegisterIndex vd = instruction.get<layouts::VU_SELECT_INSTRUCTION_Register::vd>();
 
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
@@ -1043,8 +1042,8 @@ namespace esx {
             VCC.set(i, VPR[vs][i] <= static_cast<U16>(-1 * VPR[vt][element_index]));
             VCC.set(i + 8, VPR[vs][i] >= VPR[vt][element_index]);
             BIT clip = VCO.test(i) ? VCC.test(i) : VCC.test(i + 8);
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, clip == ESX_TRUE ? vt_abs : VPR[vs][i]);
-            VPR[vd][i] = ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_LO).as<U16>();
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM_LO>(clip == ESX_TRUE ? vt_abs : VPR[vs][i]);
+            VPR[vd][i] = ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM_LO>();
         }
     }
 
@@ -1058,16 +1057,16 @@ namespace esx {
         VU_SELECT_INSTRUCTION_Register instruction;
         instruction.write(mCPU->mCurrentInstruction.binaryInstruction);
 
-        U8 element = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::element).as<U8>();
-        RegisterIndex vt = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vt).as<RegisterIndex>();
-        RegisterIndex vs = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vs).as<RegisterIndex>();
-        RegisterIndex vd = instruction.get(layouts::VU_SELECT_INSTRUCTION_Register::Field::vd).as<RegisterIndex>();
+        U8 element = instruction.get<layouts::VU_SELECT_INSTRUCTION_Register::element>();
+        RegisterIndex vt = instruction.get<layouts::VU_SELECT_INSTRUCTION_Register::vt>();
+        RegisterIndex vs = instruction.get<layouts::VU_SELECT_INSTRUCTION_Register::vs>();
+        RegisterIndex vd = instruction.get<layouts::VU_SELECT_INSTRUCTION_Register::vd>();
 
         for (I32 i = 0; i < 8; i++) {
             U8 element_index = get_element_index(element, i);
 
-            ACCUM[i].set(layouts::VU_ACCUM_Register::Field::ACCUM_LO, VCC.test(i) ? VPR[vs][i] : VPR[vt][element_index]);
-            VPR[vd][i] = ACCUM[i].get(layouts::VU_ACCUM_Register::Field::ACCUM_LO).as<U16>();
+            ACCUM[i].set<layouts::VU_ACCUM_Register::ACCUM_LO>(VCC.test(i) ? VPR[vs][i] : VPR[vt][element_index]);
+            VPR[vd][i] = ACCUM[i].get<layouts::VU_ACCUM_Register::ACCUM_LO>();
         }
     }
 

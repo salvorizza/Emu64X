@@ -10,13 +10,13 @@ namespace esx {
 		: mRCP(rcp)
 	{
 		Scheduler::AddSchedulerEventHandler(SchedulerEventType::GPUFrameStart, [&](const SchedulerEvent& ev) {
-			if (VI_V_TOTAL.get(layouts::VI_V_TOTAL_Register::Field::V_TOTAL).as<U16>() & 0x1) {
-				VI_V_CURRENT.set(layouts::VI_V_CURRENT_Register::Field::V_FIELD, 0);
+			if (VI_V_TOTAL.get<layouts::VI_V_TOTAL_Register::V_TOTAL>() & 0x1) {
+				VI_V_CURRENT.set<layouts::VI_V_CURRENT_Register::V_FIELD>(0);
 			} else {
-				VI_V_CURRENT.set(layouts::VI_V_CURRENT_Register::Field::V_FIELD, !VI_V_CURRENT.get(layouts::VI_V_CURRENT_Register::Field::V_FIELD).as<BIT>());
+				VI_V_CURRENT.set<layouts::VI_V_CURRENT_Register::V_FIELD>(!VI_V_CURRENT.get<layouts::VI_V_CURRENT_Register::V_FIELD>());
 			}
 
-			VI_V_CURRENT.set(layouts::VI_V_CURRENT_Register::Field::V_CURRENT, 0);
+			VI_V_CURRENT.set<layouts::VI_V_CURRENT_Register::V_CURRENT>(0);
 
 			mFirstLine = ESX_TRUE;
 			mCountLine = ESX_FALSE;
@@ -24,31 +24,47 @@ namespace esx {
 
 		Scheduler::AddSchedulerEventHandler(SchedulerEventType::GPUScanlineStart, [&](const SchedulerEvent& ev) {
 			if (mFirstLine == ESX_FALSE) {
-				U16 currentLine = VI_V_CURRENT.get(layouts::VI_V_CURRENT_Register::Field::V_CURRENT).as<U16>();
-				if (VI_V_TOTAL.get(layouts::VI_V_TOTAL_Register::Field::V_TOTAL).as<U16>() & 0x1) {
+				U16 currentLine = VI_V_CURRENT.get<layouts::VI_V_CURRENT_Register::V_CURRENT>();
+				if (VI_V_TOTAL.get<layouts::VI_V_TOTAL_Register::V_TOTAL>() & 0x1) {
 					currentLine += (mCountLine ? 1 : 0);
 					mCountLine = !mCountLine;
 				} else {
 					currentLine++;
 				}
-				VI_V_CURRENT.set(layouts::VI_V_CURRENT_Register::Field::V_CURRENT, currentLine);
+				VI_V_CURRENT.set<layouts::VI_V_CURRENT_Register::V_CURRENT>(currentLine);
 			} else {
 				mFirstLine = !mFirstLine;
 			}
 
 
-			if (VI_V_TOTAL.get(layouts::VI_V_TOTAL_Register::Field::V_TOTAL).as<U16>() & 0x1) {
-				if ((VI_V_INTR.get(layouts::VI_V_INTR_Register::Field::V_INTR).as<U16>() & ~0x1) == (VI_V_CURRENT.get(layouts::VI_V_CURRENT_Register::Field::V_CURRENT).as<U16>() & ~0x1)) {
-					mRCP->setInterrupt(InterruptType::VI, ESX_FALSE, ESX_TRUE, 0);
-				}
-			} else {
-				if (VI_V_INTR.get(layouts::VI_V_INTR_Register::Field::V_INTR).as<U16>() & 0x1) {
-					if ((VI_V_INTR.get(layouts::VI_V_INTR_Register::Field::V_INTR).as<U16>() & ~0x1) == (VI_V_CURRENT.get(layouts::VI_V_CURRENT_Register::Field::V_CURRENT).as<U16>() & ~0x1)) {
-						mRCP->setInterrupt(InterruptType::VI, ESX_FALSE, ESX_TRUE, 0);
+			{
+				U16 vIntr = VI_V_INTR.get<layouts::VI_V_INTR_Register::V_INTR>();
+				U16 vCurrent = VI_V_CURRENT.get<layouts::VI_V_CURRENT_Register::V_CURRENT>();
+				BIT match = ESX_FALSE;
+				if (VI_V_TOTAL.get<layouts::VI_V_TOTAL_Register::V_TOTAL>() & 0x1) {
+					// Progressive: bit 0 ignored, match on [9:1]
+					match = ((vIntr & ~0x1) == (vCurrent & ~0x1)) ? ESX_TRUE : ESX_FALSE;
+				} else {
+					// Interlaced
+					if (vIntr & 0x1) {
+						// V_INTR bit0=1: normal match on [9:1]
+						match = ((vIntr & ~0x1) == (vCurrent & ~0x1)) ? ESX_TRUE : ESX_FALSE;
+					} else {
+						// V_INTR bit0=0: HW bug - odd field triggers one line early
+						U16 vField = vCurrent & 0x1;
+						if (vField == 0) {
+							match = ((vIntr & ~0x1) == (vCurrent & ~0x1)) ? ESX_TRUE : ESX_FALSE;
+						} else {
+							match = ((vIntr == 0) ? (vCurrent >= (VI_V_TOTAL.get<layouts::VI_V_TOTAL_Register::V_TOTAL>() - 1))
+								: (((vIntr & ~0x1) - 2) == (vCurrent & ~0x1))) ? ESX_TRUE : ESX_FALSE;
+						}
 					}
 				}
-				else {
-
+				if (match == ESX_TRUE && mVIInterruptRaised == ESX_FALSE) {
+					mRCP->setInterrupt(InterruptType::VI, ESX_FALSE, ESX_TRUE, 0);
+					mVIInterruptRaised = ESX_TRUE;
+				} else if (match == ESX_FALSE) {
+					mVIInterruptRaised = ESX_FALSE;
 				}
 			}
 		});
@@ -86,9 +102,9 @@ namespace esx {
 	{
 		switch (address) {
 			case 0x04400000: {
-				U8 lastCtrl = VI_CTRL.get(layouts::VI_CTRL_Register::Field::TYPE).as<U8>() ;
+				U8 lastCtrl = VI_CTRL.get<layouts::VI_CTRL_Register::TYPE>();
 				VI_CTRL.write(value);
-				U8 newCtrl = VI_CTRL.get(layouts::VI_CTRL_Register::Field::TYPE).as<U8>();
+				U8 newCtrl = VI_CTRL.get<layouts::VI_CTRL_Register::TYPE>();
 
 				if (lastCtrl != newCtrl) {
 					scheduleVIEvents();
@@ -96,6 +112,7 @@ namespace esx {
 				break;
 			}
 			case 0x04400004: {
+				ESX_CORE_LOG_INFO("VI_ORIGIN write: {:08x}h (was {:08x}h)", value, VI_ORIGIN.read());
 				VI_ORIGIN.write(value);
 				break;
 			}
@@ -109,7 +126,6 @@ namespace esx {
 			}
 			case 0x04400010: {
 				mRCP->clearInterrupt(InterruptType::VI);
-				VI_V_CURRENT.write(value);
 				break;
 			}
 			case 0x04400014: {
@@ -234,6 +250,7 @@ namespace esx {
 				break;
 			}
 		}
+	return 0;
 	}
 
 	void VideoInterface::reset()
@@ -250,20 +267,22 @@ namespace esx {
 
 	void VideoInterface::scheduleVIEvents()
 	{
-		Scheduler::UnScheduleAllEvents(SchedulerEventType::GPUFrameStart);
-		Scheduler::UnScheduleAllEvents(SchedulerEventType::GPUScanlineStart);
-		Scheduler::UnScheduleAllEvents(SchedulerEventType::GPUStartVBlank);
-		Scheduler::UnScheduleAllEvents(SchedulerEventType::GPUEndVBlank);
-		Scheduler::UnScheduleAllEvents(SchedulerEventType::GPUStartHBlank);
-		Scheduler::UnScheduleAllEvents(SchedulerEventType::GPUEndHBlank);
+		Scheduler::UnScheduleEventTypes({
+			SchedulerEventType::GPUFrameStart,
+			SchedulerEventType::GPUScanlineStart,
+			SchedulerEventType::GPUStartVBlank,
+			SchedulerEventType::GPUEndVBlank,
+			SchedulerEventType::GPUStartHBlank,
+			SchedulerEventType::GPUEndHBlank
+		});
 
-		if (VI_CTRL.get(layouts::VI_CTRL_Register::Field::TYPE).as<U8>() != 0) {
-			U16 numScanlines = VI_V_TOTAL.get(layouts::VI_V_TOTAL_Register::Field::V_TOTAL).as<U16>();
-			U16 scanlineLength = VI_H_TOTAL.get(layouts::VI_H_TOTAL_Register::Field::H_TOTAL).as<U16>();
-			U16 startHsync = VI_H_VIDEO.get(layouts::VI_H_VIDEO_Register::Field::H_START).as<U16>() * 4;
-			U16 endHsync = VI_H_VIDEO.get(layouts::VI_H_VIDEO_Register::Field::H_END).as<U16>() * 4;
-			U16 startFrame = VI_V_VIDEO.get(layouts::VI_V_VIDEO_Register::Field::V_START).as<U16>();
-			U16 endFrame = VI_V_VIDEO.get(layouts::VI_V_VIDEO_Register::Field::V_END).as<U16>();
+		if (VI_CTRL.get<layouts::VI_CTRL_Register::TYPE>() != 0) {
+			U16 numScanlines = VI_V_TOTAL.get<layouts::VI_V_TOTAL_Register::V_TOTAL>();
+			U16 scanlineLength = VI_H_TOTAL.get<layouts::VI_H_TOTAL_Register::H_TOTAL>();
+			U16 startHsync = VI_H_VIDEO.get<layouts::VI_H_VIDEO_Register::H_START>() * 4;
+			U16 endHsync = VI_H_VIDEO.get<layouts::VI_H_VIDEO_Register::H_END>() * 4;
+			U16 startFrame = VI_V_VIDEO.get<layouts::VI_V_VIDEO_Register::V_START>();
+			U16 endFrame = VI_V_VIDEO.get<layouts::VI_V_VIDEO_Register::V_END>();
 
 			U64 cpuClocks = mRCP->getBus("Root")->getDevice<VR4300>("VR4300")->getClocks();
 

@@ -27,6 +27,10 @@ namespace esx {
 		void reset() ;
 
 		SharedPtr<R4000>& getCore() { return mCore; }
+		SharedPtr<ScalarUnit>& getScalarUnit() { return mSU; }
+
+		U32 loadDPCRegister(U32 reg);
+		void storeDPCRegister(U32 reg, U32 value);
 	private:
 		StringView mName = "RSP";
 

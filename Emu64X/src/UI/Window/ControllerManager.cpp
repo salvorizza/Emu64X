@@ -15,7 +15,7 @@ namespace esx {
 		int stateCount = 0;
 		int axesCount = 0;
 
-		const float deadZone = 0.3;
+		const float deadZone = 0.3f;
 		for (int jid = 0; jid < GLFW_JOYSTICK_LAST; jid++) {
 			if (glfwJoystickPresent(jid)) {
 				const unsigned char* buttonStates = NULL;

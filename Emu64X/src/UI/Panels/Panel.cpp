@@ -5,24 +5,24 @@
 namespace esx {
 
 	Panel::Panel(const std::string& name, bool hasMenuBar, bool noPadding, bool defaultOpen, bool isModal)
-		: mName(name),
-		mOpen(defaultOpen),
+		: mOpen(defaultOpen),
 		mHasMenuBar(hasMenuBar),
 		mNoPadding(noPadding),
 		mIsModal(isModal),
-		mFirstOpen(false),
-		mBGColor(ImGui::GetStyleColorVec4(ImGuiCol_WindowBg))
+		mName(name),
+		mBGColor(ImGui::GetStyleColorVec4(ImGuiCol_WindowBg)),
+		mFirstOpen(false)
 	{}
 
 
 	Panel::Panel(const std::string& name, bool hasMenuBar, ImVec4 bgColor, bool noPadding, bool defaultOpen, bool isModal)
-	:		mName(name),
-			mOpen(defaultOpen),
+	:		mOpen(defaultOpen),
 			mHasMenuBar(hasMenuBar),
 			mNoPadding(noPadding),
 			mIsModal(isModal),
-			mFirstOpen(false),
-			mBGColor(bgColor)
+			mName(name),
+			mBGColor(bgColor),
+			mFirstOpen(false)
 	{}
 
 	Panel::~Panel()

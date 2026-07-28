@@ -4,6 +4,7 @@
 #include "Base/Bus.h"
 
 #include "RSP/RSP.h"
+#include "RDP/RDP.h"
 #include "Interfaces/AudioInterface.h"
 #include "Interfaces/MIPSInterface.h"
 #include "Interfaces/PeripheralInterface.h"
@@ -43,6 +44,7 @@ namespace esx {
 		static U64 CPUClocksToRCPClocks(U64 CPUClocks);
 
 		SharedPtr<R4000>& getCore() { return mRSP->getCore(); }
+		RDP& getRDP() { return *mRDP; }
 	private:
 		SharedPtr<Bus> mRoot;
 		SharedPtr<R4000> mCore;
@@ -50,6 +52,7 @@ namespace esx {
 		Vector<U8> mIMEM;
 		Vector<U8> mDMEM;
 		SharedPtr<RSP> mRSP;
+		SharedPtr<RDP> mRDP;
 		SharedPtr<AudioInterface> mAudioInterface;
 		SharedPtr<MIPSInterface> mMIPSInterface;
 		SharedPtr<PeripheralInterface> mPeripheralInterface;

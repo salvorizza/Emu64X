@@ -4,7 +4,7 @@
 
 namespace esx {
 
-	enum class SchedulerEventType {
+	enum class SchedulerEventType : U8 {
 		None,
 		GPUFrameStart,
 		GPUScanlineStart,
@@ -17,8 +17,11 @@ namespace esx {
 		AIDMADone,
 		AIDMAStart,
 		SPDMADone,
-		DPDMADone
+		DPDMADone,
+		EventTypeCount
 	};
+
+	static constexpr size_t SchedulerInlineBufferSize = 32;
 
 	struct SchedulerEvent {
 		U64 Id = 0;
@@ -27,36 +30,45 @@ namespace esx {
 		U64 ClockTarget = 0;
 		BIT Reschedule = ESX_FALSE;
 		U64 RescheduleClocks = 0;
-		Vector<U8> UserData = {};
-		U8 ReadPointer = 0;
 		I32 Priority = 0;
+
+		Array<U8, SchedulerInlineBufferSize> InlineData = {};
+		Vector<U8> HeapData = {};
+		U16 DataSize = 0;
+		U16 ReadPointer = 0;
 
 		template<typename T>
 		void Write(const T& Data) {
-			size_t writeP = UserData.size();
-			UserData.resize(UserData.size() + sizeof(T));
-			std::memcpy(UserData.data() + writeP, reinterpret_cast<const U8*>(&Data), sizeof(T));
+			const U16 writeP = DataSize;
+			DataSize += static_cast<U16>(sizeof(T));
+			if (DataSize <= SchedulerInlineBufferSize) {
+				std::memcpy(InlineData.data() + writeP, reinterpret_cast<const U8*>(&Data), sizeof(T));
+			} else {
+				if (HeapData.size() < DataSize) HeapData.resize(DataSize);
+				if (writeP < SchedulerInlineBufferSize) {
+					std::memcpy(HeapData.data(), InlineData.data(), writeP);
+				}
+				std::memcpy(HeapData.data() + writeP, reinterpret_cast<const U8*>(&Data), sizeof(T));
+			}
 		}
 
 		template<typename T>
 		T Read() {
-			T value = *reinterpret_cast<const T*>(UserData.data() + ReadPointer);
-			ReadPointer += sizeof(T);
+			const U8* src = (DataSize <= SchedulerInlineBufferSize) ? InlineData.data() : HeapData.data();
+			T value = *reinterpret_cast<const T*>(src + ReadPointer);
+			ReadPointer += static_cast<U16>(sizeof(T));
 			return value;
 		}
 
 		void Clear() {
-			UserData.resize(0);
+			DataSize = 0;
+			ReadPointer = 0;
 		}
-	};
-
-	struct SchedulerCompare {
-		bool operator()(const SchedulerEvent& l, const SchedulerEvent& r) const { return l.ClockTarget > r.ClockTarget || (l.ClockTarget == r.ClockTarget && static_cast<U8>(l.Type) > static_cast<U8>(r.Type)); }
 	};
 
 	using SchedulerEventHandler = Function<void(SchedulerEvent&)>;
 	using SchedulerEventContainer = Deque<SchedulerEvent>;
-	using SchedulerEventHandlerContainer = UnorderedMap<SchedulerEventType, Vector<SchedulerEventHandler>>;
+	using SchedulerEventHandlerContainer = Array<Vector<SchedulerEventHandler>, static_cast<size_t>(SchedulerEventType::EventTypeCount)>;
 
 	class Scheduler {
 	public:
@@ -65,9 +77,11 @@ namespace esx {
 
 		static void ScheduleEvent(SchedulerEvent& schedulerEvent);
 		static void UnScheduleAllEvents(SchedulerEventType type);
+		static void UnScheduleEventTypes(std::initializer_list<SchedulerEventType> types);
 		static Optional<SchedulerEvent*> NextEventOfType(SchedulerEventType type, U64 idToExclude = 0);
 		static const SchedulerEvent& NextEvent();
 		static BIT CurrentEventHasBeenStopped();
+		static void StopCurrentEvent();
 		static void ExecuteEvent();
 		static void Progress();
 		static void AddSchedulerEventHandler(SchedulerEventType type, const SchedulerEventHandler& handler);

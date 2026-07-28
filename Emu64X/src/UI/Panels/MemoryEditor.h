@@ -64,6 +64,11 @@
 #pragma warning (disable: 4996) // warning C4996: 'sprintf': This function or variable may be unsafe.
 #endif
 
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-variable"
+#endif
+
 struct MemoryEditor
 {
     enum DataFormat
@@ -740,4 +745,8 @@ struct MemoryEditor
 
 #ifdef _MSC_VER
 #pragma warning (pop)
+#endif
+
+#ifdef __clang__
+#pragma clang diagnostic pop
 #endif

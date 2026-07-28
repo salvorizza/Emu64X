@@ -271,9 +271,9 @@ namespace esx {
 
 		void NA();
 
-		BIT is64BitMode() const { return mCP0->is64BitMode(); }
-		BIT isCoprocessorUsable(U8 copNumber) const { return mCP0->isCoprocessorUsable(copNumber); }
-		BIT isReserved64BitInstruction() const { return mCP0->isReserved64BitInstruction(); }
+		BIT is64BitMode() const override { return mCP0->is64BitMode(); }
+		BIT isCoprocessorUsable(U8 copNumber) const override { return mCP0->isCoprocessorUsable(copNumber); }
+		BIT isReserved64BitInstruction() const override { return mCP0->isReserved64BitInstruction(); }
 	private:
 		void iCacheStore(U32 address, U32 value);
 

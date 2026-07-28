@@ -165,7 +165,6 @@ namespace esx {
 	{
 
 		ImDrawList* drawList = ImGui::GetWindowDrawList();
-		ImVec2 windowPos = ImGui::GetWindowPos();
 
 		ImVec2 size = { cellSize,cellSize * 1.75f };
 

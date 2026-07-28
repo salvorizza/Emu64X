@@ -51,7 +51,6 @@ namespace esx {
 		U32 mSlot = 0;
 		U32 mWidth = 0;
 		U32 mHeight = 0;
-		InternalFormat mInternalFormat;
 		DataType mDataType;
 		DataFormat mDataFormat;
 	};

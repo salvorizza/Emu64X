@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Resources">
@@ -63,6 +63,9 @@
     </Filter>
     <Filter Include="src\Core\RCP\Interfaces">
       <UniqueIdentifier>{6C881AF5-D8BF-628C-E1C9-C6AF4D808985}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\Core\RCP\RDP">
+      <UniqueIdentifier>{EEA9BE7A-DAA2-DDCC-03D5-C251EF2CBDD8}</UniqueIdentifier>
     </Filter>
     <Filter Include="src\Core\RCP\RSP">
       <UniqueIdentifier>{DDABBE7A-C9A4-DDCC-F2D6-C251DE2EBDD8}</UniqueIdentifier>
@@ -143,6 +146,9 @@
     </ClInclude>
     <ClInclude Include="src\Core\RCP\RCP.h">
       <Filter>src\Core\RCP</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Core\RCP\RDP\RDP.h">
+      <Filter>src\Core\RCP\RDP</Filter>
     </ClInclude>
     <ClInclude Include="src\Core\RCP\RSP\RSP.h">
       <Filter>src\Core\RCP\RSP</Filter>
@@ -286,6 +292,9 @@
     </ClCompile>
     <ClCompile Include="src\Core\RCP\RCP.cpp">
       <Filter>src\Core\RCP</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Core\RCP\RDP\RDP.cpp">
+      <Filter>src\Core\RCP\RDP</Filter>
     </ClCompile>
     <ClCompile Include="src\Core\RCP\RSP\RSP.cpp">
       <Filter>src\Core\RCP\RSP</Filter>

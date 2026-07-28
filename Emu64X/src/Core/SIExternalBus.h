@@ -46,7 +46,7 @@ namespace esx {
 		void load(const StringView& busName, U32 address, U32& output, U8 lowerBits, U8 accessSize) override;
 		void store(const StringView& busName, U32 address, U32 value, U8 lowerBits, U8 accessSize) override;
 
-		void reset();
+		void reset() override;
 
 		void setCIC(CIC cic);
 

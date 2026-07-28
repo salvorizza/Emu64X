@@ -1,4 +1,5 @@
 #include "ScalarUnit.h"
+#include "../RDP/RDP.h"
 
 #include "Core/MIPS/R4000/R4000.h"
 
@@ -18,17 +19,20 @@ namespace esx {
             SP_DMA_SPADDR_Register SP_DMA_SPADDR = ev.Read<SP_DMA_SPADDR_Register>();
             SP_DMA_RAMADDR_Register SP_DMA_RAMADDR = ev.Read<SP_DMA_RAMADDR_Register>();
 
-            U32 RDRAMAddr = SP_DMA_RAMADDR.get(layouts::SP_DMA_RAMADDR_Register::Field::DRAM_ADDR).as<U32>() << 3;
-            U32 MEMBase = 0x04000000 + (SP_DMA_SPADDR.get(layouts::SP_DMA_SPADDR_Register::Field::MEM_BANK).as<U8>() << 12);
-            U32 MEMAddr = MEMBase + (SP_DMA_SPADDR.get(layouts::SP_DMA_SPADDR_Register::Field::MEM_ADDR).as<U32>() << 3);
+            U32 RDRAMAddr = SP_DMA_RAMADDR.get<layouts::SP_DMA_RAMADDR_Register::DRAM_ADDR>() << 3;
+            U32 MEMBase = 0x04000000 + (SP_DMA_SPADDR.get<layouts::SP_DMA_SPADDR_Register::MEM_BANK>() << 12);
+            U32 MEMAddr = MEMBase + (SP_DMA_SPADDR.get<layouts::SP_DMA_SPADDR_Register::MEM_ADDR>() << 3);
+            U32 Skip = 0;
             if (Write == ESX_FALSE) {
-                SP_DMA_RDLEN_Register SP_DMA_RDLEN = ev.Read<SP_DMA_RDLEN_Register>();
-                Length = ((SP_DMA_RDLEN.get(layouts::SP_DMA_RDLEN_Register::Field::RDLEN).as<U32>() + 1) << 3);
-                NumRows = SP_DMA_RDLEN.get(layouts::SP_DMA_RDLEN_Register::Field::COUNT).as<U16>() + 1;
+                SP_DMA_RDLEN_Register SP_DMA_RDLEN_Local = ev.Read<SP_DMA_RDLEN_Register>();
+                Length = ((SP_DMA_RDLEN_Local.get<layouts::SP_DMA_RDLEN_Register::RDLEN>() + 1) << 3);
+                NumRows = SP_DMA_RDLEN_Local.get<layouts::SP_DMA_RDLEN_Register::COUNT>() + 1;
+                Skip = SP_DMA_RDLEN_Local.get<layouts::SP_DMA_RDLEN_Register::SKIP>() << 3;
             } else {
-                SP_DMA_WRLEN_Register SP_DMA_WRLEN = ev.Read<SP_DMA_WRLEN_Register>();
-                Length = ((SP_DMA_WRLEN.get(layouts::SP_DMA_WRLEN_Register::Field::WRLEN).as<U32>() + 1) << 3);
-                NumRows = SP_DMA_WRLEN.get(layouts::SP_DMA_WRLEN_Register::Field::COUNT).as<U16>() + 1;
+                SP_DMA_WRLEN_Register SP_DMA_WRLEN_Local = ev.Read<SP_DMA_WRLEN_Register>();
+                Length = ((SP_DMA_WRLEN_Local.get<layouts::SP_DMA_WRLEN_Register::WRLEN>() + 1) << 3);
+                NumRows = SP_DMA_WRLEN_Local.get<layouts::SP_DMA_WRLEN_Register::COUNT>() + 1;
+                Skip = SP_DMA_WRLEN_Local.get<layouts::SP_DMA_WRLEN_Register::SKIP>() << 3;
             }
             NumDWords = (Length / 8) + ((Length % 8) > 0 ? 1 : 0);
 
@@ -54,28 +58,28 @@ namespace esx {
 
                     MEMAddr &= (MEMBase | 0xFFF);
                 }
-                RDRAMAddr += (SP_DMA_RDLEN.get(layouts::SP_DMA_RDLEN_Register::Field::SKIP).as<U32>() << 3);
+                RDRAMAddr += Skip;
             }
             
             if (Write == ESX_FALSE) {
-                SP_DMA_RDLEN.set(layouts::SP_DMA_RDLEN_Register::Field::RDLEN, 0xFF8);
+                SP_DMA_RDLEN.set<layouts::SP_DMA_RDLEN_Register::RDLEN>(0xFF8);
             } else {
-                SP_DMA_WRLEN.set(layouts::SP_DMA_WRLEN_Register::Field::WRLEN, 0xFF8);
+                SP_DMA_WRLEN.set<layouts::SP_DMA_WRLEN_Register::WRLEN>(0xFF8);
             }
 
-            if (SP_STATUS.get(layouts::SP_STATUS_Register::Field::DMA_FULL).as<BIT>() == ESX_TRUE) {
-                SP_STATUS.set(layouts::SP_STATUS_Register::Field::DMA_FULL, ESX_FALSE);
+            if (SP_STATUS.get<layouts::SP_STATUS_Register::DMA_FULL>() == ESX_TRUE) {
+                SP_STATUS.set<layouts::SP_STATUS_Register::DMA_FULL>(ESX_FALSE);
             } else {
-                SP_STATUS.set(layouts::SP_STATUS_Register::Field::DMA_BUSY, ESX_FALSE);
+                SP_STATUS.set<layouts::SP_STATUS_Register::DMA_BUSY>(ESX_FALSE);
             }
         });
     
         Scheduler::AddSchedulerEventHandler(SchedulerEventType::DPDMADone, [&](SchedulerEvent& ev) {
-            DPC_START_Register DPC_START = ev.Read<DPC_START_Register>();
+            (void)ev.Read<DPC_START_Register>();
             DPC_END_Register DPC_END = ev.Read<DPC_END_Register>();
 
-            DPC_CURRENT.set(layouts::DPC_CURRENT_Register::Field::CURRENT, DPC_END.get(layouts::DPC_END_Register::Field::END).as<U32>());
-            DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::DMA_BUSY, ESX_FALSE);
+            DPC_CURRENT.set<layouts::DPC_CURRENT_Register::CURRENT>(DPC_END.get<layouts::DPC_END_Register::END>());
+            DPC_STATUS.set<layouts::DPC_STATUS_Register::DMA_BUSY>(ESX_FALSE);
             if (mPendingTransfer) {
                 U64 cpuClocks = mRCP->getBus("Root")->getDevice<VR4300>("VR4300")->getClocks();
 
@@ -87,12 +91,12 @@ namespace esx {
                 dmaDoneEvent.Write(mPendingTransfer->Start);
                 dmaDoneEvent.Write(mPendingTransfer->End);
 
-                DPC_CURRENT.set(layouts::DPC_CURRENT_Register::Field::CURRENT, mPendingTransfer->Start.get(layouts::DPC_START_Register::Field::START).as<U32>() & ~0x7);
-                DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::END_PENDING, ESX_FALSE);
+                DPC_CURRENT.set<layouts::DPC_CURRENT_Register::CURRENT>(mPendingTransfer->Start.get<layouts::DPC_START_Register::START>() & ~0x7);
+                DPC_STATUS.set<layouts::DPC_STATUS_Register::END_PENDING>(ESX_FALSE);
                 if (mPendingTransfer->Clocks() > 0) {
                     Scheduler::ScheduleEvent(dmaDoneEvent);
-                    DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::PIPE_BUSY, ESX_TRUE);
-                    DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::DMA_BUSY, ESX_TRUE);
+                    DPC_STATUS.set<layouts::DPC_STATUS_Register::PIPE_BUSY>(ESX_TRUE);
+                    DPC_STATUS.set<layouts::DPC_STATUS_Register::DMA_BUSY>(ESX_TRUE);
                 }
                 DoTransferRDPCommands(mPendingTransfer->Start.read(), mPendingTransfer->End.read());
 
@@ -134,10 +138,12 @@ namespace esx {
 
     void ScalarUnit::signalBreak()
     {
-        SP_STATUS.set(layouts::SP_STATUS_Register::Field::BROKE, ESX_TRUE);
+        ESX_CORE_LOG_INFO("RSP BREAK at PC={:03x}h SP_STATUS={:08x}h rdpCmds={}", mCPU->mPC & 0xFFF, SP_STATUS.read(), mRDPCommandCount);
+        mRDPCommandCount = 0;
+        SP_STATUS.set<layouts::SP_STATUS_Register::BROKE>(ESX_TRUE);
         mCPU->setHalt(ESX_TRUE);
 
-        if (SP_STATUS.get(layouts::SP_STATUS_Register::Field::INTBREAK).as<BIT>() == ESX_TRUE) {
+        if (SP_STATUS.get<layouts::SP_STATUS_Register::INTBREAK>() == ESX_TRUE) {
             mRCP->setInterrupt(InterruptType::SP, ESX_FALSE, ESX_TRUE, 0);
         }
     }
@@ -151,12 +157,12 @@ namespace esx {
             case ScalarUnitRegisterType::c3:    return SP_DMA_WRLEN.read();
 
             case ScalarUnitRegisterType::c4: {
-                SP_STATUS.set(layouts::SP_STATUS_Register::Field::HALTED, mCPU->getHalt());
+                SP_STATUS.set<layouts::SP_STATUS_Register::HALTED>(mCPU->getHalt());
                 return SP_STATUS.read();
             }
 
-            case ScalarUnitRegisterType::c5:    return SP_STATUS.get(layouts::SP_STATUS_Register::Field::DMA_FULL).as<BIT>();
-            case ScalarUnitRegisterType::c6:    return SP_STATUS.get(layouts::SP_STATUS_Register::Field::DMA_BUSY).as<BIT>();
+            case ScalarUnitRegisterType::c5:    return SP_STATUS.get<layouts::SP_STATUS_Register::DMA_FULL>();
+            case ScalarUnitRegisterType::c6:    return SP_STATUS.get<layouts::SP_STATUS_Register::DMA_BUSY>();
             case ScalarUnitRegisterType::c7:    return SP_SEMAPHORE.read();
             case ScalarUnitRegisterType::c8:    return DPC_START.read();
             case ScalarUnitRegisterType::c9:    return DPC_END.read();
@@ -164,7 +170,7 @@ namespace esx {
                 auto TransferEvent = Scheduler::NextEventOfType(SchedulerEventType::DPDMADone);
                 if (TransferEvent) {
                     U64 NumBytes = ((mRCP->getBus("Root")->getDevice<VR4300>("VR4300")->getClocks() - TransferEvent.value()->ClockStart) / 10) * 37;
-                    DPC_CURRENT.set(layouts::DPC_CURRENT_Register::Field::CURRENT, DPC_CURRENT.get(layouts::DPC_CURRENT_Register::Field::CURRENT).as<U32>() + (NumBytes / 8));
+                    DPC_CURRENT.set<layouts::DPC_CURRENT_Register::CURRENT>(DPC_CURRENT.get<layouts::DPC_CURRENT_Register::CURRENT>() + (U32)(NumBytes / 8));
                 }
 
                 return DPC_CURRENT.read();
@@ -186,15 +192,15 @@ namespace esx {
             case ScalarUnitRegisterType::c2: {
                 SP_DMA_RDLEN.write(value);
 
-                if (SP_STATUS.get(layouts::SP_STATUS_Register::Field::DMA_FULL).as<BIT>() == ESX_FALSE) {
-                    BIT DMAAlreadyUp = SP_STATUS.get(layouts::SP_STATUS_Register::Field::DMA_BUSY).as<BIT>();
-                    SP_STATUS.set(layouts::SP_STATUS_Register::Field::DMA_FULL, DMAAlreadyUp);
-                    SP_STATUS.set(layouts::SP_STATUS_Register::Field::DMA_BUSY, ESX_TRUE);
+                if (SP_STATUS.get<layouts::SP_STATUS_Register::DMA_FULL>() == ESX_FALSE) {
+                    BIT DMAAlreadyUp = SP_STATUS.get<layouts::SP_STATUS_Register::DMA_BUSY>();
+                    SP_STATUS.set<layouts::SP_STATUS_Register::DMA_FULL>(DMAAlreadyUp);
+                    SP_STATUS.set<layouts::SP_STATUS_Register::DMA_BUSY>(ESX_TRUE);
 
                     U64 cpuClocks = mRCP->getBus("Root")->getDevice<VR4300>("VR4300")->getClocks();
 
-                    U32 Length = ((SP_DMA_RDLEN.get(layouts::SP_DMA_RDLEN_Register::Field::RDLEN).as<U32>() + 1) << 3);
-                    U16 NumRows = SP_DMA_RDLEN.get(layouts::SP_DMA_RDLEN_Register::Field::COUNT).as<U16>() + 1;
+                    U32 Length = ((SP_DMA_RDLEN.get<layouts::SP_DMA_RDLEN_Register::RDLEN>() + 1) << 3);
+                    U16 NumRows = SP_DMA_RDLEN.get<layouts::SP_DMA_RDLEN_Register::COUNT>() + 1;
                     U32 NumDWords = (Length / 8) + ((Length % 8) > 0 ? 1 : 0);
                     U32 NumBytes = NumRows * NumDWords * 8;
                     U64 TargetClock = DMAAlreadyUp ? Scheduler::NextEventOfType(SchedulerEventType::SPDMADone).value()->ClockTarget : cpuClocks;
@@ -220,15 +226,15 @@ namespace esx {
             case ScalarUnitRegisterType::c3: {
                 SP_DMA_WRLEN.write(value);
 
-                if (SP_STATUS.get(layouts::SP_STATUS_Register::Field::DMA_FULL).as<BIT>() == ESX_FALSE) {
-                    BIT DMAAlreadyUp = SP_STATUS.get(layouts::SP_STATUS_Register::Field::DMA_BUSY).as<BIT>();
-                    SP_STATUS.set(layouts::SP_STATUS_Register::Field::DMA_FULL, DMAAlreadyUp);
-                    SP_STATUS.set(layouts::SP_STATUS_Register::Field::DMA_BUSY, ESX_TRUE);
+                if (SP_STATUS.get<layouts::SP_STATUS_Register::DMA_FULL>() == ESX_FALSE) {
+                    BIT DMAAlreadyUp = SP_STATUS.get<layouts::SP_STATUS_Register::DMA_BUSY>();
+                    SP_STATUS.set<layouts::SP_STATUS_Register::DMA_FULL>(DMAAlreadyUp);
+                    SP_STATUS.set<layouts::SP_STATUS_Register::DMA_BUSY>(ESX_TRUE);
 
                     U64 cpuClocks = mRCP->getBus("Root")->getDevice<VR4300>("VR4300")->getClocks();
 
-                    U32 Length = ((SP_DMA_RDLEN.get(layouts::SP_DMA_RDLEN_Register::Field::RDLEN).as<U32>() + 1) << 3);
-                    U16 NumRows = SP_DMA_RDLEN.get(layouts::SP_DMA_RDLEN_Register::Field::COUNT).as<U16>() + 1;
+                    U32 Length = ((SP_DMA_WRLEN.get<layouts::SP_DMA_WRLEN_Register::WRLEN>() + 1) << 3);
+                    U16 NumRows = SP_DMA_WRLEN.get<layouts::SP_DMA_WRLEN_Register::COUNT>() + 1;
                     U32 NumDWords = (Length / 8) + ((Length % 8) > 0 ? 1 : 0);
                     U32 NumBytes = NumRows * NumDWords * 8;
                     U64 TargetClock = DMAAlreadyUp ? Scheduler::NextEventOfType(SchedulerEventType::SPDMADone).value()->ClockTarget : cpuClocks;
@@ -254,35 +260,43 @@ namespace esx {
                 SP_STATUS_Write_Register writeReg;
                 writeReg.write(value);
 
-                if (writeReg.get(layouts::SP_STATUS_Write_Register::Field::CLR_HALT).as<BIT>() == ESX_TRUE) 
+                if (writeReg.get<layouts::SP_STATUS_Write_Register::CLR_HALT>() == ESX_TRUE) {
+                    U32 taskType = 0, taskFlags = 0, ucodePtr = 0, ucodeDataPtr = 0, dataPtr = 0;
+                    mRCP->load("Root", 0x04000FC0, taskType, 0, 32);
+                    mRCP->load("Root", 0x04000FC4, taskFlags, 0, 32);
+                    mRCP->load("Root", 0x04000FD0, ucodePtr, 0, 32);
+                    mRCP->load("Root", 0x04000FD8, ucodeDataPtr, 0, 32);
+                    mRCP->load("Root", 0x04000FE0, dataPtr, 0, 32);
+                    ESX_CORE_LOG_INFO("RSP CLR_HALT task={} flags={:08x}h ucode={:08x}h ucodeData={:08x}h data={:08x}h", taskType, taskFlags, ucodePtr, ucodeDataPtr, dataPtr);
                     mCPU->setHalt(ESX_FALSE);
+                }
 
-                if (writeReg.get(layouts::SP_STATUS_Write_Register::Field::SET_HALT).as<BIT>() == ESX_TRUE) 
+                if (writeReg.get<layouts::SP_STATUS_Write_Register::SET_HALT>() == ESX_TRUE) 
                     mCPU->setHalt(ESX_TRUE);
 
-                if (writeReg.get(layouts::SP_STATUS_Write_Register::Field::CLR_BROKE).as<BIT>() == ESX_TRUE) 
-                    SP_STATUS.set(layouts::SP_STATUS_Register::Field::BROKE, ESX_FALSE);
+                if (writeReg.get<layouts::SP_STATUS_Write_Register::CLR_BROKE>() == ESX_TRUE) 
+                    SP_STATUS.set<layouts::SP_STATUS_Register::BROKE>(ESX_FALSE);
 
-                if (writeReg.get(layouts::SP_STATUS_Write_Register::Field::CLR_SSTEP).as<BIT>() == ESX_TRUE) 
-                    SP_STATUS.set(layouts::SP_STATUS_Register::Field::SSTEP, ESX_FALSE);
+                if (writeReg.get<layouts::SP_STATUS_Write_Register::CLR_SSTEP>() == ESX_TRUE) 
+                    SP_STATUS.set<layouts::SP_STATUS_Register::SSTEP>(ESX_FALSE);
 
-                if (writeReg.get(layouts::SP_STATUS_Write_Register::Field::SET_INTR).as<BIT>() == ESX_TRUE)
+                if (writeReg.get<layouts::SP_STATUS_Write_Register::SET_INTR>() == ESX_TRUE)
                     mRCP->setInterrupt(InterruptType::SP, ESX_FALSE, ESX_TRUE, 0);
 
-                if (writeReg.get(layouts::SP_STATUS_Write_Register::Field::CLR_INTR).as<BIT>() == ESX_TRUE) 
+                if (writeReg.get<layouts::SP_STATUS_Write_Register::CLR_INTR>() == ESX_TRUE) 
                     mRCP->clearInterrupt(InterruptType::SP);
 
-                if (writeReg.get(layouts::SP_STATUS_Write_Register::Field::SET_SSTEP).as<BIT>() == ESX_TRUE) 
-                    SP_STATUS.set(layouts::SP_STATUS_Register::Field::SSTEP, ESX_TRUE);
+                if (writeReg.get<layouts::SP_STATUS_Write_Register::SET_SSTEP>() == ESX_TRUE) 
+                    SP_STATUS.set<layouts::SP_STATUS_Register::SSTEP>(ESX_TRUE);
 
-                if (writeReg.get(layouts::SP_STATUS_Write_Register::Field::CLR_INTBREAK).as<BIT>() == ESX_TRUE)
-                    SP_STATUS.set(layouts::SP_STATUS_Register::Field::INTBREAK, ESX_FALSE);
+                if (writeReg.get<layouts::SP_STATUS_Write_Register::CLR_INTBREAK>() == ESX_TRUE)
+                    SP_STATUS.set<layouts::SP_STATUS_Register::INTBREAK>(ESX_FALSE);
 
-                if (writeReg.get(layouts::SP_STATUS_Write_Register::Field::SET_INTBREAK).as<BIT>() == ESX_TRUE)
-                    SP_STATUS.set(layouts::SP_STATUS_Register::Field::INTBREAK, ESX_TRUE);
+                if (writeReg.get<layouts::SP_STATUS_Write_Register::SET_INTBREAK>() == ESX_TRUE)
+                    SP_STATUS.set<layouts::SP_STATUS_Register::INTBREAK>(ESX_TRUE);
 
-                U16 clrSetSig = writeReg.get(layouts::SP_STATUS_Write_Register::Field::CLR_SET_SIG).as<U16>();
-                U8 sig = SP_STATUS.get(layouts::SP_STATUS_Register::Field::SIG).as<U8>();
+                U16 clrSetSig = writeReg.get<layouts::SP_STATUS_Write_Register::CLR_SET_SIG>();
+                U8 sig = SP_STATUS.get<layouts::SP_STATUS_Register::SIG>();
 
                 for (I32 i = 0; i < 8; i++) {
                     if (clrSetSig & (1 << (i * 2))) {
@@ -294,7 +308,7 @@ namespace esx {
                     }
                 }
 
-                SP_STATUS.set(layouts::SP_STATUS_Register::Field::SIG, sig);
+                SP_STATUS.set<layouts::SP_STATUS_Register::SIG>(sig);
                 break;
             }
 
@@ -302,7 +316,7 @@ namespace esx {
 
             case ScalarUnitRegisterType::c8: {
                 DPC_START.write(value);
-                DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::START_PENDING, ESX_TRUE);
+                DPC_STATUS.set<layouts::DPC_STATUS_Register::START_PENDING>(ESX_TRUE);
                 break;
             }
 
@@ -312,11 +326,11 @@ namespace esx {
 
 
                 auto TransferEvent = Scheduler::NextEventOfType(SchedulerEventType::DPDMADone);
-                if (DPC_STATUS.get(layouts::DPC_STATUS_Register::Field::START_PENDING).as<BIT>() == ESX_FALSE) {
+                if (DPC_STATUS.get<layouts::DPC_STATUS_Register::START_PENDING>() == ESX_FALSE) {
                     DPC_START_Register NewStart;
                     NewStart.write(TransferEvent ? DPC_START.read() : OldDPC_END.read());
 
-                    U64 TransferLength = (DPC_END.get(layouts::DPC_END_Register::Field::END).as<U32>() & ~0x7) - (NewStart.get(layouts::DPC_START_Register::Field::START).as<U32>() & ~0x7);
+                    U64 TransferLength = (DPC_END.get<layouts::DPC_END_Register::END>() & ~0x7) - (NewStart.get<layouts::DPC_START_Register::START>() & ~0x7);
                     U64 ClockStart = TransferEvent ? TransferEvent.value()->ClockStart : mRCP->getBus("Root")->getDevice<VR4300>("VR4300")->getClocks();
                     U64 ClockEnd = (TransferEvent ? TransferEvent.value()->ClockTarget : ClockStart) + (TransferLength * 10) / (37 * 2);
 
@@ -333,15 +347,15 @@ namespace esx {
 
                     if (TransferLength > 0) {
                         Scheduler::ScheduleEvent(dmaDoneEvent);
-                        DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::PIPE_BUSY, ESX_TRUE);
-                        DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::DMA_BUSY, ESX_TRUE);
+                        DPC_STATUS.set<layouts::DPC_STATUS_Register::PIPE_BUSY>(ESX_TRUE);
+                        DPC_STATUS.set<layouts::DPC_STATUS_Register::DMA_BUSY>(ESX_TRUE);
                     }
 
                     DoTransferRDPCommands(NewStart.read(), DPC_END.read());
                 }
                 else {
-                    if (TransferEvent || DPC_STATUS.get(layouts::DPC_STATUS_Register::Field::END_PENDING).as<BIT>() == ESX_TRUE) {
-                        DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::END_PENDING, ESX_TRUE);
+                    if (TransferEvent || DPC_STATUS.get<layouts::DPC_STATUS_Register::END_PENDING>() == ESX_TRUE) {
+                        DPC_STATUS.set<layouts::DPC_STATUS_Register::END_PENDING>(ESX_TRUE);
 
                         if (mPendingTransfer) {
                             mPendingTransfer->Start = DPC_START;
@@ -354,9 +368,9 @@ namespace esx {
                         }
                     }
                     else {
-                        U64 TransferLength = (DPC_END.get(layouts::DPC_END_Register::Field::END).as<U32>() & ~0x7) - (DPC_START.get(layouts::DPC_START_Register::Field::START).as<U32>() & ~0x7);
+                        U64 TransferLength = (DPC_END.get<layouts::DPC_END_Register::END>() & ~0x7) - (DPC_START.get<layouts::DPC_START_Register::START>() & ~0x7);
 
-                        DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::START_PENDING, ESX_FALSE);
+                        DPC_STATUS.set<layouts::DPC_STATUS_Register::START_PENDING>(ESX_FALSE);
                             
                         U64 ClockStart = mRCP->getBus("Root")->getDevice<VR4300>("VR4300")->getClocks();
                         U64 ClockEnd = ClockStart + (TransferLength * 10) / (37 * 2);
@@ -369,11 +383,11 @@ namespace esx {
                         dmaDoneEvent.Write(DPC_START.read());
                         dmaDoneEvent.Write(DPC_END);
 
-                        DPC_CURRENT.set(layouts::DPC_CURRENT_Register::Field::CURRENT, DPC_START.get(layouts::DPC_START_Register::Field::START).as<U32>() & ~0x7);
+                        DPC_CURRENT.set<layouts::DPC_CURRENT_Register::CURRENT>(DPC_START.get<layouts::DPC_START_Register::START>() & ~0x7);
                         if (TransferLength > 0) {
                             Scheduler::ScheduleEvent(dmaDoneEvent);
-                            DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::PIPE_BUSY, ESX_TRUE);
-                            DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::DMA_BUSY, ESX_TRUE);
+                            DPC_STATUS.set<layouts::DPC_STATUS_Register::PIPE_BUSY>(ESX_TRUE);
+                            DPC_STATUS.set<layouts::DPC_STATUS_Register::DMA_BUSY>(ESX_TRUE);
                         }
 
                         DoTransferRDPCommands(DPC_START.read(), DPC_END.read());
@@ -386,47 +400,47 @@ namespace esx {
                 DPC_STATUS_Write_Register writeReg;
                 writeReg.write(value);
 
-                if(writeReg.get(layouts::DPC_STATUS_Write_Register::Field::CLR_XBUS).as<BIT>() == ESX_TRUE) {
-                    DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::XBUS, ESX_FALSE);
+                if(writeReg.get<layouts::DPC_STATUS_Write_Register::CLR_XBUS>() == ESX_TRUE) {
+                    DPC_STATUS.set<layouts::DPC_STATUS_Register::XBUS>(ESX_FALSE);
                 }
 
-                if (writeReg.get(layouts::DPC_STATUS_Write_Register::Field::SET_XBUS).as<BIT>() == ESX_TRUE) {
-                    DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::XBUS, ESX_TRUE);
+                if (writeReg.get<layouts::DPC_STATUS_Write_Register::SET_XBUS>() == ESX_TRUE) {
+                    DPC_STATUS.set<layouts::DPC_STATUS_Register::XBUS>(ESX_TRUE);
                     ESX_CORE_LOG_WARNING("SET_XBUS not implemented yet");
                 }
 
-                if (writeReg.get(layouts::DPC_STATUS_Write_Register::Field::CLR_FREEZE).as<BIT>() == ESX_TRUE) {
-                    DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::FREEZE, ESX_FALSE);
+                if (writeReg.get<layouts::DPC_STATUS_Write_Register::CLR_FREEZE>() == ESX_TRUE) {
+                    DPC_STATUS.set<layouts::DPC_STATUS_Register::FREEZE>(ESX_FALSE);
                 }
 
-                if (writeReg.get(layouts::DPC_STATUS_Write_Register::Field::SET_FREEZE).as<BIT>() == ESX_TRUE) {
-                    DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::FREEZE, ESX_TRUE);
+                if (writeReg.get<layouts::DPC_STATUS_Write_Register::SET_FREEZE>() == ESX_TRUE) {
+                    DPC_STATUS.set<layouts::DPC_STATUS_Register::FREEZE>(ESX_TRUE);
                     ESX_CORE_LOG_WARNING("SET_FREEZE not implemented yet");
                 }
 
-                if (writeReg.get(layouts::DPC_STATUS_Write_Register::Field::CLR_FLUSH).as<BIT>() == ESX_TRUE) {
-                    DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::FLUSH, ESX_FALSE);
+                if (writeReg.get<layouts::DPC_STATUS_Write_Register::CLR_FLUSH>() == ESX_TRUE) {
+                    DPC_STATUS.set<layouts::DPC_STATUS_Register::FLUSH>(ESX_FALSE);
                 }
 
-                if (writeReg.get(layouts::DPC_STATUS_Write_Register::Field::SET_FLUSH).as<BIT>() == ESX_TRUE) {
-                    DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::FLUSH, ESX_TRUE);
+                if (writeReg.get<layouts::DPC_STATUS_Write_Register::SET_FLUSH>() == ESX_TRUE) {
+                    DPC_STATUS.set<layouts::DPC_STATUS_Register::FLUSH>(ESX_TRUE);
                     ESX_CORE_LOG_WARNING("SET_FLUSH not implemented yet");
                 }
 
-                if (writeReg.get(layouts::DPC_STATUS_Write_Register::Field::CLR_TMEM_BUSY).as<BIT>() == ESX_TRUE) {
-                    ESX_CORE_LOG_WARNING("Cear DPC_TMEM_BUSY to 0 not implemented yet");
+                if (writeReg.get<layouts::DPC_STATUS_Write_Register::CLR_TMEM_BUSY>() == ESX_TRUE) {
+                    DPC_STATUS.set<layouts::DPC_STATUS_Register::TMEM_BUSY>(ESX_FALSE);
                 }
 
-                if (writeReg.get(layouts::DPC_STATUS_Write_Register::Field::CLR_PIPE_BUSY).as<BIT>() == ESX_TRUE) {
-                    ESX_CORE_LOG_WARNING("Cear DPC_PIPE_BUSY to 0 not implemented yet");
+                if (writeReg.get<layouts::DPC_STATUS_Write_Register::CLR_PIPE_BUSY>() == ESX_TRUE) {
+                    DPC_STATUS.set<layouts::DPC_STATUS_Register::PIPE_BUSY>(ESX_FALSE);
                 }
 
-                if (writeReg.get(layouts::DPC_STATUS_Write_Register::Field::CLR_BUFFER_BUSY).as<BIT>() == ESX_TRUE) {
-                    ESX_CORE_LOG_WARNING("Cear DPC_BUSY to 0 not implemented yet");
+                if (writeReg.get<layouts::DPC_STATUS_Write_Register::CLR_BUFFER_BUSY>() == ESX_TRUE) {
+                    DPC_STATUS.set<layouts::DPC_STATUS_Register::CBUF_READY>(ESX_FALSE);
                 }
 
-                if (writeReg.get(layouts::DPC_STATUS_Write_Register::Field::CLR_CLOCK).as<BIT>() == ESX_TRUE) {
-                    ESX_CORE_LOG_WARNING("Cear DPC_CLOCK to 0 not implemented yet");
+                if (writeReg.get<layouts::DPC_STATUS_Write_Register::CLR_CLOCK>() == ESX_TRUE) {
+                    DPC_STATUS.set<layouts::DPC_STATUS_Register::GCLK>(ESX_FALSE);
                 }
                 break;
             }
@@ -476,23 +490,40 @@ namespace esx {
         start &= ~0x7;
         end &= ~0x7;
 
-        U32 RDRAMAddr = start;
         U64 TransferLength = end - start;
         U64 NumDWords = TransferLength / 8;
 
-        for (I32 numDWord = 0; numDWord < NumDWords; numDWord++) {
+        if (NumDWords == 0) return;
+
+        // Read all dwords from RDRAM into a buffer
+        Vector<U64> commandBuffer(NumDWords);
+        U32 RDRAMAddr = start;
+        for (U64 i = 0; i < NumDWords; i++) {
             U32 lo = mRCP->SysADLoad(RDRAMAddr + 4, sizeof(U32) * 8);
             U32 hi = mRCP->SysADLoad(RDRAMAddr + 0, sizeof(U32) * 8);
-            U64 command = (static_cast<U64>(hi) << 32) | lo;
+            commandBuffer[i] = (static_cast<U64>(hi) << 32) | lo;
+            RDRAMAddr += 8;
+        }
 
-            ESX_CORE_LOG_TRACE("RDP Full Command {:08x}h - Command => {}", command, sCommands[(command >> 56) & 0x3F]);
+        // Dispatch commands through RDP
+        U32 offset = 0;
+        while (offset < NumDWords) {
+            U64 firstWord = commandBuffer[offset];
+            mRDPCommandCount++;
+            ESX_CORE_LOG_TRACE("RDP Full Command {:016x}h - Command => {}", firstWord, sCommands[(firstWord >> 56) & 0x3F]);
 
-            if (((command >> 56) & 0x3F) == 0x29) {
-                mRCP->setInterrupt(InterruptType::DP, ESX_FALSE, ESX_TRUE, 0);
-                DPC_STATUS.set(layouts::DPC_STATUS_Register::Field::PIPE_BUSY, ESX_FALSE);
+            U32 consumed = mRCP->getRDP().executeCommand(&commandBuffer[offset], static_cast<U32>(NumDWords - offset));
+            if (consumed == 0) {
+                ESX_CORE_LOG_WARNING("RDP - Incomplete command at offset {}, opcode 0x{:02x}", offset, (firstWord >> 56) & 0x3F);
+                break;
             }
 
-            RDRAMAddr += 8;
+            // Handle SyncFull pipe busy clear
+            if (((firstWord >> 56) & 0x3F) == 0x29) {
+                DPC_STATUS.set<layouts::DPC_STATUS_Register::PIPE_BUSY>(ESX_FALSE);
+            }
+
+            offset += consumed;
         }
     }
 

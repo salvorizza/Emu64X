@@ -40,6 +40,8 @@ namespace esx {
 		void execute(R4000Instruction& instruction) override;
 		void reset() override;
 
+		using BusDevice::load;
+		using BusDevice::store;
 		U64 load(U32 virtualAddress, BIT& exception, size_t accessSize);
 		void store(U32 virtualAddress, U64 value, size_t accessSize);
 

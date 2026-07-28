@@ -14,11 +14,11 @@ namespace esx {
 		});
 
 		Scheduler::AddSchedulerEventHandler(SchedulerEventType::AIDMADone, [&](SchedulerEvent& ev) {
-			if (AI_STATUS.get(layouts::AI_STATUS_Register::Field::FULL).as<BIT>() == ESX_TRUE) {
-				AI_STATUS.set(layouts::AI_STATUS_Register::Field::FULL, ESX_FALSE);
+			if (AI_STATUS.get<layouts::AI_STATUS_Register::FULL>() == ESX_TRUE) {
+				AI_STATUS.set<layouts::AI_STATUS_Register::FULL>(ESX_FALSE);
 			} else {
-				AI_LENGTH.set(layouts::AI_LENGTH_Register::Field::LENGTH, 0);
-				AI_STATUS.set(layouts::AI_STATUS_Register::Field::BUSY, ESX_FALSE);
+				AI_LENGTH.set<layouts::AI_LENGTH_Register::LENGTH>(0);
+				AI_STATUS.set<layouts::AI_STATUS_Register::BUSY>(ESX_FALSE);
 			}
 		});
 	}
@@ -46,17 +46,17 @@ namespace esx {
 				AI_LENGTH.write(value);
 
 
-				if (AI_CONTROL.get(layouts::AI_CONTROL_Register::Field::DMA_ENABLE).as<BIT>() == ESX_TRUE && AI_STATUS.get(layouts::AI_STATUS_Register::Field::FULL).as<BIT>() == ESX_FALSE) {
-					BIT DMAAlreadyUp = AI_STATUS.get(layouts::AI_STATUS_Register::Field::BUSY).as<BIT>();
-					AI_STATUS.set(layouts::AI_STATUS_Register::Field::FULL, DMAAlreadyUp);
-					AI_STATUS.set(layouts::AI_STATUS_Register::Field::BUSY, ESX_TRUE);
+				if (AI_CONTROL.get<layouts::AI_CONTROL_Register::DMA_ENABLE>() == ESX_TRUE && AI_STATUS.get<layouts::AI_STATUS_Register::FULL>() == ESX_FALSE) {
+					BIT DMAAlreadyUp = AI_STATUS.get<layouts::AI_STATUS_Register::BUSY>();
+					AI_STATUS.set<layouts::AI_STATUS_Register::FULL>(DMAAlreadyUp);
+					AI_STATUS.set<layouts::AI_STATUS_Register::BUSY>(ESX_TRUE);
 
 					U64 cpuClocks = mRCP->getBus("Root")->getDevice<VR4300>("VR4300")->getClocks();
 
 					auto TransferEvent = Scheduler::NextEventOfType(SchedulerEventType::AIDMADone);
 					U64 TargetClock = DMAAlreadyUp ? TransferEvent.value()->ClockTarget : (cpuClocks + 1);
-					U64 Length = AI_LENGTH.get(layouts::AI_LENGTH_Register::Field::LENGTH).as<U64>() << 3;
-					U64 DACRate = AI_DACRATE.get(layouts::AI_DACRATE_Register::Field::DACRATE).as<U64>();
+					U64 Length = (U64)AI_LENGTH.get<layouts::AI_LENGTH_Register::LENGTH>() << 3;
+					U64 DACRate = (U64)AI_DACRATE.get<layouts::AI_DACRATE_Register::DACRATE>();
 					U64 SampleClock = (((Length / 2llu) * (DACRate + 1)) * 93750000llu) / 48681812llu;
 
 					SchedulerEvent dmaStartEvent = {
@@ -84,7 +84,7 @@ namespace esx {
 			case 0x04500008: {
 				AI_CONTROL.write(value);
 
-				AI_STATUS.set(layouts::AI_STATUS_Register::Field::ENABLED, AI_CONTROL.get(layouts::AI_CONTROL_Register::Field::DMA_ENABLE).as<BIT>());
+				AI_STATUS.set<layouts::AI_STATUS_Register::ENABLED>(AI_CONTROL.get<layouts::AI_CONTROL_Register::DMA_ENABLE>());
 				break;
 			}
 			case 0x0450000C: {
@@ -128,6 +128,7 @@ namespace esx {
 				break;
 			}
 		}
+	return 0;
 	}
 
 	void AudioInterface::reset()

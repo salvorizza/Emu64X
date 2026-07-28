@@ -25,6 +25,7 @@ namespace esx {
 		mDMEM.resize(KIBI(4));
 
 		mRSP = MakeShared<RSP>(this);
+		mRDP = MakeShared<RDP>(this);
 
 		mAudioInterface = MakeShared<AudioInterface>(this);
 		mMIPSInterface = MakeShared<MIPSInterface>(this);
@@ -34,6 +35,7 @@ namespace esx {
 		mVideoInterface = MakeShared<VideoInterface>(this);
 
 		mRSP->init();
+		mRDP->init();
 		mAudioInterface->init();
 		mMIPSInterface->init();
 		mPeripheralInterface->init();
@@ -73,8 +75,8 @@ namespace esx {
 			//TODO: Freeze
 		}
 		else if (address >= 0x04100000 && address <= 0x041FFFFF) {
-			//TODO: RDP Command
-			ESX_CORE_LOG_WARNING("Store RDP commands not implemented yet at address {:08x}h with value {:08x}h", address, value);
+			U32 reg = (address - 0x04100000) >> 2;
+			mRSP->storeDPCRegister(reg, value);
 		}
 		else if (address >= 0x04200000 && address <= 0x042FFFFF) {
 			//TODO: RDP Span
@@ -124,8 +126,8 @@ namespace esx {
 			//TODO: Freeze
 		}
 		else if (address >= 0x04100000 && address <= 0x041FFFFF) {
-			//TODO: RDP Command
-			ESX_CORE_LOG_WARNING("Load RDP commands not implemented yet at address {:08x}h", address);
+			U32 reg = (address - 0x04100000) >> 2;
+			output = static_cast<U32>(mRSP->loadDPCRegister(reg));
 		}
 		else if (address >= 0x04200000 && address <= 0x042FFFFF) {
 			//TODO: RDP Span
@@ -160,6 +162,7 @@ namespace esx {
 		std::fill(mDMEM.begin(), mDMEM.end(), 0);
 
 		mRSP->reset();
+		mRDP->reset();
 		mAudioInterface->reset();
 		mMIPSInterface->reset();
 		mPeripheralInterface->reset();

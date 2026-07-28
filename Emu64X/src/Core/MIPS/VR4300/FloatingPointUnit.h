@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Base/Base.h"
+#include <type_traits>
+#include <cmath>
 
 #define FCR0_FIELDS(M)  M(Rev, 0, 7)  M(Imp, 8, 15)
 #define FCR31_FIELDS(M)  M(RM, 0, 1)  M(Flags, 2, 6)  M(Enables, 7, 11)  M(Cause, 12, 17)  M(C, 23, 23)  M(FS, 24, 24)
@@ -94,6 +96,7 @@ namespace esx {
 				case FormatSpec::D: return std::bit_cast<F64>(data);
 				case FormatSpec::W: return std::bit_cast<U32>(static_cast<U32>(data & 0xFFFFFFFF));
 				case FormatSpec::L: return std::bit_cast<U64>(data);
+				default: return T{};
 			}
 		}
 
@@ -101,11 +104,13 @@ namespace esx {
 		T ConvertFmt(T2 value, FormatSpec from, FormatSpec to) {
 			T result = 0;
 
-			if (isFloatingPointFormat(from) && isFixedPointFormat(to)) {
-				U64 conversion = static_cast<U64>(value);
-				if (((conversion >> 53) & 0x3FF) != 0) signal(FPUException::E);
-			} else if (isFixedPointFormat(from) && isFloatingPointFormat(to)) {
-				if (((static_cast<U64>(value) >> 55) & 0x7F) != 0) signal(FPUException::E);
+			if constexpr (std::is_floating_point_v<T2>) {
+				if ((std::isnan(value) || std::isinf(value)) && isFixedPointFormat(to)) {
+					BIT fs = FCR31.get<layouts::FCR31Register::FS>();
+					if (!fs) {
+						signal(FPUException::V);
+					}
+				}
 			}
 
 			switch (to) {
@@ -113,6 +118,7 @@ namespace esx {
 				case FormatSpec::D: result = static_cast<F64>(value); break;
 				case FormatSpec::W: result = static_cast<U32>(value); break;
 				case FormatSpec::L: result = static_cast<U64>(value); break;
+				default: break;
 			}
 
 			return result;

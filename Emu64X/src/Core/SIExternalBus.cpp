@@ -28,8 +28,8 @@ namespace esx {
 
 	SIExternalBus::SIExternalBus(StringView path)
 		:	BusDevice(ESX_TEXT("SIExternalBus")),
-			mPIF_Path(path),
-			mCIC(CIC::Chip6102)
+			mCIC(CIC::Chip6102),
+			mPIF_Path(path)
 	{
 		addRange(ESX_TEXT("Root"), 0x1FC00000, 0xFFFFF, 0xFFFFFFFF);
 	}

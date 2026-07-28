@@ -210,7 +210,7 @@ namespace esx {
 						if (tabItemProc == TabItemProc::VR4300) {
 							ImGui::Text("0x%016llX", mInstance->mCP0->getRegister(RegisterIndex(i)));
 						} else {
-							ImGui::Text("0x%08X", mInstanceR4000->mCOPs[0]->getRegister(RegisterIndex(i)));
+							ImGui::Text("0x%08X", static_cast<U32>(mInstanceR4000->mCOPs[0]->getRegister(RegisterIndex(i))));
 						}
 					}
 					

@@ -15,9 +15,9 @@ namespace esx {
 		Scheduler::AddSchedulerEventHandler(SchedulerEventType::PIDMADone, [&](const SchedulerEvent& ev) {
 			size_t RDRAMPageSize = 0x800;
 
-			U32 DRAM_Address = PI_DRAM_ADDR.get(layouts::PI_DRAM_ADDR_Register::Field::DRAM_ADDR).as<U32>() << 1;
-			U32 CART_Address = PI_CART_ADDR.get(layouts::PI_CART_ADDR_Register::Field::CART_ADDR).as<U32>() << 1;
-			I32 Length = PI_WR_LEN.get(layouts::PI_WR_LEN_Register::Field::WR_LEN).as<I32>() + 1;
+			U32 DRAM_Address = PI_DRAM_ADDR.get<layouts::PI_DRAM_ADDR_Register::DRAM_ADDR>() << 1;
+			U32 CART_Address = PI_CART_ADDR.get<layouts::PI_CART_ADDR_Register::CART_ADDR>() << 1;
+			I32 Length = (I32)PI_WR_LEN.get<layouts::PI_WR_LEN_Register::WR_LEN>() + 1;
 
 			I32 RemainingLength = Length;
 			U32 StartMisalignment = DRAM_Address & 0x7;
@@ -64,10 +64,10 @@ namespace esx {
 			}
 			
 			mRCP->setInterrupt(InterruptType::PI, ESX_FALSE, ESX_TRUE, 0);
-			PI_STATUS.set(layouts::PI_STATUS_Register::Field::DMA_BUSY, ESX_FALSE);
-			PI_STATUS.set(layouts::PI_STATUS_Register::Field::DMA_COMPLETED, ESX_TRUE);
-			PI_DRAM_ADDR.set(layouts::PI_DRAM_ADDR_Register::Field::DRAM_ADDR, DRAM_Address >> 1);
-			PI_CART_ADDR.set(layouts::PI_CART_ADDR_Register::Field::CART_ADDR, CART_Address >> 1);
+			PI_STATUS.set<layouts::PI_STATUS_Register::DMA_BUSY>(ESX_FALSE);
+			PI_STATUS.set<layouts::PI_STATUS_Register::DMA_COMPLETED>(ESX_TRUE);
+			PI_DRAM_ADDR.set<layouts::PI_DRAM_ADDR_Register::DRAM_ADDR>(DRAM_Address >> 1);
+			PI_CART_ADDR.set<layouts::PI_CART_ADDR_Register::CART_ADDR>(CART_Address >> 1);
 			mLastMisalignment = (Length < 8) ? StartMisalignment : 0;
 		});
 	}
@@ -113,19 +113,19 @@ namespace esx {
 				PI_STATUS_Write_Register writeReg;
 				writeReg.write(value);
 
-				if (writeReg.get(layouts::PI_STATUS_Write_Register::Field::RESET_DMA).as<BIT>()) {
+				if (writeReg.get<layouts::PI_STATUS_Write_Register::RESET_DMA>()) {
 					//Reset DMA Controller
 					Scheduler::UnScheduleAllEvents(SchedulerEventType::PIDMADone);
-					PI_STATUS.set(layouts::PI_STATUS_Register::Field::IO_BUSY, ESX_FALSE);
-					PI_STATUS.set(layouts::PI_STATUS_Register::Field::DMA_ERROR, ESX_FALSE);
-					PI_STATUS.set(layouts::PI_STATUS_Register::Field::DMA_BUSY, ESX_FALSE);
-					PI_STATUS.set(layouts::PI_STATUS_Register::Field::DMA_COMPLETED, ESX_FALSE);
+					PI_STATUS.set<layouts::PI_STATUS_Register::IO_BUSY>(ESX_FALSE);
+					PI_STATUS.set<layouts::PI_STATUS_Register::DMA_ERROR>(ESX_FALSE);
+					PI_STATUS.set<layouts::PI_STATUS_Register::DMA_BUSY>(ESX_FALSE);
+					PI_STATUS.set<layouts::PI_STATUS_Register::DMA_COMPLETED>(ESX_FALSE);
 				}
 
-				if (writeReg.get(layouts::PI_STATUS_Write_Register::Field::CLEAR_INTERRUPT).as<BIT>()) {
+				if (writeReg.get<layouts::PI_STATUS_Write_Register::CLEAR_INTERRUPT>()) {
 					//Clear interrupt
 					mRCP->clearInterrupt(InterruptType::PI);
-					PI_STATUS.set(layouts::PI_STATUS_Register::Field::DMA_COMPLETED, ESX_FALSE);
+					PI_STATUS.set<layouts::PI_STATUS_Register::DMA_COMPLETED>(ESX_FALSE);
 				}
 
 
@@ -228,6 +228,7 @@ namespace esx {
 				break;
 			}
 		}
+	return 0;
 	}
 
 	void PeripheralInterface::reset()
@@ -237,19 +238,19 @@ namespace esx {
 
 	void PeripheralInterface::startDMAToRDRAM()
 	{
-		U32 Length = PI_WR_LEN.get(layouts::PI_WR_LEN_Register::Field::WR_LEN).as<U32>() + 1;
+		U32 Length = PI_WR_LEN.get<layouts::PI_WR_LEN_Register::WR_LEN>() + 1;
 		U64 cpuClocks = mRCP->getBus("Root")->getDevice<VR4300>("VR4300")->getClocks();
 
 		SchedulerEvent dmaDoneEvent = {
 				.Type = SchedulerEventType::PIDMADone,
 				.ClockStart = cpuClocks,
-				.ClockTarget = cpuClocks + RCP::RCPClocksToCPUClocks((Length / 2) * (PI_BSD_DOM1_RLS.get(layouts::PI_BSD_DOM_RLS_Register::Field::RLS).as<U32>() + 1))
+				.ClockTarget = cpuClocks + RCP::RCPClocksToCPUClocks((Length / 2) * (PI_BSD_DOM1_RLS.get<layouts::PI_BSD_DOM_RLS_Register::RLS>() + 1))
 		};
 
 		Scheduler::ScheduleEvent(dmaDoneEvent);
 
-		PI_STATUS.set(layouts::PI_STATUS_Register::Field::DMA_BUSY, ESX_TRUE);
-		PI_STATUS.set(layouts::PI_STATUS_Register::Field::DMA_COMPLETED, ESX_FALSE);
+		PI_STATUS.set<layouts::PI_STATUS_Register::DMA_BUSY>(ESX_TRUE);
+		PI_STATUS.set<layouts::PI_STATUS_Register::DMA_COMPLETED>(ESX_FALSE);
 	}
 
 }

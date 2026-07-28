@@ -217,41 +217,44 @@ namespace esx {
 	};
 
 
-	template<typename Storage>
-	class RegisterField {
-	public:
-		explicit RegisterField(Storage value) : mValue(value) {}
-		template<typename T> T as() { return static_cast<T>(mValue); }
-	private:
-		Storage mValue;
+	template<unsigned Start, unsigned End>
+	struct Field {
+		static constexpr unsigned start = Start;
+		static constexpr unsigned end = End;
+		static constexpr unsigned len = End - Start + 1;
 	};
 
 	template <typename Layout, typename Storage>
 	class Register {
 	public:
 		Register() : mValue(0) {}
-		explicit Register(Storage value) : mValue(value& Layout::template Mask<Storage>()) {}
+		explicit Register(Storage value) : mValue(value) {}
 
 		Storage read() const {
-			return mValue & Layout::template Mask<Storage>();
+			return mValue;
 		}
 
 		void write(Storage v) {
-			mValue = v & Layout::template Mask<Storage>();
+			mValue = v;
 		}
 
-		RegisterField<Storage> get(typename Layout::Field fieldName) const {
-			auto [start, end] = Layout::info(fieldName);
-			I32 len = (end - start) + 1;
-			Storage mask = (Layout::template ones<Storage>(len)) << start;
-			return RegisterField<Storage>((mValue & mask) >> start);
+		template<typename F>
+		constexpr Storage get() const {
+			constexpr unsigned len = F::len;
+			constexpr Storage mask = (len >= sizeof(Storage) * 8)
+				? ~Storage(0)
+				: ((Storage(1) << len) - 1);
+			return (mValue >> F::start) & mask;
 		}
 
-		void set(typename Layout::Field fieldName, Storage fieldValue) {
-			auto [start, end] = Layout::info(fieldName);
-			I32 len = (end - start) + 1;
-			Storage mask = (Layout::template ones<Storage>(len)) << start;
-			mValue = (mValue & ~mask) | ((fieldValue << start) & mask);
+		template<typename F>
+		constexpr void set(Storage fieldValue) {
+			constexpr unsigned len = F::len;
+			constexpr Storage mask = (len >= sizeof(Storage) * 8)
+				? ~Storage(0)
+				: ((Storage(1) << len) - 1);
+			constexpr Storage shifted_mask = mask << F::start;
+			mValue = (mValue & ~shifted_mask) | ((fieldValue & mask) << F::start);
 		}
 	private:
 		Storage mValue = 0;
@@ -265,7 +268,9 @@ namespace esx {
 		I32 Value;
 
 		RegisterIndex() : Value(-1) {}
-		explicit RegisterIndex(U8 value) : Value(value) {}
+		RegisterIndex(int value) : Value(value) {}
+		RegisterIndex(U8 value) : Value(value) {}
+		RegisterIndex(U32 value) : Value(static_cast<I32>(value)) {}
 		RegisterIndex(GPRRegister r) : Value((U8)r) {}
 		RegisterIndex(SystemControlRegisterType r) : Value((U8)r) {}
 
@@ -274,53 +279,14 @@ namespace esx {
 		}
 	};
 
-	// Voci enum
-#define REG_ENUM_ITEM(name, start, end) name,
-
-// case dello switch info()
-#define REG_INFO_CASE(name, start, end) case Field::name: return {start, end};
-
-// case dello switch fieldName()
-#define REG_INFO_NAME(name, start, end) case Field::name: return #name;
-
-// accumulo mask (safe anche se len == bitwidth)
-#define REG_MASK_ACCUM(name, start, end)                               \
-    {                                                                  \
-        constexpr int _start = start;                                  \
-        constexpr int _end   = end;                                    \
-        constexpr int _len   = (_end - _start + 1);                    \
-        mask |= (ones<Storage>(_len) << _start);                        \
-    }
+	#define REG_FIELD_USING(name, start, end) using name = esx::Field<start, end>;
 
 #define DEFINE_REGISTER_LAYOUT(Name, S, FIELDS_MACRO)                     \
-namespace layouts { struct Name {                                                          \
-    enum class Field { FIELDS_MACRO(REG_ENUM_ITEM)None };             \
-                                                                       \
-    static constexpr std::pair<int,int> info(Field f) {                \
-        switch (f) { FIELDS_MACRO(REG_INFO_CASE) }                     \
-        return {0, 31};                                                \
-    }                                                                  \
-	static constexpr StringView id = #Name;                            \
-	static constexpr StringView name(Field f) {                   \
-        switch (f) { FIELDS_MACRO(REG_INFO_NAME) }                     \
-        return "None";                                                 \
-    }																   \
-                                                                       \
-    template<typename Storage>                                         \
-    static constexpr Storage ones(int len) {                           \
-        return (len >= int(sizeof(Storage)*8))                         \
-            ? Storage(~Storage(0))                                     \
-            : (Storage(1) << len) - 1;                                 \
-    }                                                                  \
-                                                                       \
-    template<typename Storage>                                         \
-    static constexpr Storage Mask() {                                  \
-        Storage mask = 0;                                              \
-        FIELDS_MACRO(REG_MASK_ACCUM)                                   \
-        return mask;                                                   \
-    }                                                                  \
-};}																	   \
-using Name = Register<esx::layouts::Name, S>;								   \
+namespace layouts { struct Name {                                         \
+    FIELDS_MACRO(REG_FIELD_USING)                                         \
+    static constexpr esx::StringView id = #Name;                          \
+};}                                                                       \
+using Name = Register<esx::layouts::Name, S>;
 
 
 

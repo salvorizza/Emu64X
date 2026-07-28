@@ -44,9 +44,17 @@ project "Emu64X"
 		"miniaudio",
 		"opengl32.lib"
 	}
-	
+
+	-- Clang warnings: suppress only vendor/by-design, fix the rest in code
+	buildoptions
+	{
+		"-Wno-macro-redefined",
+		"-Wno-shift-count-overflow",
+		"-Wno-nontrivial-memcall"
+	}
+
 	filter "files:vendor/ImGuizmo/**.cpp"
-	flags { "NoPCH" }
+	enablepch "off"
 
 	filter "system:windows"
 		systemversion "latest"
@@ -61,9 +69,13 @@ project "Emu64X"
 	filter "configurations:Release"
 		defines "ESX_RELEASE"
 		runtime "Release"
-		optimize "on"
+		optimize "Full"
+		linktimeoptimization "on"
+		buildoptions { "-mavx2" }
 
 	filter "configurations:Dist"
 		defines "ESX_DIST"
 		runtime "Release"
-		optimize "on"
+		optimize "Full"
+		linktimeoptimization "on"
+		buildoptions { "-mavx2" }

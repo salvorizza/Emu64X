@@ -39,6 +39,8 @@ namespace esx {
 			case DebugState::Step:
 			case DebugState::StepOver:
 				return getCurrentInstancePC() == getDisassemblerState().mNextPC;
+			default:
+				break;
 		}
 
 		return false;
@@ -98,6 +100,8 @@ namespace esx {
 
 			case DebugState::Stop:
 				setDebugState(DebugState::Idle);
+				break;
+			default:
 				break;
 		}
 	}
@@ -178,7 +182,6 @@ namespace esx {
 
 		auto [baseAddress, adressingSize] = getDisassemblerState().mAdressingFunc();
 
-		static bool p_open = true;
 		float sizeY = ImGui::GetContentRegionAvail().y;
 
 
@@ -204,7 +207,6 @@ namespace esx {
 				{
 					for (int row = clipper.DisplayStart; row < clipper.DisplayEnd; row++) {
 						U32 physAddress = baseAddress + row * 4;
-						U32 translatedAddress = physAddress;
 
 						Instruction instruction = state.mDecodeFunc(&physAddress);
 						
@@ -250,7 +252,7 @@ namespace esx {
 						ImGui::Text("0x%08X", address);
 
 						ImGui::TableNextColumn();
-						ImGui::Text(instruction.Mnemonic.c_str());
+						ImGui::TextUnformatted(instruction.Mnemonic.c_str());
 					}
 				}
 				clipper.End();

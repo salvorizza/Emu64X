@@ -64,7 +64,7 @@ namespace esx {
 		DPC_END_Register End;
 		
 		U64 Clocks() const {
-			U64 TransferLength = (End.get(layouts::DPC_END_Register::Field::END).as<U32>() & ~0x7) - (Start.get(layouts::DPC_START_Register::Field::START).as<U32>() & ~0x7);
+			U64 TransferLength = (End.get<layouts::DPC_END_Register::END>() & ~0x7) - (Start.get<layouts::DPC_START_Register::START>() & ~0x7);
 			return (TransferLength * 10) / 37;;
 		}
 	};
@@ -93,6 +93,7 @@ namespace esx {
 	private:
 		RCP* mRCP;
 		Optional<TransferData> mPendingTransfer = {};
+		U32 mRDPCommandCount = 0;
 
 		SP_DMA_SPADDR_Register SP_DMA_SPADDR;
 		SP_DMA_RAMADDR_Register SP_DMA_RAMADDR;

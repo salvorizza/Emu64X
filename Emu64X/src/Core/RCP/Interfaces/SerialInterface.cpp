@@ -25,7 +25,7 @@ namespace esx {
 				U32 RDRAMAddr = RDRAMBaseAddr + RDRAMOffset;
 
 				if (ADDRESS_UNALIGNED(RDRAMAddr, U32)) {
-					SI_STATUS.set(layouts::SI_STATUS_Register::Field::DMA_ERROR, ESX_TRUE);
+					SI_STATUS.set<layouts::SI_STATUS_Register::DMA_ERROR>(ESX_TRUE);
 					break;
 				}
 
@@ -44,11 +44,11 @@ namespace esx {
 			}
 
 			mRCP->setInterrupt(InterruptType::SI, ESX_FALSE, ESX_TRUE, 0);
-			SI_STATUS.set(layouts::SI_STATUS_Register::Field::IO_BUSY, ESX_FALSE);
-			SI_STATUS.set(layouts::SI_STATUS_Register::Field::DMA_BUSY, ESX_FALSE);
-			SI_STATUS.set(layouts::SI_STATUS_Register::Field::INTERRUPT, ESX_TRUE);
-			SI_STATUS.set(layouts::SI_STATUS_Register::Field::DMA_STATE, 0);
-			SI_STATUS.set(layouts::SI_STATUS_Register::Field::PCH_STATE, 0);
+			SI_STATUS.set<layouts::SI_STATUS_Register::IO_BUSY>(ESX_FALSE);
+			SI_STATUS.set<layouts::SI_STATUS_Register::DMA_BUSY>(ESX_FALSE);
+			SI_STATUS.set<layouts::SI_STATUS_Register::INTERRUPT>(ESX_TRUE);
+			SI_STATUS.set<layouts::SI_STATUS_Register::DMA_STATE>(0);
+			SI_STATUS.set<layouts::SI_STATUS_Register::PCH_STATE>(0);
 		});
 	}
 
@@ -77,13 +77,13 @@ namespace esx {
 			case 0x04800004: {
 				SI_PIF_AD_RD64B.write(value);
 
-				SI_STATUS.set(layouts::SI_STATUS_Register::Field::IO_BUSY, ESX_TRUE);
-				SI_STATUS.set(layouts::SI_STATUS_Register::Field::DMA_BUSY, ESX_TRUE);
-				SI_STATUS.set(layouts::SI_STATUS_Register::Field::DMA_STATE, 1);
-				SI_STATUS.set(layouts::SI_STATUS_Register::Field::PCH_STATE, 1);
+				SI_STATUS.set<layouts::SI_STATUS_Register::IO_BUSY>(ESX_TRUE);
+				SI_STATUS.set<layouts::SI_STATUS_Register::DMA_BUSY>(ESX_TRUE);
+				SI_STATUS.set<layouts::SI_STATUS_Register::DMA_STATE>(1);
+				SI_STATUS.set<layouts::SI_STATUS_Register::PCH_STATE>(1);
 
 				if (Scheduler::NextEventOfType(SchedulerEventType::SIDMADone).has_value()) {
-					SI_STATUS.set(layouts::SI_STATUS_Register::Field::DMA_ERROR, ESX_TRUE);
+					SI_STATUS.set<layouts::SI_STATUS_Register::DMA_ERROR>(ESX_TRUE);
 				}
 				else {
 					U64 cpuClocks = mRCP->getBus("Root")->getDevice<VR4300>("VR4300")->getClocks();
@@ -104,13 +104,13 @@ namespace esx {
 			case 0x04800010: {
 				SI_PIF_AD_WR64B.write(value);
 
-				SI_STATUS.set(layouts::SI_STATUS_Register::Field::IO_BUSY, ESX_TRUE);
-				SI_STATUS.set(layouts::SI_STATUS_Register::Field::DMA_BUSY, ESX_TRUE);
-				SI_STATUS.set(layouts::SI_STATUS_Register::Field::DMA_STATE, 1);
-				SI_STATUS.set(layouts::SI_STATUS_Register::Field::PCH_STATE, 1);
+				SI_STATUS.set<layouts::SI_STATUS_Register::IO_BUSY>(ESX_TRUE);
+				SI_STATUS.set<layouts::SI_STATUS_Register::DMA_BUSY>(ESX_TRUE);
+				SI_STATUS.set<layouts::SI_STATUS_Register::DMA_STATE>(1);
+				SI_STATUS.set<layouts::SI_STATUS_Register::PCH_STATE>(1);
 
 				if (Scheduler::NextEventOfType(SchedulerEventType::SIDMADone).has_value()) {
-					SI_STATUS.set(layouts::SI_STATUS_Register::Field::DMA_ERROR, ESX_TRUE);
+					SI_STATUS.set<layouts::SI_STATUS_Register::DMA_ERROR>(ESX_TRUE);
 				} else {
 					U64 cpuClocks = mRCP->getBus("Root")->getDevice<VR4300>("VR4300")->getClocks();
 
@@ -128,7 +128,7 @@ namespace esx {
 			}
 
 			case 0x04800018: {
-				SI_STATUS.set(layouts::SI_STATUS_Register::Field::INTERRUPT, ESX_FALSE);
+				SI_STATUS.set<layouts::SI_STATUS_Register::INTERRUPT>(ESX_FALSE);
 				mRCP->clearInterrupt(InterruptType::SI);
 				break;
 			}

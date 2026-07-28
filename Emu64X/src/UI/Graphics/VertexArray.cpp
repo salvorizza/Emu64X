@@ -63,7 +63,6 @@ namespace esx {
 			glEnableVertexAttribArray(attribIndex);
 			GLint numComponents = getShaderDataTypeNumComponents(bufferElement.Type);
 			GLenum primitiveType = getShaderDataTypeOpenGLPrimitiveType(bufferElement.Type);
-			GLboolean normalized = bufferElement.Normalized ? GL_TRUE : GL_FALSE;
 			glVertexAttribIPointer(attribIndex, numComponents, primitiveType, layout.getStride(), (const void*)bufferElement.Offset);
 			attribIndex++;
 		}

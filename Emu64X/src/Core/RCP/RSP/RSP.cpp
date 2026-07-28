@@ -128,6 +128,22 @@ namespace esx {
 				break;
 			}
 		}
+	return 0;
+	}
+
+	U32 RSP::loadDPCRegister(U32 reg)
+	{
+		if (reg <= 3) {
+			return static_cast<U32>(mSU->getRegister(RegisterIndex(8 + reg)));
+		}
+		return 0;
+	}
+
+	void RSP::storeDPCRegister(U32 reg, U32 value)
+	{
+		if (reg <= 3) {
+			mSU->setRegister(RegisterIndex(8 + reg), value);
+		}
 	}
 
 	void RSP::reset() {

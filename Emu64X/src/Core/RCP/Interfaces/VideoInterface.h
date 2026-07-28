@@ -89,6 +89,7 @@ namespace esx {
 
 		BIT mCountLine;
 		BIT mFirstLine;
+		BIT mVIInterruptRaised = ESX_FALSE;
 	};
 
 }

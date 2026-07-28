@@ -10,7 +10,7 @@ namespace esx {
 	public:
 		Panel(const std::string& name, bool hasMenuBar, bool noPadding = false, bool defaultOpen = true, bool isModal = false);
 		Panel(const std::string& name, bool hasMenuBar, ImVec4 bgColor, bool noPadding = false, bool defaultOpen = true, bool isModal = false);
-		~Panel();
+		virtual ~Panel();
 
 		void open();
 		void render(const std::shared_ptr<ImGuiManager>& pManager);
